@@ -598,23 +598,23 @@ async function cycleShift(personId, day) {
   const defaultShift = person.defaults[new Date(state.year, state.month, day).getDay()];
 
   if (next.id === defaultShift) {
-    await deleteOverride(person.id, isoDate);
+    const rpcResult = await deleteOverride(person.id, isoDate);
     return {
       verify() {
         const key = overrideKey(person.id, isoDate);
         if (state.data.overridesByKey[key]) {
-          throw new Error(`Shift update reached the server, but ${isoDate} still has an override after reload.`);
+          throw new Error(`Shift delete RPC returned ${JSON.stringify(rpcResult)}, but ${isoDate} still has an override after reload.`);
         }
       }
     };
   } else {
-    await upsertOverride(person.id, isoDate, next.id);
+    const rpcResult = await upsertOverride(person.id, isoDate, next.id);
     return {
       verify() {
         const key = overrideKey(person.id, isoDate);
         const reloadedShift = state.data.overridesByKey[key];
         if (reloadedShift !== next.id) {
-          throw new Error(`Shift update did not reload from schedule_overrides. Expected ${next.id} for ${isoDate}, got ${reloadedShift || "nothing"}.`);
+          throw new Error(`Shift RPC returned ${JSON.stringify(rpcResult)}, but schedule_overrides reloaded ${reloadedShift || "nothing"} for ${isoDate}; expected ${next.id}.`);
         }
       }
     };
