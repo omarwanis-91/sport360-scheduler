@@ -74,13 +74,24 @@ function setStatus(message, isError = false) {
   render();
 }
 
+function friendlyError(error) {
+  const message = error?.message || "Something went wrong.";
+  if (message.toLowerCase().includes("row-level security")) {
+    return `${message}. Your signed-in profile must have role=admin and the latest Supabase policy migrations must be applied.`;
+  }
+  if (message.toLowerCase().includes("permission denied")) {
+    return `${message}. Check Supabase table grants and RLS policies for the authenticated role.`;
+  }
+  return message;
+}
+
 async function run(action, message = "Saved.") {
   try {
     await action();
     await refreshData(false);
     setStatus(message);
   } catch (error) {
-    setStatus(error.message || "Something went wrong.", true);
+    setStatus(friendlyError(error), true);
   }
 }
 
@@ -111,7 +122,7 @@ async function boot() {
     });
     render();
   } catch (error) {
-    setStatus(error.message || "Could not load the app.", true);
+    setStatus(friendlyError(error), true);
     render();
   }
 }
@@ -641,7 +652,7 @@ document.addEventListener("submit", async (event) => {
       await signIn(email);
       setStatus("Check your email for the sign-in link.");
     } catch (error) {
-      setStatus(error.message, true);
+      setStatus(friendlyError(error), true);
     }
   }
 
