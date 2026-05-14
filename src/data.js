@@ -49,6 +49,7 @@ export async function loadProfile(userId) {
 
 export async function loadScheduleData() {
   const client = requireClient();
+  const noCache = { head: false };
   const [
     departments,
     shiftTypes,
@@ -60,15 +61,15 @@ export async function loadScheduleData() {
     requests,
     profiles
   ] = await Promise.all([
-    unwrap(client.from("departments").select("*").eq("active", true).order("display_order")),
-    unwrap(client.from("shift_types").select("*").eq("active", true).order("display_order")),
-    unwrap(client.from("people").select("*").eq("active", true).order("display_order")),
-    unwrap(client.from("person_defaults").select("*")),
-    unwrap(client.from("schedule_overrides").select("*")),
-    unwrap(client.from("manager_defaults").select("*")),
-    unwrap(client.from("manager_overrides").select("*")),
-    unwrap(client.from("time_off_requests").select("*").order("created_at", { ascending: false })),
-    unwrap(client.from("profiles").select("*").order("email"))
+    unwrap(client.from("departments").select("*", noCache).eq("active", true).order("display_order")),
+    unwrap(client.from("shift_types").select("*", noCache).eq("active", true).order("display_order")),
+    unwrap(client.from("people").select("*", noCache).eq("active", true).order("display_order")),
+    unwrap(client.from("person_defaults").select("*", noCache)),
+    unwrap(client.from("schedule_overrides").select("*", noCache)),
+    unwrap(client.from("manager_defaults").select("*", noCache)),
+    unwrap(client.from("manager_overrides").select("*", noCache)),
+    unwrap(client.from("time_off_requests").select("*", noCache).order("created_at", { ascending: false })),
+    unwrap(client.from("profiles").select("*", noCache).order("email"))
   ]);
 
   return {
