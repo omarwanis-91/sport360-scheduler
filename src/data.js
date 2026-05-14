@@ -1,6 +1,5 @@
 import { emptyScheduleData } from "./config.js";
 import { supabase } from "./supabaseClient.js";
-import { datesInRange } from "./schedule.js";
 
 function requireClient() {
   if (!supabase) throw new Error("Missing Supabase configuration.");
@@ -87,36 +86,25 @@ export async function loadScheduleData() {
 }
 
 export async function addPerson(input, defaultShiftId) {
-  const person = await unwrap(requireClient()
-    .from("people")
-    .insert({
-      name: input.name,
-      title: input.title || "Team Member",
-      department_id: input.departmentId,
-      vacation_limit: input.vacationLimit,
-      display_order: input.displayOrder
-    })
-    .select()
-    .single());
-
-  await unwrap(requireClient()
-    .from("person_defaults")
-    .insert(Array.from({ length: 7 }, (_, weekday) => ({
-      person_id: person.id,
-      weekday,
-      shift_type_id: weekday === 5 || weekday === 6 ? "weekend" : defaultShiftId
-    }))));
-
-  return person;
+  return unwrap(requireClient().rpc("admin_add_person", {
+    p_name: input.name,
+    p_title: input.title || "Team Member",
+    p_department_id: input.departmentId,
+    p_vacation_limit: input.vacationLimit,
+    p_display_order: input.displayOrder,
+    p_default_shift_type_id: defaultShiftId
+  }));
 }
 
 export async function updatePerson(personId, patch) {
-  return unwrap(requireClient()
-    .from("people")
-    .update(patch)
-    .eq("id", personId)
-    .select()
-    .single());
+  return unwrap(requireClient().rpc("admin_update_person", {
+    p_person_id: personId,
+    p_name: Object.hasOwn(patch, "name") ? patch.name : null,
+    p_title: Object.hasOwn(patch, "title") ? patch.title : null,
+    p_department_id: Object.hasOwn(patch, "department_id") ? patch.department_id : null,
+    p_vacation_limit: Object.hasOwn(patch, "vacation_limit") ? patch.vacation_limit : null,
+    p_active: Object.hasOwn(patch, "active") ? patch.active : null
+  }));
 }
 
 export async function deactivatePerson(personId) {
@@ -124,58 +112,54 @@ export async function deactivatePerson(personId) {
 }
 
 export async function updatePersonOrder(updates) {
-  return unwrap(requireClient()
-    .from("people")
-    .upsert(updates.map(({ id, display_order }) => ({ id, display_order }))));
+  return unwrap(requireClient().rpc("admin_update_person_order", {
+    p_updates: updates.map(({ id, display_order }) => ({ id, display_order }))
+  }));
 }
 
 export async function upsertDefault(personId, weekday, shiftTypeId) {
-  return unwrap(requireClient()
-    .from("person_defaults")
-    .upsert({ person_id: personId, weekday, shift_type_id: shiftTypeId }, { onConflict: "person_id,weekday" }));
+  return unwrap(requireClient().rpc("admin_upsert_person_default", {
+    p_person_id: personId,
+    p_weekday: weekday,
+    p_shift_type_id: shiftTypeId
+  }));
 }
 
 export async function upsertOverride(personId, shiftDate, shiftTypeId) {
-  return unwrap(requireClient()
-    .from("schedule_overrides")
-    .upsert({
-      person_id: personId,
-      shift_date: shiftDate,
-      shift_type_id: shiftTypeId,
-      source: "admin"
-    }, { onConflict: "person_id,shift_date" }));
+  return unwrap(requireClient().rpc("admin_upsert_schedule_override", {
+    p_person_id: personId,
+    p_shift_date: shiftDate,
+    p_shift_type_id: shiftTypeId
+  }));
 }
 
 export async function deleteOverride(personId, shiftDate) {
-  return unwrap(requireClient()
-    .from("schedule_overrides")
-    .delete()
-    .eq("person_id", personId)
-    .eq("shift_date", shiftDate));
+  return unwrap(requireClient().rpc("admin_delete_schedule_override", {
+    p_person_id: personId,
+    p_shift_date: shiftDate
+  }));
 }
 
 export async function clearDay(shiftDate) {
-  const client = requireClient();
-  await Promise.all([
-    unwrap(client.from("schedule_overrides").delete().eq("shift_date", shiftDate)),
-    unwrap(client.from("manager_overrides").delete().eq("manager_date", shiftDate))
-  ]);
+  return unwrap(requireClient().rpc("admin_clear_day", {
+    p_target_date: shiftDate
+  }));
 }
 
 export async function upsertManagerDefault(departmentId, weekday, personId) {
-  return unwrap(requireClient()
-    .from("manager_defaults")
-    .upsert({ department_id: departmentId, weekday, person_id: personId || null }, { onConflict: "department_id,weekday" }));
+  return unwrap(requireClient().rpc("admin_upsert_manager_default", {
+    p_department_id: departmentId,
+    p_weekday: weekday,
+    p_person_id: personId || null
+  }));
 }
 
 export async function upsertManagerOverride(departmentId, managerDate, personId) {
-  return unwrap(requireClient()
-    .from("manager_overrides")
-    .upsert({
-      department_id: departmentId,
-      manager_date: managerDate,
-      person_id: personId || null
-    }, { onConflict: "department_id,manager_date" }));
+  return unwrap(requireClient().rpc("admin_upsert_manager_override", {
+    p_department_id: departmentId,
+    p_manager_date: managerDate,
+    p_person_id: personId || null
+  }));
 }
 
 export async function submitRequest(input) {
@@ -187,40 +171,18 @@ export async function submitRequest(input) {
 }
 
 export async function reviewRequest(request, status, adminNote, reviewerId, shiftTypeId) {
-  const client = requireClient();
-  const reviewedAt = new Date().toISOString();
-
-  if (status === "approved") {
-    await unwrap(client
-      .from("schedule_overrides")
-      .upsert(datesInRange(request.start_date, request.end_date).map((shiftDate) => ({
-        person_id: request.person_id,
-        shift_date: shiftDate,
-        shift_type_id: shiftTypeId,
-        source: "request",
-        request_id: request.id,
-        created_by: reviewerId
-      })), { onConflict: "person_id,shift_date" }));
-  }
-
-  return unwrap(client
-    .from("time_off_requests")
-    .update({
-      status,
-      admin_note: adminNote || "",
-      reviewed_by: reviewerId,
-      reviewed_at: reviewedAt
-    })
-    .eq("id", request.id)
-    .select()
-    .single());
+  return unwrap(requireClient().rpc("admin_review_time_off_request", {
+    p_request_id: request.id,
+    p_status: status,
+    p_admin_note: adminNote || "",
+    p_shift_type_id: shiftTypeId
+  }));
 }
 
 export async function linkProfile(profileId, personId, role) {
-  return unwrap(requireClient()
-    .from("profiles")
-    .update({ person_id: personId || null, role })
-    .eq("id", profileId)
-    .select()
-    .single());
+  return unwrap(requireClient().rpc("admin_link_profile", {
+    p_profile_id: profileId,
+    p_person_id: personId || null,
+    p_role: role
+  }));
 }
