@@ -1,19 +1,20 @@
--- Make admin write RPCs return the affected rows.
--- This prevents silent no-op writes from looking successful in the client.
+-- Make key admin write RPCs return simple verification values.
+-- This avoids silent no-op writes while keeping the function signatures easy
+-- for Supabase/PostgREST to expose.
 
 drop function if exists public.admin_upsert_schedule_override(uuid, date, text);
-create or replace function public.admin_upsert_schedule_override(
+create function public.admin_upsert_schedule_override(
   p_person_id uuid,
   p_shift_date date,
   p_shift_type_id text
 )
-returns public.schedule_overrides
+returns uuid
 language plpgsql
 security definer
-set search_path = public
-as $$
+set search_path to public
+as $function$
 declare
-  changed_row public.schedule_overrides;
+  changed_id uuid;
 begin
   perform public.assert_admin();
 
@@ -25,26 +26,26 @@ begin
     source = 'admin',
     request_id = null,
     created_by = auth.uid()
-  returning * into changed_row;
+  returning id into changed_id;
 
-  if changed_row.id is null then
+  if changed_id is null then
     raise exception 'Schedule override was not saved' using errcode = 'P0001';
   end if;
 
-  return changed_row;
+  return changed_id;
 end;
-$$;
+$function$;
 
 drop function if exists public.admin_delete_schedule_override(uuid, date);
-create or replace function public.admin_delete_schedule_override(
+create function public.admin_delete_schedule_override(
   p_person_id uuid,
   p_shift_date date
 )
 returns integer
 language plpgsql
 security definer
-set search_path = public
-as $$
+set search_path to public
+as $function$
 declare
   deleted_count integer;
 begin
@@ -57,81 +58,75 @@ begin
   get diagnostics deleted_count = row_count;
   return deleted_count;
 end;
-$$;
+$function$;
 
 drop function if exists public.admin_upsert_person_default(uuid, smallint, text);
-create or replace function public.admin_upsert_person_default(
+create function public.admin_upsert_person_default(
   p_person_id uuid,
   p_weekday smallint,
   p_shift_type_id text
 )
-returns public.person_defaults
+returns boolean
 language plpgsql
 security definer
-set search_path = public
-as $$
-declare
-  changed_row public.person_defaults;
+set search_path to public
+as $function$
 begin
   perform public.assert_admin();
 
   insert into public.person_defaults (person_id, weekday, shift_type_id)
   values (p_person_id, p_weekday, p_shift_type_id)
   on conflict (person_id, weekday)
-  do update set shift_type_id = excluded.shift_type_id
-  returning * into changed_row;
+  do update set shift_type_id = excluded.shift_type_id;
 
-  if changed_row.person_id is null then
+  if not found then
     raise exception 'Person default was not saved' using errcode = 'P0001';
   end if;
 
-  return changed_row;
+  return true;
 end;
-$$;
+$function$;
 
 drop function if exists public.admin_upsert_manager_default(uuid, smallint, uuid);
-create or replace function public.admin_upsert_manager_default(
+create function public.admin_upsert_manager_default(
   p_department_id uuid,
   p_weekday smallint,
   p_person_id uuid
 )
-returns public.manager_defaults
+returns boolean
 language plpgsql
 security definer
-set search_path = public
-as $$
-declare
-  changed_row public.manager_defaults;
+set search_path to public
+as $function$
 begin
   perform public.assert_admin();
 
   insert into public.manager_defaults (department_id, weekday, person_id)
   values (p_department_id, p_weekday, p_person_id)
   on conflict (department_id, weekday)
-  do update set person_id = excluded.person_id
-  returning * into changed_row;
+  do update set person_id = excluded.person_id;
 
-  if changed_row.department_id is null then
+  if not found then
     raise exception 'Manager default was not saved' using errcode = 'P0001';
   end if;
 
-  return changed_row;
+  return true;
 end;
-$$;
+$function$;
 
 drop function if exists public.admin_upsert_manager_override(uuid, date, uuid);
-create or replace function public.admin_upsert_manager_override(
+create function public.admin_upsert_manager_override(
   p_department_id uuid,
   p_manager_date date,
   p_person_id uuid
 )
-returns public.manager_overrides
+returns uuid
 language plpgsql
 security definer
-set search_path = public
-as $$
+set search_path to public
+as $function$
 declare
-  changed_row public.manager_overrides;
+  changed_id uuid;
 begin
   perform public.assert_admin();
 
@@ -141,15 +136,15 @@ begin
   do update set
     person_id = excluded.person_id,
     created_by = auth.uid()
-  returning * into changed_row;
+  returning id into changed_id;
 
-  if changed_row.id is null then
+  if changed_id is null then
     raise exception 'Manager override was not saved' using errcode = 'P0001';
   end if;
 
-  return changed_row;
+  return changed_id;
 end;
-$$;
+$function$;
 
 grant execute on function public.admin_upsert_schedule_override(uuid, date, text) to authenticated;
 grant execute on function public.admin_delete_schedule_override(uuid, date) to authenticated;
