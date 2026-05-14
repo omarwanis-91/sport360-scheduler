@@ -28,6 +28,8 @@ Admins can create/link people in the app. Members should be invited through Supa
 
 Deploy to Vercel and set the same environment variables from `.env.example`. The app is private by default: signed-out users only see the sign-in screen.
 
+You can also deploy to Netlify. The repo includes `netlify.toml`, so Netlify can use `npm run build` and publish `dist`.
+
 After Vercel gives you a production URL, add it in Supabase:
 
 - Authentication > URL Configuration > Site URL

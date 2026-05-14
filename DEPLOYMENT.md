@@ -57,3 +57,28 @@ Add your production URL too:
 ```text
 https://your-vercel-app.vercel.app/
 ```
+
+## Netlify
+
+Netlify is also supported and works well for this Vite app.
+
+1. Go to Netlify and import the GitHub repository.
+2. Build command: `npm run build`.
+3. Publish directory: `dist`.
+4. Add environment variables:
+
+```env
+VITE_SUPABASE_URL=https://rahlamjjcldjuvbeynty.supabase.co
+VITE_SUPABASE_ANON_KEY=your-public-or-anon-key
+```
+
+After Netlify deploys, copy the production URL and add it to Supabase:
+
+- Authentication > URL Configuration > Site URL
+- Authentication > URL Configuration > Redirect URLs
+
+Example:
+
+```text
+https://your-netlify-site.netlify.app/
+```
