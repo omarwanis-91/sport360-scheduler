@@ -71,15 +71,18 @@ language plpgsql
 security definer
 set search_path to public
 as $function$
+declare
+  saved_person_id uuid;
 begin
   perform public.assert_admin();
 
   insert into public.person_defaults (person_id, weekday, shift_type_id)
   values (p_person_id, p_weekday, p_shift_type_id)
   on conflict (person_id, weekday)
-  do update set shift_type_id = excluded.shift_type_id;
+  do update set shift_type_id = excluded.shift_type_id
+  returning person_id into saved_person_id;
 
-  if not found then
+  if saved_person_id is null then
     raise exception 'Person default was not saved' using errcode = 'P0001';
   end if;
 
@@ -98,15 +101,18 @@ language plpgsql
 security definer
 set search_path to public
 as $function$
+declare
+  saved_department_id uuid;
 begin
   perform public.assert_admin();
 
   insert into public.manager_defaults (department_id, weekday, person_id)
   values (p_department_id, p_weekday, p_person_id)
   on conflict (department_id, weekday)
-  do update set person_id = excluded.person_id;
+  do update set person_id = excluded.person_id
+  returning department_id into saved_department_id;
 
-  if not found then
+  if saved_department_id is null then
     raise exception 'Manager default was not saved' using errcode = 'P0001';
   end if;
 

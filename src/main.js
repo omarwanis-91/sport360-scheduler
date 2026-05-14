@@ -87,8 +87,11 @@ function friendlyError(error) {
 
 async function run(action, message = "Saved.") {
   try {
-    await action();
+    const result = await action();
     await refreshData(false);
+    if (typeof result?.verify === "function") {
+      result.verify();
+    }
     setStatus(message);
   } catch (error) {
     setStatus(friendlyError(error), true);
@@ -596,8 +599,25 @@ async function cycleShift(personId, day) {
 
   if (next.id === defaultShift) {
     await deleteOverride(person.id, isoDate);
+    return {
+      verify() {
+        const key = overrideKey(person.id, isoDate);
+        if (state.data.overridesByKey[key]) {
+          throw new Error(`Shift update reached the server, but ${isoDate} still has an override after reload.`);
+        }
+      }
+    };
   } else {
     await upsertOverride(person.id, isoDate, next.id);
+    return {
+      verify() {
+        const key = overrideKey(person.id, isoDate);
+        const reloadedShift = state.data.overridesByKey[key];
+        if (reloadedShift !== next.id) {
+          throw new Error(`Shift update did not reload from schedule_overrides. Expected ${next.id} for ${isoDate}, got ${reloadedShift || "nothing"}.`);
+        }
+      }
+    };
   }
 }
 
