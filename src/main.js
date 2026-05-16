@@ -19,6 +19,7 @@ import {
   syncProfileEmailLinks,
   updatePerson,
   updatePersonOrder,
+  uploadProfilePicture,
   upsertDefault,
   upsertManagerDefault,
   upsertManagerOverride,
@@ -448,7 +449,7 @@ function renderPeopleView() {
           <div class="person-edit">
             <input id="newPerson" type="text" placeholder="Name" required>
             <input id="newEmail" type="email" placeholder="Email">
-            <input id="newPicture" type="url" placeholder="Picture URL">
+            <input id="newPicture" type="file" accept="image/*">
             <input id="newTitle" type="text" placeholder="Title">
             <select id="newDepartment" required>${state.data.departments.map((department) => `<option value="${department.id}">${escapeHtml(department.name)}</option>`).join("")}</select>
             <input id="newVacationLimit" type="number" min="0" value="${appConfig.vacationLimit}">
@@ -668,7 +669,7 @@ function renderMyProfileCard(person) {
       <div class="person-edit profile-edit">
         <label>Name<input data-person-name="${person.id}" value="${escapeHtml(person.name)}"></label>
         <label>Email<input data-person-email="${person.id}" type="email" value="${escapeHtml(personEmail(person))}" placeholder="${escapeHtml(state.profile.email)}"></label>
-        <label>Picture URL<input data-person-picture="${person.id}" value="${escapeHtml(personPicture(person))}" placeholder="https://..."></label>
+        <label>Profile picture<input data-person-picture="${person.id}" type="file" accept="image/*"></label>
         <label>Title<input data-person-title="${person.id}" value="${escapeHtml(person.title)}"></label>
         <label>Department<select data-person-department="${person.id}">${state.data.departments.map((department) => `<option value="${department.id}" ${person.department_id === department.id ? "selected" : ""}>${escapeHtml(department.name)}</option>`).join("")}</select></label>
         <label>Vacation days<input data-person-vacation-limit="${person.id}" type="number" min="0" value="${person.vacation_limit}"></label>
@@ -829,12 +830,16 @@ async function addPersonFromForm() {
     const newId = await addPerson({
       name,
       email: document.querySelector("#newEmail")?.value.trim() || "",
-      pictureUrl: document.querySelector("#newPicture")?.value.trim() || "",
       title: document.querySelector("#newTitle")?.value.trim() || "Team Member",
       departmentId: document.querySelector("#newDepartment").value,
       vacationLimit: Number(document.querySelector("#newVacationLimit").value) || appConfig.vacationLimit,
       displayOrder: state.data.people.length * 10 + 10
     }, defaultShift);
+
+    const pictureFile = document.querySelector("#newPicture")?.files?.[0];
+    if (pictureFile && newId) {
+      await uploadProfilePicture(newId, pictureFile);
+    }
 
     return {
       verify() {
@@ -993,7 +998,10 @@ document.addEventListener("change", async (event) => {
 
   const pictureInput = event.target.closest("[data-person-picture]");
   if (pictureInput) {
-    await run(() => updatePerson(pictureInput.dataset.personPicture, { picture_url: pictureInput.value.trim() }), "Picture updated.");
+    const file = pictureInput.files?.[0];
+    if (file) {
+      await run(() => uploadProfilePicture(pictureInput.dataset.personPicture, file), "Picture uploaded.");
+    }
     return;
   }
 

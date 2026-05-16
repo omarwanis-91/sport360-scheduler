@@ -199,3 +199,23 @@ export async function linkProfile(profileId, personId, role) {
     p_role: role
   }));
 }
+
+export async function uploadProfilePicture(personId, file) {
+  const client = requireClient();
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `people/${personId}/avatar-${Date.now()}.${extension}`;
+  const { error } = await client.storage
+    .from("profile-pictures")
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: true
+    });
+  if (error) throw error;
+
+  const { data } = client.storage.from("profile-pictures").getPublicUrl(path);
+  await unwrap(client.rpc("set_profile_picture", {
+    p_person_id: personId,
+    p_picture_url: data.publicUrl
+  }));
+  return data.publicUrl;
+}
