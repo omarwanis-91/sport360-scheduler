@@ -47,6 +47,10 @@ export async function loadProfile(userId) {
     .single());
 }
 
+export async function autoLinkProfileByEmail() {
+  return unwrap(requireClient().rpc("link_profile_by_email"));
+}
+
 export async function loadScheduleData() {
   const client = requireClient();
   const noCache = { head: false };

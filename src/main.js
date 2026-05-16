@@ -3,6 +3,7 @@ import { appConfig } from "./config.js";
 import { hasSupabaseConfig } from "./supabaseClient.js";
 import {
   addPerson,
+  autoLinkProfileByEmail,
   clearDay,
   deactivatePerson,
   deleteOverride,
@@ -104,6 +105,15 @@ async function refreshData(shouldRender = true) {
   if (shouldRender) render();
 }
 
+async function loadCurrentProfile(userId) {
+  let profile = await loadProfile(userId);
+  if (!profile.person_id) {
+    await autoLinkProfileByEmail();
+    profile = await loadProfile(userId);
+  }
+  return profile;
+}
+
 async function boot() {
   if (!hasSupabaseConfig) {
     renderSetup();
@@ -113,12 +123,12 @@ async function boot() {
   try {
     state.session = await getSession();
     if (state.session?.user) {
-      state.profile = await loadProfile(state.session.user.id);
+      state.profile = await loadCurrentProfile(state.session.user.id);
       await refreshData(false);
     }
     onAuthChange(async (session) => {
       state.session = session;
-      state.profile = session?.user ? await loadProfile(session.user.id) : null;
+      state.profile = session?.user ? await loadCurrentProfile(session.user.id) : null;
       state.data = null;
       if (session?.user) await refreshData(false);
       render();
@@ -565,7 +575,7 @@ function renderAccountView() {
   const selfLinker = !myPerson && canManagePeople(state.profile) ? `
     <div class="account-card">
       <div class="request-title">Link your account</div>
-      <p class="status">Choose the staff profile that belongs to ${escapeHtml(state.profile.email)}.</p>
+      <p class="status">Accounts link automatically when a staff profile email matches ${escapeHtml(state.profile.email)}. Use this manual link only to resolve exceptions.</p>
       <select data-profile-person="${state.profile.id}">
         ${personOptions(state.profile.person_id)}
       </select>
@@ -575,6 +585,7 @@ function renderAccountView() {
   const linker = canManagePeople(state.profile) ? `
     <div class="account-card">
       <div class="request-title">Account links</div>
+      <p class="status">Best path: add the same email on the person profile and the account will link automatically on next sign-in.</p>
       <div class="profile-linker">
         ${state.data.profiles.map((profile) => `
           <div class="person-edit">
@@ -616,7 +627,7 @@ function renderUnlinkedProfileCard() {
           </div>
         </div>
       </div>
-      <p class="status">Link this account to a staff profile to show name, email, picture, vacation days, title, department, and schedule.</p>
+      <p class="status">Add this email to the matching staff profile and sign in again. If more than one staff profile has the same email, an admin must resolve the duplicate first.</p>
     </div>
   `;
 }
