@@ -93,7 +93,9 @@ export async function addPerson(input, defaultShiftId) {
     p_department_id: input.departmentId,
     p_vacation_limit: input.vacationLimit,
     p_display_order: input.displayOrder,
-    p_default_shift_type_id: defaultShiftId
+    p_default_shift_type_id: defaultShiftId,
+    p_email: input.email || null,
+    p_picture_url: input.pictureUrl || null
   }));
 }
 

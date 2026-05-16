@@ -436,10 +436,12 @@ function renderPeopleView() {
           </div>
           <div class="person-edit">
             <input id="newPerson" type="text" placeholder="Name" required>
+            <input id="newEmail" type="email" placeholder="Email">
+            <input id="newPicture" type="url" placeholder="Picture URL">
             <input id="newTitle" type="text" placeholder="Title">
             <select id="newDepartment" required>${state.data.departments.map((department) => `<option value="${department.id}">${escapeHtml(department.name)}</option>`).join("")}</select>
             <input id="newVacationLimit" type="number" min="0" value="${appConfig.vacationLimit}">
-            <button class="button primary" type="submit">Add to schedule</button>
+            <button class="button primary" data-add-person type="button">Add to schedule</button>
           </div>
         </form>
       </div>
@@ -770,16 +772,7 @@ document.addEventListener("submit", async (event) => {
 
   if (event.target.id === "addPersonForm") {
     event.preventDefault();
-    await run(async () => {
-      const defaultShift = state.data.shiftTypes.find((shift) => shift.default_eligible)?.id || state.data.shiftTypes[0]?.id;
-      await addPerson({
-        name: document.querySelector("#newPerson").value.trim(),
-        title: document.querySelector("#newTitle").value.trim() || "Team Member",
-        departmentId: document.querySelector("#newDepartment").value,
-        vacationLimit: Number(document.querySelector("#newVacationLimit").value) || appConfig.vacationLimit,
-        displayOrder: state.data.people.length * 10 + 10
-      }, defaultShift);
-    }, "Person added.");
+    await addPersonFromForm();
   }
 
   if (event.target.id === "requestForm") {
@@ -799,6 +792,36 @@ document.addEventListener("submit", async (event) => {
     }, "Request sent.");
   }
 });
+
+async function addPersonFromForm() {
+  const name = document.querySelector("#newPerson")?.value.trim();
+  if (!name) {
+    setStatus("Name is required before adding a person.", true);
+    return;
+  }
+
+  await run(async () => {
+    const defaultShift = state.data.shiftTypes.find((shift) => shift.default_eligible)?.id || state.data.shiftTypes[0]?.id;
+    const newId = await addPerson({
+      name,
+      email: document.querySelector("#newEmail")?.value.trim() || "",
+      pictureUrl: document.querySelector("#newPicture")?.value.trim() || "",
+      title: document.querySelector("#newTitle")?.value.trim() || "Team Member",
+      departmentId: document.querySelector("#newDepartment").value,
+      vacationLimit: Number(document.querySelector("#newVacationLimit").value) || appConfig.vacationLimit,
+      displayOrder: state.data.people.length * 10 + 10
+    }, defaultShift);
+
+    return {
+      verify() {
+        const created = state.data.people.find((person) => person.id === newId || person.name === name);
+        if (!created) {
+          throw new Error(`Add person RPC returned ${JSON.stringify(newId)}, but the person did not reload in the People list.`);
+        }
+      }
+    };
+  }, "Person added.");
+}
 
 document.addEventListener("click", async (event) => {
   const viewButton = event.target.closest("[data-view]");
@@ -872,6 +895,12 @@ document.addEventListener("click", async (event) => {
   const defaultButton = event.target.closest("[data-default-person][data-weekday]");
   if (defaultButton) {
     await run(() => cycleDefault(defaultButton.dataset.defaultPerson, Number(defaultButton.dataset.weekday)), "Default updated.");
+    return;
+  }
+
+  const addPersonButton = event.target.closest("[data-add-person]");
+  if (addPersonButton) {
+    await addPersonFromForm();
     return;
   }
 
