@@ -51,6 +51,10 @@ export async function autoLinkProfileByEmail() {
   return unwrap(requireClient().rpc("link_profile_by_email"));
 }
 
+export async function syncProfileEmailLinks() {
+  return unwrap(requireClient().rpc("admin_sync_profile_email_links"));
+}
+
 export async function loadScheduleData() {
   const client = requireClient();
   const noCache = { head: false };

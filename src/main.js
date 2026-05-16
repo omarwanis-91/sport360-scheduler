@@ -16,6 +16,7 @@ import {
   signIn,
   signOut,
   submitRequest,
+  syncProfileEmailLinks,
   updatePerson,
   updatePersonOrder,
   upsertDefault,
@@ -93,7 +94,7 @@ async function run(action, message = "Saved.") {
     if (typeof result?.verify === "function") {
       result.verify();
     }
-    setStatus(message);
+    setStatus(result?.statusMessage || message);
   } catch (error) {
     setStatus(friendlyError(error), true);
   }
@@ -586,10 +587,11 @@ function renderAccountView() {
     <div class="account-card">
       <div class="request-title">Account links</div>
       <p class="status">Best path: add the same email on the person profile and the account will link automatically on next sign-in.</p>
+      <button class="button primary" data-sync-email-links type="button">Sync email matches</button>
       <div class="profile-linker">
         ${state.data.profiles.map((profile) => `
           <div class="person-edit">
-            <label>${escapeHtml(profile.email)}</label>
+            <label>${escapeHtml(profile.email)}${renderEmailLinkStatus(profile)}</label>
             <select data-profile-person="${profile.id}">
               ${personOptions(profile.person_id)}
             </select>
@@ -612,6 +614,17 @@ function renderAccountView() {
       </div>
     </div>
   `;
+}
+
+function renderEmailLinkStatus(profile) {
+  const normalizedEmail = profile.email?.trim().toLowerCase();
+  const matches = state.data.people.filter((person) => personEmail(person).trim().toLowerCase() === normalizedEmail);
+  const linkedPerson = state.data.people.find((person) => person.id === profile.person_id);
+  if (linkedPerson) return `<span class="tiny">Linked to ${escapeHtml(linkedPerson.name)}</span>`;
+  if (!normalizedEmail) return `<span class="tiny">No account email</span>`;
+  if (matches.length === 1) return `<span class="tiny">Email match ready: ${escapeHtml(matches[0].name)}</span>`;
+  if (matches.length > 1) return `<span class="tiny">Duplicate person emails: fix before auto-linking</span>`;
+  return `<span class="tiny">No matching person email</span>`;
 }
 
 function renderUnlinkedProfileCard() {
@@ -912,6 +925,17 @@ document.addEventListener("click", async (event) => {
   const addPersonButton = event.target.closest("[data-add-person]");
   if (addPersonButton) {
     await addPersonFromForm();
+    return;
+  }
+
+  const syncEmailLinksButton = event.target.closest("[data-sync-email-links]");
+  if (syncEmailLinksButton) {
+    await run(async () => {
+      const linkedCount = await syncProfileEmailLinks();
+      return {
+        statusMessage: `Email sync linked ${linkedCount || 0} account${linkedCount === 1 ? "" : "s"}.`
+      };
+    }, "Email links synced.");
     return;
   }
 
