@@ -363,6 +363,14 @@ function personOptions(selectedId, departmentId = "") {
   return `<option value="">Unassigned</option>${people.map((person) => `<option value="${person.id}" ${selectedId === person.id ? "selected" : ""}>${escapeHtml(person.name)}</option>`).join("")}`;
 }
 
+function personEmail(person) {
+  return person?.email || person?.profile?.email || "";
+}
+
+function personPicture(person) {
+  return person?.picture_url || "";
+}
+
 function renderDefaultsView() {
   if (!canEditSchedule(state.profile)) return `<div class="empty-state">Only admins can edit defaults.</div>`;
   if (!state.data.people.length) return `<div class="empty-state">Add someone to define a regular weekly pattern.</div>`;
@@ -476,6 +484,8 @@ function renderPersonCard(person) {
       </div>
       <div class="person-edit">
         <input data-person-name="${person.id}" value="${escapeHtml(person.name)}" aria-label="Name">
+        <input data-person-email="${person.id}" type="email" value="${escapeHtml(personEmail(person))}" placeholder="Email" aria-label="Email">
+        <input data-person-picture="${person.id}" value="${escapeHtml(personPicture(person))}" placeholder="Picture URL" aria-label="Picture URL">
         <input data-person-title="${person.id}" value="${escapeHtml(person.title)}" aria-label="Title">
         <select data-person-department="${person.id}">${state.data.departments.map((department) => `<option value="${department.id}" ${person.department_id === department.id ? "selected" : ""}>${escapeHtml(department.name)}</option>`).join("")}</select>
         <input data-person-vacation-limit="${person.id}" type="number" min="0" value="${person.vacation_limit}">
@@ -550,6 +560,16 @@ function renderRequestCard(request) {
 
 function renderAccountView() {
   const myPerson = state.data.people.find((person) => person.id === state.profile.person_id);
+  const selfLinker = !myPerson && canManagePeople(state.profile) ? `
+    <div class="account-card">
+      <div class="request-title">Link your account</div>
+      <p class="status">Choose the staff profile that belongs to ${escapeHtml(state.profile.email)}.</p>
+      <select data-profile-person="${state.profile.id}">
+        ${personOptions(state.profile.person_id)}
+      </select>
+      <input type="hidden" data-profile-role="${state.profile.id}" value="${escapeHtml(state.profile.role)}">
+    </div>
+  ` : "";
   const linker = canManagePeople(state.profile) ? `
     <div class="account-card">
       <div class="request-title">Account links</div>
@@ -573,15 +593,87 @@ function renderAccountView() {
   return `
     <div class="account-view">
       <div class="account-grid">
-        <div class="account-card">
+        ${myPerson ? renderMyProfileCard(myPerson) : renderUnlinkedProfileCard()}
+        ${selfLinker}
+        ${linker}
+      </div>
+    </div>
+  `;
+}
+
+function renderUnlinkedProfileCard() {
+  return `
+    <div class="account-card profile-card">
+      <div class="profile-main">
+        <div class="avatar-placeholder">${escapeHtml((state.profile.email || "?").slice(0, 1).toUpperCase())}</div>
+        <div>
           <div class="request-title">${escapeHtml(state.profile.display_name || state.profile.email)}</div>
           <div class="person-meta">
             <span class="meta-pill">${escapeHtml(state.profile.role)}</span>
-            <span class="meta-pill">${myPerson ? escapeHtml(myPerson.name) : "No person linked"}</span>
+            <span class="meta-pill">No person linked</span>
           </div>
-          <p class="status">Accounts are invited from Supabase Auth. Admins link invited accounts to staff profiles here.</p>
         </div>
-        ${linker}
+      </div>
+      <p class="status">Link this account to a staff profile to show name, email, picture, vacation days, title, department, and schedule.</p>
+    </div>
+  `;
+}
+
+function renderMyProfileCard(person) {
+  const remaining = vacationRemaining(state.data, person, state.year, state.month);
+  const used = vacationCount(state.data, person, state.year, state.month);
+  const picture = personPicture(person);
+  return `
+    <div class="account-card profile-card">
+      <div class="profile-main">
+        ${picture
+          ? `<img class="profile-photo" src="${escapeHtml(picture)}" alt="${escapeHtml(person.name)}">`
+          : `<div class="avatar-placeholder">${escapeHtml(person.name.slice(0, 1).toUpperCase())}</div>`}
+        <div>
+          <div class="request-title">${escapeHtml(person.name)}</div>
+          <div class="person-meta">
+            <span class="meta-pill">${escapeHtml(state.profile.role)}</span>
+            <span class="meta-pill">${escapeHtml(person.department?.name || "No department")}</span>
+            <span class="meta-pill">${escapeHtml(person.title)}</span>
+          </div>
+          <div class="tiny">${escapeHtml(personEmail(person) || state.profile.email)}</div>
+        </div>
+      </div>
+      <div class="person-edit profile-edit">
+        <label>Name<input data-person-name="${person.id}" value="${escapeHtml(person.name)}"></label>
+        <label>Email<input data-person-email="${person.id}" type="email" value="${escapeHtml(personEmail(person))}" placeholder="${escapeHtml(state.profile.email)}"></label>
+        <label>Picture URL<input data-person-picture="${person.id}" value="${escapeHtml(personPicture(person))}" placeholder="https://..."></label>
+        <label>Title<input data-person-title="${person.id}" value="${escapeHtml(person.title)}"></label>
+        <label>Department<select data-person-department="${person.id}">${state.data.departments.map((department) => `<option value="${department.id}" ${person.department_id === department.id ? "selected" : ""}>${escapeHtml(department.name)}</option>`).join("")}</select></label>
+        <label>Vacation days<input data-person-vacation-limit="${person.id}" type="number" min="0" value="${person.vacation_limit}"></label>
+      </div>
+      <div class="vacation-meter">
+        <div class="meter-line"><span>Vacation this month</span><span>${used} used / ${remaining} left / ${person.vacation_limit} total</span></div>
+        <div class="meter-track"><div class="meter-fill" style="--fill: ${person.vacation_limit ? Math.min(100, Math.round((remaining / person.vacation_limit) * 100)) : 0}%"></div></div>
+      </div>
+      ${renderPersonalSchedule(person)}
+    </div>
+  `;
+}
+
+function renderPersonalSchedule(person) {
+  const days = visibleDays(state);
+  return `
+    <div class="profile-schedule">
+      <div class="request-title">Schedule</div>
+      <div class="profile-schedule-grid">
+        ${days.map((day) => {
+          const isoDate = dateKey(state.year, state.month, day);
+          const shift = state.data.shiftsById[getShiftId(state.data, person, state.year, state.month, day)];
+          const date = new Date(state.year, state.month, day);
+          return `
+            <div class="profile-shift" style="--shift: ${shift?.color || "#6f927b"}">
+              <span>${escapeHtml(appConfig.weekdays[date.getDay()].slice(0, 3))}</span>
+              <strong>${escapeHtml(shift?.label || "Shift")}</strong>
+              <small>${escapeHtml(isoDate)}</small>
+            </div>
+          `;
+        }).join("")}
       </div>
     </div>
   `;
@@ -826,6 +918,18 @@ document.addEventListener("change", async (event) => {
   const nameInput = event.target.closest("[data-person-name]");
   if (nameInput) {
     await run(() => updatePerson(nameInput.dataset.personName, { name: nameInput.value.trim() || "Unnamed" }), "Person updated.");
+    return;
+  }
+
+  const emailInput = event.target.closest("[data-person-email]");
+  if (emailInput) {
+    await run(() => updatePerson(emailInput.dataset.personEmail, { email: emailInput.value.trim() }), "Email updated.");
+    return;
+  }
+
+  const pictureInput = event.target.closest("[data-person-picture]");
+  if (pictureInput) {
+    await run(() => updatePerson(pictureInput.dataset.personPicture, { picture_url: pictureInput.value.trim() }), "Picture updated.");
     return;
   }
 

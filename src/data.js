@@ -104,7 +104,9 @@ export async function updatePerson(personId, patch) {
     p_title: Object.hasOwn(patch, "title") ? patch.title : null,
     p_department_id: Object.hasOwn(patch, "department_id") ? patch.department_id : null,
     p_vacation_limit: Object.hasOwn(patch, "vacation_limit") ? patch.vacation_limit : null,
-    p_active: Object.hasOwn(patch, "active") ? patch.active : null
+    p_active: Object.hasOwn(patch, "active") ? patch.active : null,
+    p_email: Object.hasOwn(patch, "email") ? patch.email : null,
+    p_picture_url: Object.hasOwn(patch, "picture_url") ? patch.picture_url : null
   }));
 }
 

@@ -68,6 +68,7 @@ export function normalizeData(data) {
   const people = data.people.map((person) => ({
     ...person,
     department: departmentsById[person.department_id],
+    profile: data.profiles.find((profile) => profile.person_id === person.id) || null,
     defaults: appConfig.weekdays.map((_, weekday) => defaultsByPerson[person.id]?.[weekday] || defaultShift)
   }));
 
