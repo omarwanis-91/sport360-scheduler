@@ -66,14 +66,17 @@ The repository previously contained a different migration sequence, and some SQL
 
 - Admin identity and application reads: pass.
 - Unmatched authenticated account isolation: pass.
-- Department Lead: skipped because no linked Lead account exists.
-- Employee: skipped because no linked Employee account exists.
+- Department Lead identity and restricted reads: pass.
+- Employee identity and restricted reads: pass.
 
-The skipped roles require real linked test accounts before their policies can be evaluated accurately.
+Verified restrictions include:
+
+- Lead and Employee accounts can see only their own role row.
+- Lead and Employee accounts cannot read the audit log.
+- Leads cannot read vacation requests outside their department.
+- Employees cannot read vacation requests for other profiles.
+- Unmatched authenticated accounts cannot read profiles, departments, statuses, rotations, overrides, or daily leads.
 
 ## Next Action
 
-1. Link one test account to an Employee profile.
-2. Link one test account to a Department Lead profile and assign the Lead role.
-3. Rerun `supabase/audit/002_role_read_audit.sql`; Lead and Employee should report `pass`.
-4. Complete controlled write tests with the dedicated accounts.
+Complete controlled write tests with the dedicated Admin, Department Lead, and Employee accounts.
