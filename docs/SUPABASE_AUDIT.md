@@ -60,6 +60,20 @@ The repository previously contained a different migration sequence, and some SQL
 | Read audit log | Allow | Deny | Deny |
 | Update own name/photo | Allow | Allow | Allow |
 
+`supabase/audit/002_role_read_audit.sql` performs the read-access portion of this matrix using temporary tables and simulated JWT subjects. It makes no application-data changes. Write behavior still requires controlled UI or API tests with dedicated accounts.
+
+### Read Audit Result - 2026-06-20
+
+- Admin identity and application reads: pass.
+- Unmatched authenticated account isolation: pass.
+- Department Lead: skipped because no linked Lead account exists.
+- Employee: skipped because no linked Employee account exists.
+
+The skipped roles require real linked test accounts before their policies can be evaluated accurately.
+
 ## Next Action
 
-Execute the role test matrix with separate Admin, Department Lead, Employee, and unmatched accounts.
+1. Link one test account to an Employee profile.
+2. Link one test account to a Department Lead profile and assign the Lead role.
+3. Rerun `supabase/audit/002_role_read_audit.sql`; Lead and Employee should report `pass`.
+4. Complete controlled write tests with the dedicated accounts.

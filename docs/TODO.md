@@ -7,7 +7,9 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Review and merge draft PR #1 so the current local application becomes the stable GitHub `main` version.
 - [x] Run `supabase/audit/001_live_schema_audit.sql` against the live Supabase project.
 - [x] Verify the live pre-hardening schema required by migration `011`.
-- [ ] Confirm RLS and RPC behavior for Admin, Department Lead, and Employee accounts.
+- [ ] Complete RLS/RPC behavior testing for Department Lead and Employee accounts; Admin and unmatched-account reads pass.
+- [x] Run `supabase/audit/002_role_read_audit.sql`; no failures, but Lead and Employee were skipped.
+- [ ] Link dedicated Department Lead and Employee test accounts, then rerun the role audit.
 - [x] Reconcile the required live baseline objects with the current migration set.
 - [x] Apply `011_harden_claimed_user_access.sql` to the live project.
 - [x] Rerun the consolidated audit and confirm every reported check passes.
