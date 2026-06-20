@@ -1,221 +1,150 @@
-import { emptyScheduleData } from "./config.js";
-import { supabase } from "./supabaseClient.js";
-
-function requireClient() {
-  if (!supabase) throw new Error("Missing Supabase configuration.");
-  return supabase;
-}
-
-async function unwrap(query) {
-  const { data, error } = await query;
-  if (error) throw error;
-  return data;
-}
-
-export async function getSession() {
-  const client = requireClient();
-  const { data, error } = await client.auth.getSession();
-  if (error) throw error;
-  return data.session;
-}
-
-export function onAuthChange(callback) {
-  const client = requireClient();
-  return client.auth.onAuthStateChange((_event, session) => callback(session));
-}
-
-export async function signIn(email) {
-  const client = requireClient();
-  const { error } = await client.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin }
-  });
-  if (error) throw error;
-}
-
-export async function signOut() {
-  const client = requireClient();
-  const { error } = await client.auth.signOut();
-  if (error) throw error;
-}
-
-export async function loadProfile(userId) {
-  return unwrap(requireClient()
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single());
-}
-
-export async function autoLinkProfileByEmail() {
-  return unwrap(requireClient().rpc("link_profile_by_email"));
-}
-
-export async function syncProfileEmailLinks() {
-  return unwrap(requireClient().rpc("admin_sync_profile_email_links"));
-}
-
-export async function loadScheduleData() {
-  const client = requireClient();
-  const noCache = { head: false };
-  const [
-    departments,
-    shiftTypes,
-    people,
-    defaults,
-    overrides,
-    managerDefaults,
-    managerOverrides,
-    requests,
-    profiles
-  ] = await Promise.all([
-    unwrap(client.from("departments").select("*", noCache).eq("active", true).order("display_order")),
-    unwrap(client.from("shift_types").select("*", noCache).eq("active", true).order("display_order")),
-    unwrap(client.from("people").select("*", noCache).eq("active", true).order("display_order")),
-    unwrap(client.from("person_defaults").select("*", noCache)),
-    unwrap(client.from("schedule_overrides").select("*", noCache)),
-    unwrap(client.from("manager_defaults").select("*", noCache)),
-    unwrap(client.from("manager_overrides").select("*", noCache)),
-    unwrap(client.from("time_off_requests").select("*", noCache).order("created_at", { ascending: false })),
-    unwrap(client.from("profiles").select("*", noCache).order("email"))
-  ]);
-
-  return {
-    ...emptyScheduleData,
-    departments,
-    shiftTypes,
-    people,
-    defaults,
-    overrides,
-    managerDefaults,
-    managerOverrides,
-    requests,
-    profiles
-  };
-}
-
-export async function addPerson(input, defaultShiftId) {
-  return unwrap(requireClient().rpc("admin_add_person", {
-    p_name: input.name,
-    p_title: input.title || "Team Member",
-    p_department_id: input.departmentId,
-    p_vacation_limit: input.vacationLimit,
-    p_display_order: input.displayOrder,
-    p_default_shift_type_id: defaultShiftId,
-    p_email: input.email || null,
-    p_picture_url: input.pictureUrl || null
-  }));
-}
-
-export async function updatePerson(personId, patch) {
-  return unwrap(requireClient().rpc("admin_update_person", {
-    p_person_id: personId,
-    p_name: Object.hasOwn(patch, "name") ? patch.name : null,
-    p_title: Object.hasOwn(patch, "title") ? patch.title : null,
-    p_department_id: Object.hasOwn(patch, "department_id") ? patch.department_id : null,
-    p_vacation_limit: Object.hasOwn(patch, "vacation_limit") ? patch.vacation_limit : null,
-    p_active: Object.hasOwn(patch, "active") ? patch.active : null,
-    p_email: Object.hasOwn(patch, "email") ? patch.email : null,
-    p_picture_url: Object.hasOwn(patch, "picture_url") ? patch.picture_url : null
-  }));
-}
-
-export async function deactivatePerson(personId) {
-  return updatePerson(personId, { active: false });
-}
-
-export async function updatePersonOrder(updates) {
-  return unwrap(requireClient().rpc("admin_update_person_order", {
-    p_updates: updates.map(({ id, display_order }) => ({ id, display_order }))
-  }));
-}
-
-export async function upsertDefault(personId, weekday, shiftTypeId) {
-  return unwrap(requireClient().rpc("admin_upsert_person_default", {
-    p_person_id: personId,
-    p_weekday: weekday,
-    p_shift_type_id: shiftTypeId
-  }));
-}
-
-export async function upsertOverride(personId, shiftDate, shiftTypeId) {
-  return unwrap(requireClient().rpc("admin_upsert_schedule_override", {
-    p_person_id: personId,
-    p_shift_date: shiftDate,
-    p_shift_type_id: shiftTypeId
-  }));
-}
-
-export async function deleteOverride(personId, shiftDate) {
-  return unwrap(requireClient().rpc("admin_delete_schedule_override", {
-    p_person_id: personId,
-    p_shift_date: shiftDate
-  }));
-}
-
-export async function clearDay(shiftDate) {
-  return unwrap(requireClient().rpc("admin_clear_day", {
-    p_target_date: shiftDate
-  }));
-}
-
-export async function upsertManagerDefault(departmentId, weekday, personId) {
-  return unwrap(requireClient().rpc("admin_upsert_manager_default", {
-    p_department_id: departmentId,
-    p_weekday: weekday,
-    p_person_id: personId || null
-  }));
-}
-
-export async function upsertManagerOverride(departmentId, managerDate, personId) {
-  return unwrap(requireClient().rpc("admin_upsert_manager_override", {
-    p_department_id: departmentId,
-    p_manager_date: managerDate,
-    p_person_id: personId || null
-  }));
-}
-
-export async function submitRequest(input) {
-  return unwrap(requireClient()
-    .from("time_off_requests")
-    .insert(input)
-    .select()
-    .single());
-}
-
-export async function reviewRequest(request, status, adminNote, reviewerId, shiftTypeId) {
-  return unwrap(requireClient().rpc("admin_review_time_off_request", {
-    p_request_id: request.id,
-    p_status: status,
-    p_admin_note: adminNote || "",
-    p_shift_type_id: shiftTypeId
-  }));
-}
-
-export async function linkProfile(profileId, personId, role) {
-  return unwrap(requireClient().rpc("admin_link_profile", {
-    p_profile_id: profileId,
-    p_person_id: personId || null,
-    p_role: role
-  }));
-}
-
-export async function uploadProfilePicture(personId, file) {
-  const client = requireClient();
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `people/${personId}/avatar-${Date.now()}.${extension}`;
-  const { error } = await client.storage
-    .from("profile-pictures")
-    .upload(path, file, {
-      cacheControl: "3600",
-      upsert: true
-    });
-  if (error) throw error;
-
-  const { data } = client.storage.from("profile-pictures").getPublicUrl(path);
-  await unwrap(client.rpc("set_profile_picture", {
-    p_person_id: personId,
-    p_picture_url: data.publicUrl
-  }));
-  return data.publicUrl;
-}
+export const seedState = {
+  currentUserId: "user-admin",
+  statuses: [
+    { id: "morning", label: "Morning", color: "#2f80ed", kind: "working" },
+    { id: "night", label: "Night", color: "#5b45d8", kind: "working" },
+    { id: "midday", label: "Mid-day", color: "#d97706", kind: "working" },
+    { id: "weekend", label: "Weekend", color: "#64748b", kind: "off" },
+    { id: "vacation", label: "Vacation", color: "#059669", kind: "leave" },
+    { id: "sick", label: "Sick", color: "#dc2626", kind: "leave" },
+    { id: "ground", label: "On Ground", color: "#0f766e", kind: "working" }
+  ],
+  departments: [
+    { id: "ops", name: "Operations" },
+    { id: "support", name: "Customer Support" },
+    { id: "field", name: "Field Team" }
+  ],
+  users: [
+    { id: "user-admin", email: "admin@company.test", role: "admin", profileId: "emp-001" },
+    { id: "user-lead", email: "mona@company.test", role: "lead", profileId: "emp-002" },
+    { id: "user-employee", email: "youssef@company.test", role: "employee", profileId: "emp-004" }
+  ],
+  profiles: [
+    {
+      id: "emp-001",
+      employeeId: "SCH-001",
+      email: "admin@company.test",
+      name: "Omar Wanis",
+      title: "Workforce Admin",
+      departmentId: "ops",
+      photo: "",
+      yearlyVacationDays: 24,
+      remainingVacationDays: 22,
+      userId: "user-admin"
+    },
+    {
+      id: "emp-002",
+      employeeId: "SCH-014",
+      email: "mona@company.test",
+      name: "Mona Saleh",
+      title: "Department Lead",
+      departmentId: "ops",
+      photo: "",
+      yearlyVacationDays: 24,
+      remainingVacationDays: 19,
+      userId: "user-lead"
+    },
+    {
+      id: "emp-003",
+      employeeId: "SCH-018",
+      email: "karim@company.test",
+      name: "Karim Adel",
+      title: "Scheduler",
+      departmentId: "ops",
+      photo: "",
+      yearlyVacationDays: 21,
+      remainingVacationDays: 16,
+      userId: null
+    },
+    {
+      id: "emp-004",
+      employeeId: "SCH-022",
+      email: "youssef@company.test",
+      name: "Youssef Nabil",
+      title: "Agent",
+      departmentId: "support",
+      photo: "",
+      yearlyVacationDays: 21,
+      remainingVacationDays: 18,
+      userId: "user-employee"
+    },
+    {
+      id: "emp-005",
+      employeeId: "SCH-031",
+      email: "layla@company.test",
+      name: "Layla Hassan",
+      title: "Field Specialist",
+      departmentId: "field",
+      photo: "",
+      yearlyVacationDays: 21,
+      remainingVacationDays: 21,
+      userId: null
+    }
+  ],
+  rotationVersions: [
+    {
+      id: "rot-001",
+      profileId: "emp-001",
+      effectiveStart: "2026-05-01",
+      pattern: ["morning", "morning", "night", "night", "morning", "weekend", "weekend"]
+    },
+    {
+      id: "rot-002",
+      profileId: "emp-002",
+      effectiveStart: "2026-05-01",
+      pattern: ["morning", "morning", "morning", "midday", "night", "night", "weekend"]
+    },
+    {
+      id: "rot-003",
+      profileId: "emp-003",
+      effectiveStart: "2026-05-01",
+      pattern: ["night", "night", "weekend", "morning", "morning", "weekend", "weekend"]
+    },
+    {
+      id: "rot-004",
+      profileId: "emp-004",
+      effectiveStart: "2026-05-01",
+      pattern: ["morning", "weekend", "night", "night", "weekend", "morning", "weekend"]
+    },
+    {
+      id: "rot-005",
+      profileId: "emp-005",
+      effectiveStart: "2026-05-01",
+      pattern: ["ground", "ground", "weekend", "morning", "night", "weekend", "weekend"]
+    }
+  ],
+  scheduleOverrides: [
+    { id: "ovr-001", profileId: "emp-002", date: "2026-05-20", statusId: "midday", note: "Ramadan pilot shift" },
+    { id: "ovr-002", profileId: "emp-004", date: "2026-05-18", statusId: "sick", note: "Medical leave" }
+  ],
+  departmentLeads: [
+    { id: "lead-001", departmentId: "ops", date: "2026-05-16", profileId: "emp-002" },
+    { id: "lead-002", departmentId: "support", date: "2026-05-16", profileId: "emp-004" },
+    { id: "lead-003", departmentId: "field", date: "2026-05-16", profileId: "emp-005" }
+  ],
+  vacationRequests: [
+    {
+      id: "vac-001",
+      profileId: "emp-003",
+      startDate: "2026-05-22",
+      endDate: "2026-05-24",
+      reason: "Family travel",
+      status: "pending",
+      requestedAt: "2026-05-15T10:00:00.000Z",
+      decidedBy: null,
+      decidedAt: null,
+      deductedDays: 0
+    }
+  ],
+  auditLog: [
+    {
+      id: "aud-001",
+      actorId: "user-admin",
+      action: "seed.created",
+      entityType: "system",
+      entityId: "demo",
+      createdAt: "2026-05-16T00:00:00.000Z",
+      detail: "Demo schedule initialized"
+    }
+  ]
+};

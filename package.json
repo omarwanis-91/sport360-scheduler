@@ -1,17 +1,11 @@
 {
-  "name": "shift-loom",
-  "version": "1.0.0",
+  "name": "sport360-scheduler",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "description": "Sport360 department scheduler with profile claiming, rotations, vacation approvals, and Supabase schema.",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1",
-    "check": "vite build"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.45.4",
-    "vite": "^8.0.10"
-  },
-  "devDependencies": {}
+    "start": "node server.js",
+    "build": "node scripts/build.js",
+    "check": "node --check server.js && node --check src/config.js && node --check src/data.js && node --check src/supabaseStore.js && node --check src/main.js"
+  }
 }

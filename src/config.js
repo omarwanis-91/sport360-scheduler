@@ -1,23 +1,9 @@
-export const appConfig = {
-  appName: "Shift Loom",
-  defaultMonth: { year: 2026, month: 3 },
-  vacationLimit: 15,
-  weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-  defaultDayOrder: [1, 2, 3, 4, 5, 6, 0],
-  requestTypes: [
-    { id: "vacation", label: "Vacation", shiftTypeId: "vacation" },
-    { id: "sick", label: "Sick Leave", shiftTypeId: "sick" }
-  ]
+export const supabaseConfig = {
+  url: "https://zehdjadirhhiqfxudikp.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplaGRqYWRpcmhoaXFmeHVkaWtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMDc0MjYsImV4cCI6MjA5NDU4MzQyNn0.ZgD0KiNnDViLsfl5EBIamqErDG8hyaKHgO0E-avl7yM"
 };
 
-export const emptyScheduleData = {
-  departments: [],
-  shiftTypes: [],
-  people: [],
-  defaults: [],
-  overrides: [],
-  managerDefaults: [],
-  managerOverrides: [],
-  requests: [],
-  profiles: []
+export const appConfig = {
+  demoMode: false,
+  defaultScheduleDays: 14
 };

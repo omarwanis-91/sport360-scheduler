@@ -1,84 +1,44 @@
-# Deploy Shift Loom
+# Deployment
 
-## Current State
+## Build
 
-- The app builds with `npm.cmd run build`.
-- Supabase Auth and database are connected through environment variables.
-- Database setup requires three SQL runs:
-  1. `supabase/migrations/001_initial_schema.sql`
-  2. `supabase/migrations/002_api_grants.sql`
-  3. `supabase/seed/001_demo_data.sql`
-
-## GitHub
-
-Create a new GitHub repository, then from this folder run:
+The project uses a dependency-free static build:
 
 ```powershell
-git init
-git add .
-git commit -m "Initial Shift Loom app"
-git branch -M main
-git remote add origin https://github.com/YOUR-USER/YOUR-REPO.git
-git push -u origin main
+npm.cmd run check
+npm.cmd run build
 ```
 
-Do not commit `.env`; it is ignored by `.gitignore`.
-
-## Vercel
-
-1. Go to Vercel and import the GitHub repository.
-2. Framework preset: Vite.
-3. Build command: `npm run build`.
-4. Output directory: `dist`.
-5. Add environment variables:
-
-```env
-VITE_SUPABASE_URL=https://rahlamjjcldjuvbeynty.supabase.co
-VITE_SUPABASE_ANON_KEY=your-public-or-anon-key
-```
-
-Use the publishable/anon public key only. Never use `sb_secret_...` or `service_role`.
-
-## Supabase Redirects
-
-After Vercel deploys, copy the production URL and add it to Supabase:
-
-- Authentication > URL Configuration > Site URL
-- Authentication > URL Configuration > Redirect URLs
-
-Keep this local redirect for development:
-
-```text
-http://127.0.0.1:5173/
-```
-
-Add your production URL too:
-
-```text
-https://your-vercel-app.vercel.app/
-```
+The build recreates `dist/` and copies only `index.html` and `src/` into it.
 
 ## Netlify
 
-Netlify is also supported and works well for this Vite app.
+`netlify.toml` configures:
 
-1. Go to Netlify and import the GitHub repository.
-2. Build command: `npm run build`.
-3. Publish directory: `dist`.
-4. Add environment variables:
+- Build command: `npm run build`
+- Publish directory: `dist`
+- SPA fallback: all paths return `index.html`
 
-```env
-VITE_SUPABASE_URL=https://rahlamjjcldjuvbeynty.supabase.co
-VITE_SUPABASE_ANON_KEY=your-public-or-anon-key
-```
+The existing Netlify project should deploy pull-request previews and production updates from GitHub.
 
-After Netlify deploys, copy the production URL and add it to Supabase:
+## Vercel
 
-- Authentication > URL Configuration > Site URL
-- Authentication > URL Configuration > Redirect URLs
+`vercel.json` uses the same build command, output directory, and SPA fallback.
 
-Example:
+## Supabase Authentication URLs
+
+Add every active local, preview, and production URL in Supabase under Authentication > URL Configuration.
+
+Local development:
 
 ```text
-https://your-netlify-site.netlify.app/
+http://127.0.0.1:4173/
 ```
+
+Production and preview URLs should use HTTPS.
+
+## Security
+
+- The frontend may use the public Supabase anon key.
+- Never expose a service-role key, database password, or private token.
+- Production authorization must remain enforced by Supabase RLS and RPC functions.

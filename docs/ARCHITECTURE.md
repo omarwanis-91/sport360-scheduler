@@ -1,0 +1,126 @@
+# Architecture
+
+## Current Shape
+
+Sport360 Scheduler is a desktop-first static web application built with vanilla JavaScript, HTML, and CSS. A small Node server serves local files. Supabase provides authentication, PostgreSQL data, RLS policies, and RPC functions.
+
+There is no frontend framework or bundler. A dependency-free Node build copies the deployable static files into `dist/` for hosting.
+
+## Main Files
+
+| Path | Responsibility |
+| --- | --- |
+| `index.html` | Application shell and asset cache versions. |
+| `src/main.js` | UI state, rendering, event binding, permissions, and workflows. |
+| `src/styles.css` | Full visual system and responsive layout. |
+| `src/supabaseStore.js` | Supabase REST/Auth client and persistence adapter. |
+| `src/data.js` | Seed/demo state and initial domain data. |
+| `src/config.js` | Supabase and application configuration. |
+| `server.js` | Local static file server. |
+| `scripts/build.js` | Creates the deployable `dist/` directory. |
+| `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
+| `vercel.json` | Vercel build, output, and SPA rewrite settings. |
+| `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
+| `supabase/seed.sql` | Optional starter data. |
+
+## Runtime Flow
+
+1. `src/main.js` initializes the data store.
+2. `src/supabaseStore.js` uses Supabase when configured and available.
+3. Authentication state determines whether the sign-in or application shell is rendered.
+4. Application state is rendered into `#app` using template functions.
+5. Event listeners call workflow functions and persistence methods.
+6. Successful writes update Supabase and then refresh or persist local state.
+
+## UI Structure
+
+The application uses view-level render functions rather than routes. Primary views include:
+
+- My Profile
+- Scheduler
+- Vacation Requests
+- People
+- Departments
+- Rotations
+- Activity
+- Settings
+
+Right-side drawers handle focused tasks such as shift edits, daily bulk editing, request review, profile editing, department details, and rotation editing. Full employee profile and calendar experiences use the main content area.
+
+## Scheduling Model
+
+### Rotations
+
+- Rotation patterns contain seven weekday slots.
+- Allowed rotational states are Morning, Mid-day, Night, and Weekend.
+- Every rotation version has an effective start date.
+- The latest version effective on a requested date is used.
+
+### Daily Overrides
+
+- Overrides belong to one profile and one date.
+- An override replaces the rotation-derived state for that date.
+- Vacation, Sick, and On Ground are daily exceptions.
+- Clearing an override returns the date to its rotation-derived state.
+
+### Schedule Resolution
+
+For a person and date:
+
+1. Find a matching daily override.
+2. Find the newest rotation version effective on that date.
+3. Resolve the correct weekday slot.
+4. Use the override when present; otherwise use the rotation result.
+5. If no rotation exists, show Unassigned.
+
+## Main Domain Data
+
+- `profiles`: employee identity, role-related details, department, leave balance, and optional auth link.
+- `departments`: organizational grouping and minimum coverage target.
+- `statuses`: schedule labels, kinds, and visual metadata.
+- `rotation_versions`: versioned weekly schedule patterns.
+- `schedule_overrides`: manual per-person, per-date changes.
+- `vacation_requests`: request dates, status, decision data, and deducted days.
+- `department_leads`: daily lead assignments.
+- `user_roles`: application access roles.
+- `audit_log`: important operational changes.
+
+## Authorization Model
+
+- Admins can manage system settings, departments, profiles, and schedules.
+- Department leads can manage permitted current/future data for their departments.
+- Employees primarily view their own information and create allowed requests.
+- Frontend permission helpers control affordances and visibility.
+- Supabase RLS and RPC functions must enforce the actual security boundary.
+
+## Visual Foundation
+
+- Dark charcoal and black surfaces.
+- Compact typography and restrained spacing.
+- Red reserved for brand actions, selection, warnings, and destructive states.
+- Shift-specific colors communicate schedule state.
+- Unavailable states remain quieter than working states.
+- Cards are used for repeated entities and focused tools, not every page section.
+- Icons and concise status tags carry repeated information.
+
+## Persistence And Security
+
+- Supabase Auth provides user sessions.
+- Profiles may be created before auth users exist.
+- A matching email can claim an unassigned profile.
+- The browser uses the public Supabase anon key.
+- RLS policies and RPC functions protect privileged operations.
+- Service-role keys and private credentials must never enter the frontend repository.
+
+## Known Architectural Limits
+
+- `src/main.js` and `src/styles.css` are large and will eventually benefit from modularization.
+- There is no automated browser test suite yet.
+- Configuration is currently committed directly rather than injected per environment.
+- Profile images need a fully verified Supabase Storage workflow.
+- Migration application state must be reconciled before production release.
+- Loading, offline, and recovery behavior need further hardening.
+
+## Direction For Growth
+
+Prefer incremental modularization over a framework rewrite. Extract a module only when a domain boundary is stable, such as scheduling, permissions, people, requests, or shared UI primitives. Preserve behavior and tests while moving code.

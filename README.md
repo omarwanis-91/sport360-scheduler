@@ -1,38 +1,46 @@
-# Shift Loom
+# Sport360 Scheduler
 
-Private shift scheduling app with Supabase auth, role-aware admin/member views, time-off requests, and Vercel-ready deployment.
+Dark desktop-first scheduling prototype for departments, profile claiming, shift-label rotations, daily leads, and vacation approvals.
 
-## Setup
+## Project Knowledge
 
-1. Create a Supabase project.
-2. Run `supabase/migrations/001_initial_schema.sql` in the Supabase SQL editor.
-3. Run `supabase/migrations/002_api_grants.sql` in the Supabase SQL editor.
-4. Run `supabase/seed/001_demo_data.sql` if you want the starter departments, shifts, and people.
-5. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-6. Install dependencies with `npm install`.
-7. Run locally with `npm run dev -- --port 5173`.
+- [Product vision](docs/VISION.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Decision log](docs/DECISIONS.md)
+- [Current TODO](docs/TODO.md)
+- [AI agent instructions](AGENTS.md)
 
-## First Admin
+`PROJECT_CONTEXT_HANDOFF.md` remains as a historical snapshot. The documents above are the living sources of truth.
 
-Invite the first admin from Supabase Auth. Then update their profile:
+## Run Locally
 
-```sql
-update public.profiles
-set role = 'admin'
-where email = 'admin@example.com';
+```powershell
+npm run check
+npm start
 ```
 
-Admins can create/link people in the app. Members should be invited through Supabase Auth, then linked to a person row by an admin.
+Open `http://127.0.0.1:4173`.
 
-## Deploy
+## What Is Implemented
 
-Deploy to Vercel and set the same environment variables from `.env.example`. The app is private by default: signed-out users only see the sign-in screen.
+- Dark Sport360 UI with red brand accent and compact hybrid scheduler grid.
+- Rows are employee profiles; columns are schedule dates.
+- Full shift labels with themed icon blocks for Morning, Night, Mid-day, Weekend, Vacation, Sick, and On Ground.
+- Right-side drawer for shift overrides, people, vacation requests, rotations, statuses, and daily leads.
+- Demo role switcher for admin, lead, and employee behavior.
+- Per-person versioned rotation generation.
+- Manual overrides for specific days.
+- Vacation approval that deducts scheduled work days and writes Vacation overrides.
+- Configurable status labels in the UI.
+- Initial Supabase schema and RLS policies in `supabase/migrations/001_initial_scheduler_schema.sql`.
 
-You can also deploy to Netlify. The repo includes `netlify.toml`, so Netlify can use `npm run build` and publish `dist`.
+## Supabase Notes
 
-After Vercel gives you a production URL, add it in Supabase:
+The current application is configured for Supabase in `src/config.js`.
 
-- Authentication > URL Configuration > Site URL
-- Authentication > URL Configuration > Redirect URLs
+1. Review and apply the required files in `supabase/migrations/` in order.
+2. Optionally run `supabase/seed.sql` for starter departments and profiles.
+3. Confirm RLS policies and RPC permissions for each application role.
+4. Create accounts using emails that match employee profiles. Sign-in links an account to the matching unclaimed profile.
 
-Keep `http://127.0.0.1:5173/` as a redirect URL while testing locally.
+The browser uses the public Supabase anon key. Never place a service-role key or private credential in frontend code.
