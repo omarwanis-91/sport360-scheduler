@@ -4,10 +4,13 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Review and merge draft PR #1 so the current local application becomes the stable GitHub `main` version.
-- [ ] Verify the live Supabase schema against every migration currently required by the application.
+- [x] Review and merge draft PR #1 so the current local application becomes the stable GitHub `main` version.
+- [x] Run `supabase/audit/001_live_schema_audit.sql` against the live Supabase project.
+- [x] Verify the live pre-hardening schema required by migration `011`.
 - [ ] Confirm RLS and RPC behavior for Admin, Department Lead, and Employee accounts.
-- [ ] Reconcile the current local migration set with the older migrations already present on GitHub and applied manually.
+- [x] Reconcile the required live baseline objects with the current migration set.
+- [x] Apply `011_harden_claimed_user_access.sql` to the live project.
+- [x] Rerun the consolidated audit and confirm every reported check passes.
 
 ## Next
 

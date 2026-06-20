@@ -112,3 +112,17 @@ Repository knowledge is maintained in `docs/VISION.md`, `docs/ARCHITECTURE.md`, 
 **Status:** Accepted
 
 The app remains framework-free. Deployment uses a small Node script that copies `index.html` and `src/` into `dist/`; hosting configuration publishes that directory with an SPA fallback.
+
+## D-019 - Claimed Profiles Gate Operational Data
+
+**Date:** 2026-06-20
+**Status:** Accepted
+
+Authentication alone does not grant access to employee or schedule data. The signed-in account must be linked to an employee profile. An unmatched signup receives no application role or operational read access.
+
+## D-020 - Privileged Database Helpers Are Internal
+
+**Date:** 2026-06-20
+**Status:** Accepted
+
+`SECURITY DEFINER` functions that do not perform their own authorization checks are internal helpers. They must not be directly executable by browser roles and should only be reached through authorized RPC workflows.
