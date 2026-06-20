@@ -8,6 +8,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Run `supabase/audit/001_live_schema_audit.sql` against the live Supabase project.
 - [x] Verify the live pre-hardening schema required by migration `011`.
 - [ ] Confirm RLS and RPC behavior for Admin, Department Lead, and Employee accounts.
+- [ ] Run `supabase/audit/002_role_read_audit.sql` and resolve failures or missing role accounts.
 - [x] Reconcile the required live baseline objects with the current migration set.
 - [x] Apply `011_harden_claimed_user_access.sql` to the live project.
 - [x] Rerun the consolidated audit and confirm every reported check passes.
