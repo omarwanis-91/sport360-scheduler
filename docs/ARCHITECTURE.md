@@ -21,6 +21,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
 | `vercel.json` | Vercel build, output, and SPA rewrite settings. |
 | `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
+| `supabase/audit/` | Read-only SQL reports for comparing the live database with repository expectations. |
 | `supabase/seed.sql` | Optional starter data. |
 
 ## Runtime Flow
@@ -111,6 +112,8 @@ For a person and date:
 - The browser uses the public Supabase anon key.
 - RLS policies and RPC functions protect privileged operations.
 - Service-role keys and private credentials must never enter the frontend repository.
+- Unclaimed auth accounts must not receive operational read access.
+- Internal `SECURITY DEFINER` helpers must not be directly executable unless they perform their own authorization checks.
 
 ## Known Architectural Limits
 

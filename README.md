@@ -8,6 +8,7 @@ Dark desktop-first scheduling prototype for departments, profile claiming, shift
 - [Architecture](docs/ARCHITECTURE.md)
 - [Decision log](docs/DECISIONS.md)
 - [Current TODO](docs/TODO.md)
+- [Supabase audit](docs/SUPABASE_AUDIT.md)
 - [AI agent instructions](AGENTS.md)
 
 `PROJECT_CONTEXT_HANDOFF.md` remains as a historical snapshot. The documents above are the living sources of truth.
