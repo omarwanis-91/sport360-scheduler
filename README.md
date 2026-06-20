@@ -2,6 +2,16 @@
 
 Dark desktop-first scheduling prototype for departments, profile claiming, shift-label rotations, daily leads, and vacation approvals.
 
+## Project Knowledge
+
+- [Product vision](docs/VISION.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Decision log](docs/DECISIONS.md)
+- [Current TODO](docs/TODO.md)
+- [AI agent instructions](AGENTS.md)
+
+`PROJECT_CONTEXT_HANDOFF.md` remains as a historical snapshot. The documents above are the living sources of truth.
+
 ## Run Locally
 
 ```powershell
@@ -26,14 +36,11 @@ Open `http://127.0.0.1:4173`.
 
 ## Supabase Notes
 
-The app uses seeded browser storage while `appConfig.demoMode` is `true`.
+The current application is configured for Supabase in `src/config.js`.
 
-To use Supabase:
-
-1. Run `supabase/migrations/001_initial_scheduler_schema.sql` in your Supabase project.
+1. Review and apply the required files in `supabase/migrations/` in order.
 2. Optionally run `supabase/seed.sql` for starter departments and profiles.
-3. Fill `src/config.js` with your Supabase project URL and anon key.
-4. Set `appConfig.demoMode` to `false`.
-5. Create accounts using emails that match employee profiles. On sign-in, `claim_profile_for_current_user()` links the account to the matching unclaimed profile.
+3. Confirm RLS policies and RPC permissions for each application role.
+4. Create accounts using emails that match employee profiles. Sign-in links an account to the matching unclaimed profile.
 
-The frontend imports Supabase JS from `supabaseConfig.clientUrl` when live mode is enabled. Demo mode does not use the network.
+The browser uses the public Supabase anon key. Never place a service-role key or private credential in frontend code.
