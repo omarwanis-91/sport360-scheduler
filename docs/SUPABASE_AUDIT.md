@@ -2,9 +2,9 @@
 
 ## Audit Status
 
-Static migration review was completed on 2026-06-20. Live schema verification is pending because this environment does not have a Supabase database connector or SQL-editor access.
+Static migration review was completed on 2026-06-20. An initial live audit confirmed that all expected pre-hardening RPCs are present and that `is_claimed_user` is not yet installed, as expected before migration `011`. Consolidated table, RLS, column, policy, and grant verification remains pending.
 
-Run `supabase/audit/001_live_schema_audit.sql` in the Supabase SQL editor. It is read-only and reports tables, columns, RLS policies, routines, routine grants, and missing expected objects.
+Run `supabase/audit/001_live_schema_audit.sql` in the Supabase SQL editor. It is read-only and ends with one consolidated result grid covering tables, RLS, required columns, routines, and the two identified security risks.
 
 ## Static Findings
 
@@ -57,4 +57,3 @@ The repository previously contained a different migration sequence, and some SQL
 3. Reconcile any missing objects or legacy migrations.
 4. Apply migration `011_harden_claimed_user_access.sql` only after reconciliation.
 5. Execute the role test matrix with separate accounts.
-
