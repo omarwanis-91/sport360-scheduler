@@ -18,6 +18,7 @@ expected_functions(routine_name) as (
     ('current_role'),
     ('current_profile_department'),
     ('current_profile_id'),
+    ('is_claimed_user'),
     ('claim_profile_for_current_user'),
     ('update_own_profile'),
     ('vacation_workday_count'),

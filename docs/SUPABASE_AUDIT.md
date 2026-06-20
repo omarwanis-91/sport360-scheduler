@@ -2,7 +2,17 @@
 
 ## Audit Status
 
-Static migration review was completed on 2026-06-20. An initial live audit confirmed that all expected pre-hardening RPCs are present and that `is_claimed_user` is not yet installed, as expected before migration `011`. Consolidated table, RLS, column, policy, and grant verification remains pending.
+Static migration review and the consolidated live baseline audit were completed on 2026-06-20.
+
+The live audit passed for:
+
+- All nine expected application tables.
+- RLS enabled on every application table.
+- The department coverage target column.
+- Nullable profile department membership.
+- Every expected pre-hardening RPC.
+
+The audit confirmed both expected security risks: direct browser execution of `apply_vacation_overrides` and the legacy broad-read profile policy. The live schema is ready for migration `011_harden_claimed_user_access.sql`.
 
 Run `supabase/audit/001_live_schema_audit.sql` in the Supabase SQL editor. It is read-only and ends with one consolidated result grid covering tables, RLS, required columns, routines, and the two identified security risks.
 
@@ -20,17 +30,13 @@ The original claim function creates an Employee role even when no employee profi
 
 Migration `011_harden_claimed_user_access.sql` changes claiming so an unmatched account receives an error and no role. Broad operational reads now require an auth account linked to an employee profile.
 
-### Pending - Live Migration State
+### Verified - Live Baseline Migration State
 
-The repository previously contained a different migration sequence, and some SQL was applied manually. The live database must be compared with the current expected schema before migration `011` is applied.
+The repository previously contained a different migration sequence, and some SQL was applied manually. The consolidated audit confirms that the current live objects required before migration `011` are present and RLS-enabled.
 
-## Required Live Checks
+## Post-Migration Checks
 
-- Confirm all nine expected public tables exist.
-- Confirm RLS is enabled on every public application table.
-- Confirm `employee_profiles.department_id` is nullable.
-- Confirm `departments.min_available_people` exists.
-- Confirm all expected RPC functions exist.
+- Confirm `is_claimed_user` is present.
 - Confirm `apply_vacation_overrides` is not executable by `PUBLIC`, `anon`, or `authenticated` after migration `011`.
 - Confirm unmatched signups cannot read profiles or schedules.
 - Test Admin, Lead, and Employee behavior using separate accounts.
@@ -52,8 +58,6 @@ The repository previously contained a different migration sequence, and some SQL
 
 ## Next Action
 
-1. Run the read-only audit SQL in Supabase.
-2. Save or share the results.
-3. Reconcile any missing objects or legacy migrations.
-4. Apply migration `011_harden_claimed_user_access.sql` only after reconciliation.
-5. Execute the role test matrix with separate accounts.
+1. Apply `011_harden_claimed_user_access.sql` in Supabase.
+2. Rerun the read-only audit SQL; every row should report `pass`.
+3. Execute the role test matrix with separate accounts.
