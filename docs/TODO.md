@@ -9,8 +9,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Verify the live pre-hardening schema required by migration `011`.
 - [ ] Confirm RLS and RPC behavior for Admin, Department Lead, and Employee accounts.
 - [x] Reconcile the required live baseline objects with the current migration set.
-- [ ] Apply `011_harden_claimed_user_access.sql` to the live project.
-- [ ] Rerun the consolidated audit and confirm every check passes.
+- [x] Apply `011_harden_claimed_user_access.sql` to the live project.
+- [x] Rerun the consolidated audit and confirm every reported check passes.
 
 ## Next
 

@@ -12,7 +12,9 @@ The live audit passed for:
 - Nullable profile department membership.
 - Every expected pre-hardening RPC.
 
-The audit confirmed both expected security risks: direct browser execution of `apply_vacation_overrides` and the legacy broad-read profile policy. The live schema is ready for migration `011_harden_claimed_user_access.sql`.
+The baseline audit confirmed both expected security risks: direct browser execution of `apply_vacation_overrides` and the legacy broad-read profile policy.
+
+Migration `011_harden_claimed_user_access.sql` was applied on 2026-06-20. The post-migration audit passed every reported table, column, function, RLS, and security check. Direct browser execution of the internal helper is revoked, and the legacy broad-read profile policy is absent.
 
 Run `supabase/audit/001_live_schema_audit.sql` in the Supabase SQL editor. It is read-only and ends with one consolidated result grid covering tables, RLS, required columns, routines, and the two identified security risks.
 
@@ -34,12 +36,14 @@ Migration `011_harden_claimed_user_access.sql` changes claiming so an unmatched 
 
 The repository previously contained a different migration sequence, and some SQL was applied manually. The consolidated audit confirms that the current live objects required before migration `011` are present and RLS-enabled.
 
-## Post-Migration Checks
+## Post-Migration Result
 
-- Confirm `is_claimed_user` is present.
-- Confirm `apply_vacation_overrides` is not executable by `PUBLIC`, `anon`, or `authenticated` after migration `011`.
-- Confirm unmatched signups cannot read profiles or schedules.
-- Test Admin, Lead, and Employee behavior using separate accounts.
+- All expected tables and pre-hardening functions are present.
+- RLS is enabled on every application table.
+- Required coverage and unassigned-profile columns pass.
+- `apply_vacation_overrides` is not browser-executable.
+- The legacy broad-read profile policy is absent.
+- Role-by-role workflow testing remains pending.
 
 ## Role Test Matrix
 
@@ -58,6 +62,4 @@ The repository previously contained a different migration sequence, and some SQL
 
 ## Next Action
 
-1. Apply `011_harden_claimed_user_access.sql` in Supabase.
-2. Rerun the read-only audit SQL; every row should report `pass`.
-3. Execute the role test matrix with separate accounts.
+Execute the role test matrix with separate Admin, Department Lead, Employee, and unmatched accounts.
