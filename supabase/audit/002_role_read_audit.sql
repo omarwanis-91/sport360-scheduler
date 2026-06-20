@@ -11,7 +11,7 @@ create temp table role_audit_subjects (
   subject_exists boolean not null
 );
 
-insert into role_audit_subjects (role_name, user_id, expected_role, subject_exists)
+insert into pg_temp.role_audit_subjects (role_name, user_id, expected_role, subject_exists)
 select
   expected.role_name,
   coalesce(actual.user_id, gen_random_uuid()),
@@ -32,7 +32,7 @@ left join lateral (
   limit 1
 ) actual on true;
 
-insert into role_audit_subjects (role_name, user_id, expected_role, subject_exists)
+insert into pg_temp.role_audit_subjects (role_name, user_id, expected_role, subject_exists)
 values ('unmatched', gen_random_uuid(), 'employee', true);
 
 create temp table role_audit_results (
@@ -42,14 +42,14 @@ create temp table role_audit_results (
   details text not null
 );
 
-grant select on role_audit_subjects to authenticated;
-grant select, insert on role_audit_results to authenticated;
+grant select on pg_temp.role_audit_subjects to authenticated;
+grant select, insert on pg_temp.role_audit_results to authenticated;
 
-select set_config('request.jwt.claim.sub', (select user_id::text from role_audit_subjects where role_name = 'admin'), false);
+select set_config('request.jwt.claim.sub', (select user_id::text from pg_temp.role_audit_subjects where role_name = 'admin'), false);
 select set_config('request.jwt.claim.role', 'authenticated', false);
 set role authenticated;
 
-insert into role_audit_results
+insert into pg_temp.role_audit_results
 select
   'admin',
   'linked identity',
@@ -62,10 +62,10 @@ select
     then 'role=' || public.current_role()::text || ', claimed=' || public.is_claimed_user()::text
     else 'no linked Admin account found'
   end
-from role_audit_subjects subject
+from pg_temp.role_audit_subjects subject
 where subject.role_name = 'admin';
 
-insert into role_audit_results
+insert into pg_temp.role_audit_results
 select
   'admin',
   'application reads',
@@ -76,16 +76,16 @@ select
       || ', audit=' || (select count(*) from public.audit_log)::text
     else 'no linked Admin account found'
   end
-from role_audit_subjects subject
+from pg_temp.role_audit_subjects subject
 where subject.role_name = 'admin';
 
 reset role;
 
-select set_config('request.jwt.claim.sub', (select user_id::text from role_audit_subjects where role_name = 'lead'), false);
+select set_config('request.jwt.claim.sub', (select user_id::text from pg_temp.role_audit_subjects where role_name = 'lead'), false);
 select set_config('request.jwt.claim.role', 'authenticated', false);
 set role authenticated;
 
-insert into role_audit_results
+insert into pg_temp.role_audit_results
 select
   'lead',
   'linked identity',
@@ -98,10 +98,10 @@ select
     then 'role=' || public.current_role()::text || ', claimed=' || public.is_claimed_user()::text
     else 'no linked Department Lead account found'
   end
-from role_audit_subjects subject
+from pg_temp.role_audit_subjects subject
 where subject.role_name = 'lead';
 
-insert into role_audit_results
+insert into pg_temp.role_audit_results
 select
   'lead',
   'restricted reads',
@@ -129,16 +129,16 @@ select
       )::text
     else 'no linked Department Lead account found'
   end
-from role_audit_subjects subject
+from pg_temp.role_audit_subjects subject
 where subject.role_name = 'lead';
 
 reset role;
 
-select set_config('request.jwt.claim.sub', (select user_id::text from role_audit_subjects where role_name = 'employee'), false);
+select set_config('request.jwt.claim.sub', (select user_id::text from pg_temp.role_audit_subjects where role_name = 'employee'), false);
 select set_config('request.jwt.claim.role', 'authenticated', false);
 set role authenticated;
 
-insert into role_audit_results
+insert into pg_temp.role_audit_results
 select
   'employee',
   'linked identity',
@@ -151,10 +151,10 @@ select
     then 'role=' || public.current_role()::text || ', claimed=' || public.is_claimed_user()::text
     else 'no linked Employee account found'
   end
-from role_audit_subjects subject
+from pg_temp.role_audit_subjects subject
 where subject.role_name = 'employee';
 
-insert into role_audit_results
+insert into pg_temp.role_audit_results
 select
   'employee',
   'restricted reads',
@@ -180,16 +180,16 @@ select
       )::text
     else 'no linked Employee account found'
   end
-from role_audit_subjects subject
+from pg_temp.role_audit_subjects subject
 where subject.role_name = 'employee';
 
 reset role;
 
-select set_config('request.jwt.claim.sub', (select user_id::text from role_audit_subjects where role_name = 'unmatched'), false);
+select set_config('request.jwt.claim.sub', (select user_id::text from pg_temp.role_audit_subjects where role_name = 'unmatched'), false);
 select set_config('request.jwt.claim.role', 'authenticated', false);
 set role authenticated;
 
-insert into role_audit_results
+insert into pg_temp.role_audit_results
 select
   'unmatched',
   'operational data blocked',
@@ -215,7 +215,7 @@ select set_config('request.jwt.claim.sub', '', false);
 select set_config('request.jwt.claim.role', '', false);
 
 select role_name, check_name, audit_status, details
-from role_audit_results
+from pg_temp.role_audit_results
 order by
   case audit_status when 'fail' then 1 when 'skip' then 2 else 3 end,
   role_name,
