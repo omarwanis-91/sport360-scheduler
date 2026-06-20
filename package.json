@@ -1,0 +1,10 @@
+{
+  "name": "sport360-scheduler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sport360 department scheduler with profile claiming, rotations, vacation approvals, and Supabase schema.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check src/config.js && node --check src/data.js && node --check src/supabaseStore.js && node --check src/main.js"
+  }
+}
