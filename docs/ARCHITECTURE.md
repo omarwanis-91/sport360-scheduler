@@ -4,7 +4,7 @@
 
 Sport360 Scheduler is a desktop-first static web application built with vanilla JavaScript, HTML, and CSS. A small Node server serves local files. Supabase provides authentication, PostgreSQL data, RLS policies, and RPC functions.
 
-There is no frontend framework or build step at present.
+There is no frontend framework or bundler. A dependency-free Node build copies the deployable static files into `dist/` for hosting.
 
 ## Main Files
 
@@ -17,6 +17,9 @@ There is no frontend framework or build step at present.
 | `src/data.js` | Seed/demo state and initial domain data. |
 | `src/config.js` | Supabase and application configuration. |
 | `server.js` | Local static file server. |
+| `scripts/build.js` | Creates the deployable `dist/` directory. |
+| `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
+| `vercel.json` | Vercel build, output, and SPA rewrite settings. |
 | `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
 | `supabase/seed.sql` | Optional starter data. |
 
@@ -121,4 +124,3 @@ For a person and date:
 ## Direction For Growth
 
 Prefer incremental modularization over a framework rewrite. Extract a module only when a domain boundary is stable, such as scheduling, permissions, people, requests, or shared UI primitives. Preserve behavior and tests while moving code.
-

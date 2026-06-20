@@ -41,4 +41,4 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Improved Activity filtering and visual differentiation.
 - [x] Connected the local project to GitHub through a safe review branch and draft PR.
 - [x] Added living repository documentation and Codex agent instructions.
-
+- [x] Added a dependency-free production build and hosting configuration.

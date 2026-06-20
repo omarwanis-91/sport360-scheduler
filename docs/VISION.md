@@ -70,4 +70,3 @@ Views a personal schedule and profile, requests vacation, and understands upcomi
 - Employees can understand a month of work and exceptions without visual noise.
 - Important changes are attributable and reviewable.
 - New contributors or agents can understand the project without relying on chat history.
-

@@ -94,15 +94,21 @@ Continue with the existing vanilla JavaScript application while core workflows s
 
 ## D-016 - GitHub Review Workflow
 
-**Date:** 2026-06-20  
+**Date:** 2026-06-20
 **Status:** Accepted
 
 `main` is the stable branch. Coherent changes are developed on focused `codex/<description>` branches, pushed to GitHub, and reviewed through pull requests before merging.
 
 ## D-017 - Living Project Documentation
 
-**Date:** 2026-06-20  
+**Date:** 2026-06-20
 **Status:** Accepted
 
 Repository knowledge is maintained in `docs/VISION.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and `docs/TODO.md`. Agent-specific instructions live in root `AGENTS.md` for automatic discovery.
 
+## D-018 - Dependency-Free Static Deployment Build
+
+**Date:** 2026-06-20
+**Status:** Accepted
+
+The app remains framework-free. Deployment uses a small Node script that copies `index.html` and `src/` into `dist/`; hosting configuration publishes that directory with an SPA fallback.

@@ -539,4 +539,3 @@ Continue from the current state. Do not restart the app or redesign from scratch
 
 Use npm.cmd run check after code changes.
 ```
-

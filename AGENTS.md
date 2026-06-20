@@ -26,6 +26,7 @@ Before changing code, read:
 - Avoid native browser `alert()`, `confirm()`, and `prompt()` dialogs. Use in-app notices or drawers.
 - Update the query-string asset version in `index.html` whenever `src/main.js` or `src/styles.css` changes.
 - Run `npm.cmd run check` after JavaScript changes and before publishing.
+- Run `npm.cmd run build` when deployment files or the static application shell changes.
 - After UI changes, state exactly where the user should navigate and what they should inspect.
 
 ## Product Rules
@@ -62,4 +63,3 @@ Before changing code, read:
 - Create a focused branch for one coherent change, normally named `codex/<short-description>`.
 - Commit only the files belonging to that change.
 - Push the branch and review it through a pull request before merging into `main`.
-
