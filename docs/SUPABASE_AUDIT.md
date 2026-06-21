@@ -76,6 +76,31 @@ All 17 controlled write checks passed:
 
 Every successful test write was rolled back inside its test subtransaction. No audit fixture rows were retained.
 
+### UI Regression Result - 2026-06-21
+
+A temporary demo-mode build was tested in the browser for all three roles. No console warnings or errors were reported.
+
+Admin checks passed:
+
+- New Profile, New Department, New Rotation, New Request, and New Status actions are available.
+- Shift override controls and date ranges are enabled.
+- Personal profile editing is available.
+
+Department Lead checks passed:
+
+- Profile, department, and status creation actions are hidden.
+- Rotation and vacation-request actions are available.
+- Current/future shift editing is enabled inside the Lead's department.
+- Shift editing is disabled after switching to another department.
+- Personal profile editing remains available.
+
+Employee checks passed:
+
+- Profile, department, rotation, and status management actions are hidden.
+- Shift override controls and date ranges are disabled.
+- Vacation request creation is available only for the signed-in Employee profile.
+- Personal profile editing allows name/photo self-service while email, title, department, balances, and role remain Admin-controlled.
+
 ### Read Audit Result - 2026-06-20
 
 - Admin identity and application reads: pass.
@@ -93,4 +118,4 @@ Verified restrictions include:
 
 ## Next Action
 
-Confirm the same critical workflows through the application UI with the dedicated accounts during regression testing.
+Repeat this role regression after any material permission, navigation, profile, schedule, rotation, or request workflow change.
