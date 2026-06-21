@@ -10,6 +10,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Complete read-policy testing for Admin, Department Lead, Employee, and unmatched accounts.
 - [x] Run `supabase/audit/002_role_read_audit.sql`; every role-read check passes.
 - [ ] Complete controlled write-policy tests with the dedicated role accounts.
+- [ ] Run `supabase/audit/003_role_write_audit.sql` and resolve any failures.
 - [x] Reconcile the required live baseline objects with the current migration set.
 - [x] Apply `011_harden_claimed_user_access.sql` to the live project.
 - [x] Rerun the consolidated audit and confirm every reported check passes.

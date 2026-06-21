@@ -62,6 +62,8 @@ The repository previously contained a different migration sequence, and some SQL
 
 `supabase/audit/002_role_read_audit.sql` performs the read-access portion of this matrix using temporary tables and simulated JWT subjects. It makes no application-data changes. Write behavior still requires controlled UI or API tests with dedicated accounts.
 
+`supabase/audit/003_role_write_audit.sql` performs rollback-safe write checks. Each successful DML statement is deliberately rolled back inside a PL/pgSQL subtransaction, while denied statements are checked by affected-row count or expected SQLSTATE.
+
 ### Read Audit Result - 2026-06-20
 
 - Admin identity and application reads: pass.
@@ -79,4 +81,6 @@ Verified restrictions include:
 
 ## Next Action
 
-Complete controlled write tests with the dedicated Admin, Department Lead, and Employee accounts.
+1. Run `supabase/audit/003_role_write_audit.sql` in the Supabase SQL editor.
+2. Resolve any `fail` result before changing application permissions.
+3. Confirm the same workflows through the application UI with the dedicated accounts.
