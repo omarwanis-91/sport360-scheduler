@@ -4,11 +4,10 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Perform a short application UI regression pass with Admin, Department Lead, and Employee accounts.
+- [ ] Improve department-wide rotation editing so multiple people can be reviewed and changed together.
 
 ## Next
 
-- [ ] Improve department-wide rotation editing so multiple people can be reviewed and changed together.
 - [ ] Add stronger loading, empty, error, and retry states around Supabase operations.
 - [ ] Move profile photos to a verified Supabase Storage workflow instead of database-heavy image data.
 - [ ] Add vacation cancellation and clearer rejection notes/history.
@@ -42,3 +41,4 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Reconciled the live Supabase schema and applied claimed-user security hardening.
 - [x] Completed Supabase read-policy tests for Admin, Lead, Employee, and unmatched accounts.
 - [x] Completed 17 rollback-safe Supabase write-policy checks with no failures.
+- [x] Completed browser UI regression for Admin, Department Lead, and Employee permission boundaries.
