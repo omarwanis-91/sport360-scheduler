@@ -62,6 +62,20 @@ The repository previously contained a different migration sequence, and some SQL
 
 `supabase/audit/002_role_read_audit.sql` performs the read-access portion of this matrix using temporary tables and simulated JWT subjects. It makes no application-data changes. Write behavior still requires controlled UI or API tests with dedicated accounts.
 
+`supabase/audit/003_role_write_audit.sql` performs rollback-safe write checks. Each successful DML statement is deliberately rolled back inside a PL/pgSQL subtransaction, while denied statements are checked by affected-row count or expected SQLSTATE.
+
+### Write Audit Result - 2026-06-21
+
+All 17 controlled write checks passed:
+
+- Admin can manage departments, profiles, statuses, and past schedule corrections.
+- Department Leads can create future rotations and overrides in their own department.
+- Department Leads cannot manage departments, edit past schedules/rotations, or edit other departments.
+- Employees can create their own vacation requests and update their own profile through the authorized RPC.
+- Employees cannot directly edit profiles, departments, schedules, or other profiles' vacation data.
+
+Every successful test write was rolled back inside its test subtransaction. No audit fixture rows were retained.
+
 ### Read Audit Result - 2026-06-20
 
 - Admin identity and application reads: pass.
@@ -79,4 +93,4 @@ Verified restrictions include:
 
 ## Next Action
 
-Complete controlled write tests with the dedicated Admin, Department Lead, and Employee accounts.
+Confirm the same critical workflows through the application UI with the dedicated accounts during regression testing.
