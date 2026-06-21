@@ -4,16 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [x] Review and merge draft PR #1 so the current local application becomes the stable GitHub `main` version.
-- [x] Run `supabase/audit/001_live_schema_audit.sql` against the live Supabase project.
-- [x] Verify the live pre-hardening schema required by migration `011`.
-- [x] Complete read-policy testing for Admin, Department Lead, Employee, and unmatched accounts.
-- [x] Run `supabase/audit/002_role_read_audit.sql`; every role-read check passes.
-- [ ] Complete controlled write-policy tests with the dedicated role accounts.
-- [ ] Run `supabase/audit/003_role_write_audit.sql` and resolve any failures.
-- [x] Reconcile the required live baseline objects with the current migration set.
-- [x] Apply `011_harden_claimed_user_access.sql` to the live project.
-- [x] Rerun the consolidated audit and confirm every reported check passes.
+- [ ] Perform a short application UI regression pass with Admin, Department Lead, and Employee accounts.
 
 ## Next
 
@@ -48,3 +39,6 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Connected the local project to GitHub through a safe review branch and draft PR.
 - [x] Added living repository documentation and Codex agent instructions.
 - [x] Added a dependency-free production build and hosting configuration.
+- [x] Reconciled the live Supabase schema and applied claimed-user security hardening.
+- [x] Completed Supabase read-policy tests for Admin, Lead, Employee, and unmatched accounts.
+- [x] Completed 17 rollback-safe Supabase write-policy checks with no failures.
