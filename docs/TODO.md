@@ -6,11 +6,11 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 - [x] Replace committed environment details with generated runtime configuration.
 - [x] Generate production configuration from Netlify variables and ignored local configuration.
-- [~] Disable public signup in production and verify Admin-created/invited onboarding. (Public signup disabled; onboarding verification pending)
+- [x] Disable public signup in production and verify Admin-created onboarding.
 
 ## Next
 
-- [ ] Move new profile photos to private Supabase Storage with legacy fallback.
+- [~] Move new profile photos to private Supabase Storage with legacy fallback. (In progress)
 - [ ] Add consistent mutation loading, disabled, success, retry, offline, and failure states.
 - [ ] Add Node unit tests and GitHub Actions checks, build, and Chromium smoke tests.
 - [ ] Verify Chrome/Edge layouts at all supported desktop widths.

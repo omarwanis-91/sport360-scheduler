@@ -505,8 +505,8 @@ function renderAuth() {
         </div>
         <div>
           <span class="eyebrow">Supabase Sign In</span>
-          <h1>Claim your schedule profile</h1>
-          <p>Use the same email that was created on your employee profile.</p>
+          <h1>${appConfig.allowSignup ? "Claim your schedule profile" : "Sign in to your schedule"}</h1>
+          <p>${appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
         </div>
         ${ui.error ? `<p class="form-error">${ui.error}</p>` : ""}
         ${ui.notice ? `<p class="form-notice">${ui.notice}</p>` : ""}
@@ -514,7 +514,7 @@ function renderAuth() {
         <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
         <button class="primary wide" name="intent" value="sign-in">Sign In</button>
         ${appConfig.allowSignup ? `<button class="ghost wide" name="intent" value="sign-up">Create Account</button>` : ""}
-        <p class="hint">After sign-in, the app links your account to the unclaimed profile with the same email.</p>
+        <p class="hint">${appConfig.allowSignup ? "After sign-in, the app links your account to the unclaimed profile with the same email." : "If your access is not ready, contact your administrator instead of creating another account."}</p>
       </form>
     </main>
   `;
