@@ -38,6 +38,14 @@ function createLocalStore() {
     async updateVacationDecision() {},
     async upsertDailyLead() {},
     async upsertRotation() {},
+    async saveDepartmentRotations(departmentId, effectiveStart, patterns) {
+      return patterns.map((item) => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : `rot-${Math.random().toString(36).slice(2, 8)}`,
+        profileId: item.profileId,
+        effectiveStart,
+        pattern: [...item.pattern]
+      }));
+    },
     async upsertStatus() {},
     async insertAudit() {}
   };
@@ -110,6 +118,14 @@ function createRemoteStore(client) {
     },
     async upsertRotation(rotation) {
       await client.upsert("rotation_versions", toDbRotation(rotation), "id");
+    },
+    async saveDepartmentRotations(departmentId, effectiveStart, patterns) {
+      const rows = await client.rpc("save_department_rotation_versions", {
+        p_department_id: departmentId,
+        p_effective_start: effectiveStart,
+        p_patterns_json: patterns
+      });
+      return rows.map(fromDbRotation);
     },
     async upsertStatus(status) {
       await client.upsert("shift_statuses", toDbStatus(status), "id");

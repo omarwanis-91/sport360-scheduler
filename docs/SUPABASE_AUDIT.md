@@ -118,4 +118,16 @@ Verified restrictions include:
 
 ## Next Action
 
-Repeat this role regression after any material permission, navigation, profile, schedule, rotation, or request workflow change.
+Run `supabase/audit/004_department_rotation_batch_audit.sql` after migration `012`. It verifies history preservation, valid Admin/Lead saves, invalid-status rejection, atomic failure, past-date restrictions, cross-department restrictions, and Employee denial. Every successful test write is rolled back.
+
+### Department Rotation Batch Audit Result - 2026-06-21
+
+All eight checks passed:
+
+- Existing rotation history remained unchanged while new effective-dated versions were created.
+- Invalid rotational statuses were rejected.
+- Mixed-department failure was atomic and retained no rows.
+- Admin batch saves, Lead future own-department saves, and Employee denial behaved as designed.
+- Lead past-date and cross-department batch saves were rejected.
+
+Repeat the broader role regression after any material permission, navigation, profile, schedule, rotation, or request workflow change.

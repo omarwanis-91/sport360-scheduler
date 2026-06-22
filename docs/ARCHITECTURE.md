@@ -115,6 +115,16 @@ For a person and date:
 - Unclaimed auth accounts must not receive operational read access.
 - Internal `SECURITY DEFINER` helpers must not be directly executable unless they perform their own authorization checks.
 
+## Runtime Configuration
+
+Runtime environment values are not committed in frontend modules. `index.html` loads `runtime-config.js` before the application module and `src/config.js` reads `window.__SPORT360_CONFIG__`.
+
+- Local development: `server.js` generates `/runtime-config.js` from ignored `.env.local`.
+- Static builds: `scripts/build.js` writes `dist/runtime-config.js` from deployment environment variables.
+- Netlify builds require `SPORT360_SUPABASE_URL` and `SPORT360_SUPABASE_ANON_KEY`.
+- `SPORT360_ALLOW_SIGNUP=false` hides public account creation for the internal release.
+- `SPORT360_RELEASE` identifies the deployed release; Netlify falls back to `COMMIT_REF`.
+
 ## Known Architectural Limits
 
 - `src/main.js` and `src/styles.css` are large and will eventually benefit from modularization.

@@ -5,6 +5,7 @@ Dark desktop-first scheduling prototype for departments, profile claiming, shift
 ## Project Knowledge
 
 - [Product vision](docs/VISION.md)
+- [Phased roadmap](docs/ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Decision log](docs/DECISIONS.md)
 - [Current TODO](docs/TODO.md)
@@ -15,12 +16,23 @@ Dark desktop-first scheduling prototype for departments, profile claiming, shift
 
 ## Run Locally
 
+Create ignored `.env.local` using the variable names in `.env.example`. The local server generates browser runtime configuration from that file.
+
 ```powershell
 npm run check
 npm start
 ```
 
 Open `http://127.0.0.1:4173`.
+
+## Netlify Environment
+
+Configure these variables under **Site configuration → Environment variables** before deploying:
+
+- `SPORT360_SUPABASE_URL`
+- `SPORT360_SUPABASE_ANON_KEY`
+- `SPORT360_ALLOW_SIGNUP=false`
+- `SPORT360_RELEASE` is optional because Netlify uses the commit reference by default.
 
 ## What Is Implemented
 

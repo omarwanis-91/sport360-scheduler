@@ -511,7 +511,7 @@ supabase/migrations/
 Current Supabase project:
 
 ```text
-https://zehdjadirhhiqfxudikp.supabase.co
+Configured through ignored `.env.local` or deployment environment variables.
 ```
 
 Current UI direction:

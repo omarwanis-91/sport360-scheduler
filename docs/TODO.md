@@ -4,29 +4,34 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Improve department-wide rotation editing so multiple people can be reviewed and changed together.
+- [x] Replace committed environment details with generated runtime configuration.
+- [x] Generate production configuration from Netlify variables and ignored local configuration.
+- [~] Disable public signup in production and verify Admin-created/invited onboarding. (Public signup disabled; onboarding verification pending)
 
 ## Next
 
-- [ ] Add stronger loading, empty, error, and retry states around Supabase operations.
-- [ ] Move profile photos to a verified Supabase Storage workflow instead of database-heavy image data.
-- [ ] Add vacation cancellation and clearer rejection notes/history.
-- [ ] Improve responsive behavior for narrower laptop and mobile widths.
-- [ ] Make Activity search update as the user types and add employee/date filtering.
-- [ ] Add automated tests for schedule resolution, rotations, overrides, and vacation deduction.
+- [ ] Move new profile photos to private Supabase Storage with legacy fallback.
+- [ ] Add consistent mutation loading, disabled, success, retry, offline, and failure states.
+- [ ] Add Node unit tests and GitHub Actions checks, build, and Chromium smoke tests.
+- [ ] Verify Chrome/Edge layouts at all supported desktop widths.
+- [ ] Document and rehearse production backup, restore, health check, monitoring, and rollback.
+- [ ] Pilot one department for five business days and record signoff.
 
 ## Later
 
-- [ ] Extract stable domains from `src/main.js` into focused modules.
-- [ ] Split `src/styles.css` by stable UI/domain boundaries.
-- [ ] Add deployment-ready environment configuration.
-- [ ] Add production deployment documentation and health checks.
-- [ ] Add notification support for request decisions and important schedule changes.
-- [ ] Consider multi-cell selection, drag-to-fill, and copy-week scheduler tools.
-- [ ] Consider splitting this decision log into individual ADR files once it becomes difficult to scan.
+- [ ] Phase 5: add vacation cancellation, rejection comments, and richer request history.
+- [ ] Phase 5: add Activity live search and employee, department, date, and action filters.
+- [ ] Phase 5: add notifications and advanced scheduler bulk tools.
+- [ ] Phase 5: complete mobile workflows if mobile becomes a supported target.
+- [ ] Phase 6: extract stable domains from `src/main.js` and split CSS by stable boundaries.
+- [ ] Phase 6: add migration automation, broader integration, accessibility, performance, and observability checks.
+- [ ] Phase 6: split decisions into individual ADR files when the current log becomes difficult to scan.
 
 ## Recently Completed
 
+- [x] Completed department-wide rotation editing with multi-person selection and shared weekly patterns.
+- [x] Added and verified atomic, history-preserving batch rotation saves for Admin and Department Leads.
+- [x] Passed all eight department rotation history, validation, atomicity, and role-boundary audit checks.
 - [x] Added full personal and employee profile calendar views.
 - [x] Added four People views.
 - [x] Improved department membership assignment and removal.

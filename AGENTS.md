@@ -9,7 +9,8 @@ Before changing code, read:
 1. `docs/VISION.md` for the product direction and boundaries.
 2. `docs/ARCHITECTURE.md` for the current technical and visual structure.
 3. `docs/DECISIONS.md` for decisions that should not be casually reversed.
-4. `docs/TODO.md` for current priorities.
+4. `docs/ROADMAP.md` for the current phase, future phases, and acceptance gates.
+5. `docs/TODO.md` for the short actionable queue.
 
 `PROJECT_CONTEXT_HANDOFF.md` is a historical snapshot. The files above are the living sources of truth.
 
@@ -54,7 +55,9 @@ Before changing code, read:
 - Update `docs/VISION.md` only when product direction or scope changes.
 - Update `docs/ARCHITECTURE.md` when system structure, data flow, major modules, or visual foundations change.
 - Append to `docs/DECISIONS.md` when a meaningful product or technical decision is agreed.
-- Update `docs/TODO.md` whenever priorities or completion states change.
+- Update `docs/ROADMAP.md` when phase status, scope, gates, or production direction changes.
+- Update `docs/TODO.md` whenever current or immediately upcoming priorities change.
+- Read and maintain `docs/ROADMAP.md` before using `docs/TODO.md` to choose work.
 - Keep documentation changes in the same commit as the implementation they describe when practical.
 
 ## Git Workflow

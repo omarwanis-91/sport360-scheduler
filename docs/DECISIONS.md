@@ -126,3 +126,38 @@ Authentication alone does not grant access to employee or schedule data. The sig
 **Status:** Accepted
 
 `SECURITY DEFINER` functions that do not perform their own authorization checks are internal helpers. They must not be directly executable by browser roles and should only be reached through authorized RPC workflows.
+
+## D-021 - Roadmap And Tactical Queue Separation
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+`docs/ROADMAP.md` is the durable phased project plan and records phase status and acceptance gates. `docs/TODO.md` is the short actionable queue for current and immediately upcoming work. Both are maintained as the project progresses.
+
+## D-022 - Production Gate Follows Department Rotations
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+The project enters production hardening immediately after department-wide rotation editing is complete. Later product expansion does not block the first production release unless evidence from hardening or the pilot establishes that it is required.
+
+## D-023 - Internal Production Rollout
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+The first production release is an internal Sport360 rollout. One department pilots the release for five business days before broader internal expansion, subject to the documented production acceptance gate.
+
+## D-024 - Admin-Controlled Account Onboarding
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+Production accounts are created or invited by an Admin. Public account creation is hidden when runtime configuration sets `allowSignup` to false. Existing email-based profile linking remains part of onboarding.
+
+## D-025 - Initial Production Device Support
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+The initial production guarantee covers current Chrome and Edge on desktop and laptop displays 1024px wide and above. Mobile behavior remains best-effort until mobile is explicitly promoted to a supported target.

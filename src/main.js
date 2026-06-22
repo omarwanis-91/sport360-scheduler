@@ -58,6 +58,11 @@ const ui = {
   requestFilter: "pending",
   activityType: "all",
   activitySearch: "",
+  rotationDepartmentEdit: false,
+  selectedRotationProfileIds: [],
+  rotationBulkEditing: false,
+  rotationBulkPattern: [...defaultWeekPattern],
+  rotationBulkEffectiveStart: todayIso,
   drawer: null,
   loading: true,
   error: "",
@@ -508,7 +513,7 @@ function renderAuth() {
         <label>Email<input name="email" type="email" autocomplete="email" required></label>
         <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
         <button class="primary wide" name="intent" value="sign-in">Sign In</button>
-        <button class="ghost wide" name="intent" value="sign-up">Create Account</button>
+        ${appConfig.allowSignup ? `<button class="ghost wide" name="intent" value="sign-up">Create Account</button>` : ""}
         <p class="hint">After sign-in, the app links your account to the unclaimed profile with the same email.</p>
       </form>
     </main>
@@ -1200,7 +1205,12 @@ function renderRotations() {
         <select id="department-select">
           ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
         </select>
-        ${canEditDepartmentRotations ? `<button class="primary" data-open-drawer="rotation">${icons.plus} New Rotation</button>` : ""}
+        ${canEditDepartmentRotations ? `
+          <button class="ghost" data-open-drawer="rotation">${icons.plus} New Rotation</button>
+          <button class="${ui.rotationDepartmentEdit ? "ghost" : "primary"}" id="toggle-department-rotation-edit">
+            ${ui.rotationDepartmentEdit ? `${icons.close} Cancel Edit` : `${icons.plus} Edit Department`}
+          </button>
+        ` : ""}
       </div>
     `)}
     <section class="rotation-overview">
@@ -1217,6 +1227,7 @@ function renderRotations() {
         <span><strong>${stats.nextEffective || "None"}</strong> next start</span>
       </div>
     </section>
+    ${ui.rotationDepartmentEdit ? renderDepartmentRotationToolbar(profiles) : ""}
     <section class="rotation-board">
       <div class="rotation-grid">
         <div class="rotation-head">
@@ -1257,15 +1268,26 @@ function renderRotationRow(profile) {
   const rotation = latestRotationForProfile(profile.id);
   const pattern = rotation ? sanitizeRotationPattern(rotation.pattern) : Array.from({ length: 7 });
   const missingClass = rotation ? "" : " missing";
+  const isSelected = ui.selectedRotationProfileIds.includes(profile.id);
+  const personContent = `
+    <div class="avatar">${avatar(profile)}</div>
+    <div class="rotation-person-meta">
+      <strong>${profile.name}</strong>
+      <span>${rotation ? `Effective ${rotation.effectiveStart}` : "Missing weekly pattern"}</span>
+    </div>
+    ${rotation ? "" : `<mark>Setup</mark>`}
+  `;
   return `
-    <button class="employee-cell rotation-person${missingClass}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
-      <div class="avatar">${avatar(profile)}</div>
-      <div class="rotation-person-meta">
-        <strong>${profile.name}</strong>
-        <span>${rotation ? `Effective ${rotation.effectiveStart}` : "Missing weekly pattern"}</span>
-      </div>
-      ${rotation ? "" : `<mark>Setup</mark>`}
-    </button>
+    ${ui.rotationDepartmentEdit ? `
+      <label class="employee-cell rotation-person rotation-person-selectable${missingClass}${isSelected ? " selected" : ""}">
+        <input type="checkbox" data-rotation-profile-select="${profile.id}" ${isSelected ? "checked" : ""}>
+        ${personContent}
+      </label>
+    ` : `
+      <button class="employee-cell rotation-person${missingClass}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
+        ${personContent}
+      </button>
+    `}
     ${pattern.map((statusId) => renderRotationCell(profile, rotation, statusId)).join("")}
   `;
 }
@@ -1962,6 +1984,71 @@ function renderVacationImpactRow(row, requestStatus, profileId) {
   `;
 }
 
+function renderDepartmentRotationToolbar(profiles) {
+  const selectedCount = ui.selectedRotationProfileIds.length;
+  const allSelected = profiles.length > 0 && selectedCount === profiles.length;
+  if (ui.rotationBulkEditing) return renderDepartmentRotationEditor();
+  return `
+    <section class="rotation-edit-toolbar">
+      <div>
+        <span class="eyebrow">Department edit</span>
+        <strong>${selectedCount} ${selectedCount === 1 ? "person" : "people"} selected</strong>
+        <p>Select the people whose weekly patterns should change together.</p>
+      </div>
+      <div class="rotation-edit-actions">
+        <button type="button" class="ghost" id="toggle-all-rotation-people" ${profiles.length ? "" : "disabled"}>${allSelected ? "Clear selection" : "Select all"}</button>
+        <button type="button" class="primary" id="continue-department-rotation-edit" ${selectedCount ? "" : "disabled"}>Continue with ${selectedCount || 0}</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderDepartmentRotationEditor() {
+  const pattern = sanitizeRotationPattern(ui.rotationBulkPattern);
+  const selectedProfiles = ui.selectedRotationProfileIds.map((id) => byId(state.profiles, id)).filter(Boolean);
+  return `
+    <form class="rotation-bulk-editor" id="department-rotation-form">
+      <div class="rotation-bulk-head">
+        <div>
+          <span class="eyebrow">Shared weekly pattern</span>
+          <strong>${selectedProfiles.length} ${selectedProfiles.length === 1 ? "person" : "people"}</strong>
+          <p>${selectedProfiles.map((profile) => profile.name).join(", ")}</p>
+        </div>
+        <label>Effective start<input type="date" name="effectiveStart" value="${ui.rotationBulkEffectiveStart}" required></label>
+      </div>
+      ${rotationPresets.length ? `
+        <div class="rotation-bulk-presets">
+          <span>Apply preset</span>
+          ${rotationPresets.map((preset) => `<button type="button" class="ghost" data-bulk-rotation-preset="${preset.id}">${preset.label}</button>`).join("")}
+        </div>
+      ` : ""}
+      <div class="rotation-bulk-days">
+        ${pattern.map((statusId, index) => bulkRotationDay(statusId, index)).join("")}
+      </div>
+      <div class="rotation-bulk-footer">
+        <button type="button" class="ghost" id="back-to-rotation-selection">Back to selection</button>
+        <button type="submit" class="primary">Save ${selectedProfiles.length} ${selectedProfiles.length === 1 ? "rotation" : "rotations"}</button>
+      </div>
+    </form>
+  `;
+}
+
+function bulkRotationDay(statusId, index) {
+  const status = byId(state.statuses, statusId) || byId(state.statuses, "weekend");
+  return `
+    <div class="rotation-bulk-day">
+      <div><span>${weekDays[index]}</span><strong>${status.label}</strong></div>
+      <div class="pattern-chip-row">
+        ${rotationStatuses().map((item) => `
+          <button type="button" class="pattern-chip ${item.id} ${item.id === status.id ? "active" : ""}" data-bulk-pattern-day="${index}" data-pattern-status="${item.id}" title="${item.label}">
+            ${statusIcons[item.id] || icons.scheduler}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function leadDrawer() {
   const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
   const profiles = state.profiles.filter((profile) => profile.departmentId === ui.selectedDepartmentId);
@@ -2204,8 +2291,67 @@ function bindEvents() {
 
   document.querySelector("#department-select")?.addEventListener("change", (event) => {
     ui.selectedDepartmentId = event.target.value;
+    ui.rotationDepartmentEdit = false;
+    ui.selectedRotationProfileIds = [];
+    ui.rotationBulkEditing = false;
     render();
   });
+
+  document.querySelector("#toggle-department-rotation-edit")?.addEventListener("click", () => {
+    ui.rotationDepartmentEdit = !ui.rotationDepartmentEdit;
+    ui.selectedRotationProfileIds = [];
+    ui.rotationBulkEditing = false;
+    render();
+  });
+
+  document.querySelectorAll("[data-rotation-profile-select]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const profileId = input.dataset.rotationProfileSelect;
+      ui.selectedRotationProfileIds = input.checked
+        ? [...new Set([...ui.selectedRotationProfileIds, profileId])]
+        : ui.selectedRotationProfileIds.filter((id) => id !== profileId);
+      render();
+    });
+  });
+
+  document.querySelector("#toggle-all-rotation-people")?.addEventListener("click", () => {
+    const profileIds = departmentProfiles().map((profile) => profile.id);
+    ui.selectedRotationProfileIds = ui.selectedRotationProfileIds.length === profileIds.length ? [] : profileIds;
+    render();
+  });
+
+  document.querySelector("#continue-department-rotation-edit")?.addEventListener("click", () => {
+    const firstRotation = latestRotationForProfile(ui.selectedRotationProfileIds[0]);
+    ui.rotationBulkPattern = sanitizeRotationPattern(firstRotation?.pattern || defaultWeekPattern);
+    ui.rotationBulkEffectiveStart = todayIso;
+    ui.rotationBulkEditing = true;
+    render();
+  });
+
+  document.querySelector("#back-to-rotation-selection")?.addEventListener("click", () => {
+    ui.rotationBulkEditing = false;
+    render();
+  });
+
+  document.querySelectorAll("[data-bulk-pattern-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pattern = sanitizeRotationPattern(ui.rotationBulkPattern);
+      pattern[Number(button.dataset.bulkPatternDay)] = button.dataset.patternStatus;
+      ui.rotationBulkPattern = pattern;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-bulk-rotation-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = rotationPresets.find((item) => item.id === button.dataset.bulkRotationPreset);
+      if (!preset) return;
+      ui.rotationBulkPattern = sanitizeRotationPattern(preset.pattern);
+      render();
+    });
+  });
+
+  document.querySelector("#department-rotation-form")?.addEventListener("submit", saveDepartmentRotations);
 
   document.querySelector("#people-department-select")?.addEventListener("change", (event) => {
     ui.peopleDepartmentId = event.target.value;
@@ -2470,6 +2616,7 @@ function bindAuthEvents() {
     ui.notice = "";
     try {
       if (submitter?.value === "sign-up") {
+        if (!appConfig.allowSignup) throw new Error("Account creation is disabled. Ask an Admin for an invitation.");
         const result = await dataStore.signUp(form.get("email"), form.get("password"));
         if (!result?.session) {
           ui.notice = "Account created. Check your email if confirmation is enabled, then sign in here.";
@@ -2837,6 +2984,40 @@ async function saveRotation(event) {
   await saveState();
   ui.drawer = null;
   render();
+}
+
+async function saveDepartmentRotations(event) {
+  event.preventDefault();
+  if (!canManageDepartment(ui.selectedDepartmentId) || !ui.selectedRotationProfileIds.length) return;
+  const form = new FormData(event.currentTarget);
+  const effectiveStart = form.get("effectiveStart");
+  const pattern = sanitizeRotationPattern(ui.rotationBulkPattern);
+  const selectedProfiles = ui.selectedRotationProfileIds.map((id) => byId(state.profiles, id)).filter(Boolean);
+  if (selectedProfiles.some((profile) => profile.departmentId !== ui.selectedDepartmentId)) {
+    notify("Every selected person must belong to this department.");
+    return;
+  }
+  if (selectedProfiles.some((profile) => state.rotationVersions.some((rotation) => rotation.profileId === profile.id && rotation.effectiveStart === effectiveStart))) {
+    notify("One or more selected people already have a rotation starting on that date. Choose another effective date.");
+    return;
+  }
+
+  const patterns = selectedProfiles.map((profile) => ({ profileId: profile.id, pattern }));
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const rotations = await dataStore.saveDepartmentRotations(ui.selectedDepartmentId, effectiveStart, patterns);
+    state.rotationVersions.push(...rotations);
+    rotations.forEach((rotation) => audit("rotation.saved", "rotation_version", rotation.id, `${rotation.pattern.length} day department pattern`));
+    await saveState();
+    ui.rotationDepartmentEdit = false;
+    ui.rotationBulkEditing = false;
+    ui.selectedRotationProfileIds = [];
+    notify(`Saved ${rotations.length} ${rotations.length === 1 ? "rotation" : "rotations"} starting ${effectiveStart}.`);
+  } catch (error) {
+    if (submitButton) submitButton.disabled = false;
+    notify(error.message || "The department rotations could not be saved.");
+  }
 }
 
 async function saveStatus(event) {
