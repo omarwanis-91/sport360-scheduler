@@ -1803,6 +1803,7 @@ function departmentDrawer() {
         </div>
       ` : ""}
       <button class="primary wide" ${canEdit ? "" : "disabled"}>${department ? "Save Department" : "Create Department"}</button>
+      ${department && canEdit ? `<button type="button" class="danger wide" id="delete-department">Delete Department</button>` : ""}
     </form>
   `;
 }
@@ -2506,6 +2507,7 @@ function bindEvents() {
   document.querySelector("#day-bulk-form")?.addEventListener("submit", saveDayBulkOverrides);
   bindDayEditorPreview();
   document.querySelector("#department-form")?.addEventListener("submit", saveDepartment);
+  document.querySelector("#delete-department")?.addEventListener("click", deleteDepartment);
   document.querySelector("#department-member-form")?.addEventListener("submit", assignDepartmentMembers);
   document.querySelector("#rotation-form")?.addEventListener("submit", saveRotation);
   document.querySelector("#status-form")?.addEventListener("submit", saveStatus);
@@ -2912,6 +2914,47 @@ async function saveDepartment(event) {
     await dataStore.upsertDepartment(department);
     await saveState();
     ui.drawer = { type: "department-detail", departmentId: department.id };
+    render();
+  });
+}
+
+async function deleteDepartment() {
+  const department = byId(state.departments, ui.drawer.departmentId);
+  if (!department || !canManageDepartments()) return;
+  const previousDepartments = [...state.departments];
+  const previousProfiles = state.profiles.map((profile) => ({ ...profile }));
+  const previousLeads = [...state.departmentLeads];
+  const previousSelectedDepartmentId = ui.selectedDepartmentId;
+  const affectedProfiles = state.profiles.filter((profile) => profile.departmentId === department.id);
+  const confirmed = window.confirm(`Delete ${department.name}? ${affectedProfiles.length} ${affectedProfiles.length === 1 ? "person" : "people"} will become unassigned.`);
+  if (!confirmed) return;
+
+  await runMutation("department-delete", {
+    pending: `Deleting ${department.name}...`,
+    success: `${department.name} deleted. ${affectedProfiles.length} ${affectedProfiles.length === 1 ? "person is" : "people are"} now unassigned.`,
+    failure: "The department could not be deleted."
+  }, async () => {
+    for (const profile of affectedProfiles) {
+      profile.departmentId = null;
+      await dataStore.updateProfile(profile);
+    }
+    state.departmentLeads = state.departmentLeads.filter((lead) => lead.departmentId !== department.id);
+    state.departments = state.departments.filter((item) => item.id !== department.id);
+    delete coverageTargets[department.id];
+    saveCoverageTargets();
+    if (ui.selectedDepartmentId === department.id) ui.selectedDepartmentId = state.departments[0]?.id || "";
+    audit("department.deleted", "department", department.id, `${department.name} deleted`);
+    await dataStore.deleteDepartment(department);
+    await saveState();
+    ui.drawer = null;
+    ui.activeView = "departments";
+    render();
+  }).then((result) => {
+    if (result.ok) return;
+    state.departments = previousDepartments;
+    state.profiles = previousProfiles;
+    state.departmentLeads = previousLeads;
+    ui.selectedDepartmentId = previousSelectedDepartmentId;
     render();
   });
 }

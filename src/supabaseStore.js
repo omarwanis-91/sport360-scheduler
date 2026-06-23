@@ -34,6 +34,7 @@ function createLocalStore() {
     async upsertUserRole() {},
     async unlinkProfileAccount() {},
     async upsertDepartment() {},
+    async deleteDepartment() {},
     async upsertScheduleOverride() {},
     async deleteScheduleOverride() {},
     async createVacationRequest() {},
@@ -106,6 +107,9 @@ function createRemoteStore(client) {
     },
     async upsertDepartment(department) {
       await client.upsert("departments", toDbDepartment(department), "id");
+    },
+    async deleteDepartment(department) {
+      await client.delete("departments", `id=eq.${department.id}`);
     },
     async upsertScheduleOverride(override) {
       await client.upsert("schedule_overrides", toDbOverride(override), "profile_id,shift_date");
