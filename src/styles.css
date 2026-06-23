@@ -304,6 +304,30 @@ textarea:focus {
   line-height: 1.4;
 }
 
+.app-notice.info {
+  border-color: rgba(148, 163, 184, 0.34);
+  background:
+    radial-gradient(circle at 92% 14%, rgba(148, 163, 184, 0.12), transparent 36%),
+    #121315;
+  color: #dbe4ef;
+}
+
+.app-notice.success {
+  border-color: rgba(34, 197, 94, 0.34);
+  background:
+    radial-gradient(circle at 92% 14%, rgba(34, 197, 94, 0.12), transparent 36%),
+    #0f1712;
+  color: #bbf7d0;
+}
+
+.app-notice.error {
+  border-color: rgba(225, 29, 72, 0.38);
+  background:
+    radial-gradient(circle at 92% 14%, rgba(225, 29, 72, 0.14), transparent 36%),
+    #141010;
+  color: #fecdd3;
+}
+
 .app-notice span {
   min-width: 0;
 }

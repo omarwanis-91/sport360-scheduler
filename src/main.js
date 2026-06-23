@@ -68,12 +68,42 @@ const ui = {
   drawer: null,
   loading: true,
   error: "",
-  notice: ""
+  notice: "",
+  noticeKind: "info",
+  mutation: { key: "", status: "idle", message: "" }
 };
 
-function notify(message) {
+function notify(message, kind = "info") {
   ui.notice = message;
+  ui.noticeKind = kind;
   render();
+}
+
+function isMutationPending() {
+  return ui.mutation.status === "pending";
+}
+
+async function runMutation(key, messages, action) {
+  if (isMutationPending()) return { ok: false };
+  if (dataStore?.mode === "supabase" && !navigator.onLine) {
+    notify("You appear to be offline. Reconnect, then try again.", "error");
+    return { ok: false };
+  }
+  ui.mutation = { key, status: "pending", message: messages.pending };
+  ui.notice = messages.pending;
+  ui.noticeKind = "info";
+  render();
+  try {
+    const result = await action();
+    ui.mutation = { key, status: "success", message: messages.success };
+    notify(messages.success, "success");
+    return { ok: true, result };
+  } catch (error) {
+    const message = error.message || messages.failure;
+    ui.mutation = { key, status: "error", message };
+    notify(message, "error");
+    return { ok: false, error };
+  }
 }
 
 function loadState() {
@@ -399,6 +429,7 @@ function render() {
   if (dataStore?.mode === "supabase" && !dataStore.session) {
     app.innerHTML = renderAuth();
     bindAuthEvents();
+    applyMutationPendingUi();
     return;
   }
 
@@ -490,7 +521,7 @@ function showFatalError(error) {
 function renderAppNotice() {
   if (!ui.notice || (dataStore?.mode === "supabase" && !dataStore.session)) return "";
   return `
-    <div class="app-notice" role="status">
+    <div class="app-notice ${ui.noticeKind || "info"}" role="status">
       <span>${ui.notice}</span>
       <button type="button" class="icon-button" id="dismiss-notice">${icons.close}</button>
     </div>
@@ -2571,6 +2602,16 @@ function bindEvents() {
       render();
     });
   });
+
+  applyMutationPendingUi();
+}
+
+function applyMutationPendingUi() {
+  if (!isMutationPending()) return;
+  document.querySelectorAll("button, input, select, textarea").forEach((control) => {
+    if (control.id === "dismiss-notice") return;
+    control.disabled = true;
+  });
 }
 
 function bindPhotoUploader() {
@@ -2624,31 +2665,46 @@ function bindAuthEvents() {
     event.preventDefault();
     const submitter = event.submitter;
     const form = new FormData(event.currentTarget);
+    const intent = submitter?.value === "sign-up" ? "sign-up" : "sign-in";
+    const email = form.get("email");
+    const password = form.get("password");
     ui.error = "";
     ui.notice = "";
-    try {
-      if (submitter?.value === "sign-up") {
+    const result = await runMutation("auth", {
+      pending: intent === "sign-up" ? "Creating account..." : "Signing in...",
+      success: intent === "sign-up" ? "Account is ready." : "Signed in.",
+      failure: "Unable to authenticate."
+    }, async () => {
+      if (intent === "sign-up") {
         if (!appConfig.allowSignup) throw new Error("Account creation is disabled. Ask an Admin for an invitation.");
-        const result = await dataStore.signUp(form.get("email"), form.get("password"));
+        const result = await dataStore.signUp(email, password);
         if (!result?.session) {
           ui.notice = "Account created. Check your email if confirmation is enabled, then sign in here.";
+          ui.noticeKind = "success";
           render();
           return;
         }
       } else {
-        await dataStore.signIn(form.get("email"), form.get("password"));
+        await dataStore.signIn(email, password);
       }
       await reloadState();
-    } catch (error) {
-      ui.error = error.message || "Unable to authenticate.";
+    });
+    if (!result.ok) {
+      ui.error = result.error?.message || "Unable to authenticate.";
       render();
     }
   });
 }
 
 async function signOut() {
-  await dataStore.signOut();
-  await reloadState();
+  await runMutation("sign-out", {
+    pending: "Signing out...",
+    success: "Signed out.",
+    failure: "Unable to sign out."
+  }, async () => {
+    await dataStore.signOut();
+    await reloadState();
+  });
 }
 
 async function saveShiftOverride(event) {
@@ -2661,23 +2717,34 @@ async function saveShiftOverride(event) {
   const rangeStart = startDate <= endDate ? startDate : endDate;
   const rangeEnd = startDate <= endDate ? endDate : startDate;
   const targetDates = datesBetween(rangeStart, rangeEnd).filter(editableDate);
-  for (const date of targetDates) {
+  const payloads = targetDates.map((date) => {
     const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === date);
-    const payload = {
-      id: existing?.id || makeId("ovr"),
-      profileId: ui.drawer.profileId,
-      date,
-      statusId: form.get("statusId"),
-      note: form.get("note").trim()
+    return {
+      existing,
+      payload: {
+        id: existing?.id || makeId("ovr"),
+        profileId: ui.drawer.profileId,
+        date,
+        statusId: form.get("statusId"),
+        note: form.get("note").trim()
+      }
     };
-    if (existing) Object.assign(existing, payload);
-    else state.scheduleOverrides.push(payload);
-    audit("schedule.override", "schedule_override", payload.id, `${payload.date} set to ${payload.statusId}`);
-    await dataStore.upsertScheduleOverride(payload);
-  }
-  await saveState();
-  ui.drawer = null;
-  render();
+  });
+  await runMutation("shift-override", {
+    pending: "Saving daily change...",
+    success: "Daily change saved.",
+    failure: "The daily change could not be saved."
+  }, async () => {
+    for (const item of payloads) {
+      if (item.existing) Object.assign(item.existing, item.payload);
+      else state.scheduleOverrides.push(item.payload);
+      audit("schedule.override", "schedule_override", item.payload.id, `${item.payload.date} set to ${item.payload.statusId}`);
+      await dataStore.upsertScheduleOverride(item.payload);
+    }
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function clearShiftOverride() {
@@ -2685,12 +2752,18 @@ async function clearShiftOverride() {
   if (!profile || !canManageDepartment(profile.departmentId) || !editableDate(ui.drawer.date)) return;
   const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === ui.drawer.date);
   if (!existing) return;
-  state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
-  audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
-  await dataStore.deleteScheduleOverride(existing);
-  await saveState();
-  ui.drawer = null;
-  render();
+  await runMutation("shift-clear", {
+    pending: "Clearing daily change...",
+    success: "Daily change cleared.",
+    failure: "The daily change could not be cleared."
+  }, async () => {
+    state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
+    audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
+    await dataStore.deleteScheduleOverride(existing);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveProfile(event) {
@@ -2713,59 +2786,70 @@ async function saveProfile(event) {
     userId: existing?.userId || null
   };
   const previousPhotoRef = existing?.photoRef || "";
-  let uploadedPhoto = null;
-  try {
-    if (ui.pendingPhotoFile) {
-      uploadedPhoto = await dataStore.uploadProfilePhoto(profile.id, ui.pendingPhotoFile, ui.pendingPhotoDataUrl);
-      profile.photo = uploadedPhoto.url;
-      profile.photoRef = uploadedPhoto.reference;
-    }
-    if (existing && !hadProfileAdmin) await dataStore.updateOwnProfileName(profile);
-    else if (existing) await dataStore.updateProfile(profile);
-    else await dataStore.createProfile(profile);
-
-    if (hadProfileAdmin && existing?.userId && form.get("role")) {
-      const userRole = { userId: existing.userId, role: form.get("role") };
-      await dataStore.upsertUserRole(userRole);
-      const existingRole = state.userRoles?.find((role) => role.userId === userRole.userId);
-      if (existingRole) Object.assign(existingRole, userRole);
-      else {
-        state.userRoles ||= [];
-        state.userRoles.push(userRole);
+  await runMutation("profile-save", {
+    pending: ui.pendingPhotoFile ? "Uploading photo and saving profile..." : "Saving profile...",
+    success: existing ? "Profile saved." : "Profile created.",
+    failure: "The profile could not be saved."
+  }, async () => {
+    let uploadedPhoto = null;
+    try {
+      if (ui.pendingPhotoFile) {
+        uploadedPhoto = await dataStore.uploadProfilePhoto(profile.id, ui.pendingPhotoFile, ui.pendingPhotoDataUrl);
+        profile.photo = uploadedPhoto.url;
+        profile.photoRef = uploadedPhoto.reference;
       }
-      if (existing.userId === currentUser()?.id) currentUser().role = userRole.role;
-      audit("role.updated", "user_role", userRole.userId, `${profile.name} set to ${userRole.role}`);
-    }
-  } catch (error) {
-    if (uploadedPhoto) await dataStore.deleteProfilePhoto(uploadedPhoto.reference).catch(() => {});
-    notify(error.message || "The profile could not be saved.");
-    return;
-  }
+      if (existing && !hadProfileAdmin) await dataStore.updateOwnProfileName(profile);
+      else if (existing) await dataStore.updateProfile(profile);
+      else await dataStore.createProfile(profile);
 
-  if (existing) Object.assign(existing, profile);
-  else state.profiles.push(profile);
-  if (uploadedPhoto && previousPhotoRef && previousPhotoRef !== uploadedPhoto.reference) {
-    await dataStore.deleteProfilePhoto(previousPhotoRef).catch(() => {});
-  }
-  ui.pendingPhotoFile = null;
-  ui.pendingPhotoDataUrl = "";
-  audit(existing ? "profile.updated" : "profile.created", "profile", profile.id, profile.email);
-  await saveState();
-  ui.drawer = { type: "person", profileId: profile.id };
-  render();
+      if (hadProfileAdmin && existing?.userId && form.get("role")) {
+        const userRole = { userId: existing.userId, role: form.get("role") };
+        await dataStore.upsertUserRole(userRole);
+        const existingRole = state.userRoles?.find((role) => role.userId === userRole.userId);
+        if (existingRole) Object.assign(existingRole, userRole);
+        else {
+          state.userRoles ||= [];
+          state.userRoles.push(userRole);
+        }
+        if (existing.userId === currentUser()?.id) currentUser().role = userRole.role;
+        audit("role.updated", "user_role", userRole.userId, `${profile.name} set to ${userRole.role}`);
+      }
+    } catch (error) {
+      if (uploadedPhoto) await dataStore.deleteProfilePhoto(uploadedPhoto.reference).catch(() => {});
+      throw error;
+    }
+
+    if (existing) Object.assign(existing, profile);
+    else state.profiles.push(profile);
+    if (uploadedPhoto && previousPhotoRef && previousPhotoRef !== uploadedPhoto.reference) {
+      await dataStore.deleteProfilePhoto(previousPhotoRef).catch(() => {});
+    }
+    ui.pendingPhotoFile = null;
+    ui.pendingPhotoDataUrl = "";
+    audit(existing ? "profile.updated" : "profile.created", "profile", profile.id, profile.email);
+    await saveState();
+    ui.drawer = { type: "person", profileId: profile.id };
+    render();
+  });
 }
 
 async function unlinkProfileAccount() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile?.userId || !canManageProfiles()) return;
   const previousUserId = profile.userId;
-  profile.userId = null;
-  state.userRoles = (state.userRoles || []).filter((role) => role.userId !== previousUserId);
-  audit("profile.unlinked", "profile", profile.id, `${profile.email} account link removed`);
-  await dataStore.unlinkProfileAccount({ ...profile, userId: previousUserId });
-  await saveState();
-  ui.drawer = { type: "person", profileId: profile.id };
-  render();
+  await runMutation("profile-unlink", {
+    pending: "Unlinking account...",
+    success: "Account unlinked.",
+    failure: "The account could not be unlinked."
+  }, async () => {
+    profile.userId = null;
+    state.userRoles = (state.userRoles || []).filter((role) => role.userId !== previousUserId);
+    audit("profile.unlinked", "profile", profile.id, `${profile.email} account link removed`);
+    await dataStore.unlinkProfileAccount({ ...profile, userId: previousUserId });
+    await saveState();
+    ui.drawer = { type: "person", profileId: profile.id };
+    render();
+  });
 }
 
 async function removeProfileDepartment() {
@@ -2783,22 +2867,26 @@ async function removeProfileDepartment() {
     detail: `${profile.name} removed from ${previousDepartment?.name || "department"}`,
     createdAt: new Date().toISOString()
   };
-  profile.departmentId = null;
-  state.departmentLeads = state.departmentLeads.filter((lead) => lead.profileId !== profile.id);
-  state.auditLog.unshift(auditEntry);
-  ui.drawer = null;
-  render();
-  try {
+  await runMutation("profile-remove-department", {
+    pending: "Removing department...",
+    success: "Department removed from profile.",
+    failure: "Unable to remove department."
+  }, async () => {
+    profile.departmentId = null;
+    state.departmentLeads = state.departmentLeads.filter((lead) => lead.profileId !== profile.id);
+    state.auditLog.unshift(auditEntry);
+    ui.drawer = null;
+    render();
     await dataStore.updateProfile(profile);
     if (dataStore?.mode === "supabase") void dataStore.insertAudit(auditEntry);
     await saveState();
-  } catch (error) {
+  }).then((result) => {
+    if (result.ok) return;
     profile.departmentId = previousDepartmentId;
     state.departmentLeads = previousLeads;
     state.auditLog = state.auditLog.filter((entry) => entry.id !== auditEntry.id);
-    ui.notice = error.message || "Unable to remove department.";
     render();
-  }
+  });
 }
 
 async function saveDepartment(event) {
@@ -2811,15 +2899,21 @@ async function saveDepartment(event) {
     name: form.get("name").trim(),
     coverageTarget: Number(form.get("coverageTarget") || 0)
   };
-  if (existing) Object.assign(existing, department);
-  else state.departments.push(department);
-  coverageTargets[department.id] = department.coverageTarget;
-  saveCoverageTargets();
-  audit(existing ? "department.updated" : "department.created", "department", department.id, department.name);
-  await dataStore.upsertDepartment(department);
-  await saveState();
-  ui.drawer = { type: "department-detail", departmentId: department.id };
-  render();
+  await runMutation("department-save", {
+    pending: "Saving department...",
+    success: existing ? "Department saved." : "Department created.",
+    failure: "The department could not be saved."
+  }, async () => {
+    if (existing) Object.assign(existing, department);
+    else state.departments.push(department);
+    coverageTargets[department.id] = department.coverageTarget;
+    saveCoverageTargets();
+    audit(existing ? "department.updated" : "department.created", "department", department.id, department.name);
+    await dataStore.upsertDepartment(department);
+    await saveState();
+    ui.drawer = { type: "department-detail", departmentId: department.id };
+    render();
+  });
 }
 
 async function assignDepartmentMembers(event) {
@@ -2830,16 +2924,22 @@ async function assignDepartmentMembers(event) {
   const form = new FormData(event.currentTarget);
   const profileIds = form.getAll("profileId");
   if (!profileIds.length) return;
-  for (const profileId of profileIds) {
-    const profile = byId(state.profiles, profileId);
-    if (!profile) continue;
-    profile.departmentId = department.id;
-    audit("profile.department_assigned", "profile", profile.id, `${profile.name} added to ${department.name}`);
-    await dataStore.updateProfile(profile);
-  }
-  await saveState();
-  ui.drawer = { type: "department-detail", departmentId: department.id };
-  render();
+  await runMutation("department-members", {
+    pending: "Adding selected members...",
+    success: `${profileIds.length} ${profileIds.length === 1 ? "member" : "members"} added.`,
+    failure: "Selected members could not be added."
+  }, async () => {
+    for (const profileId of profileIds) {
+      const profile = byId(state.profiles, profileId);
+      if (!profile) continue;
+      profile.departmentId = department.id;
+      audit("profile.department_assigned", "profile", profile.id, `${profile.name} added to ${department.name}`);
+      await dataStore.updateProfile(profile);
+    }
+    await saveState();
+    ui.drawer = { type: "department-detail", departmentId: department.id };
+    render();
+  });
 }
 
 async function saveVacationRequest(event) {
@@ -2859,13 +2959,19 @@ async function saveVacationRequest(event) {
     decidedAt: null,
     deductedDays: 0
   };
-  state.vacationRequests.unshift(request);
-  audit("vacation.requested", "vacation_request", request.id, `${request.startDate} to ${request.endDate}`);
-  await dataStore.createVacationRequest(request);
-  await saveState();
-  ui.activeView = "requests";
-  ui.drawer = null;
-  render();
+  await runMutation("vacation-request", {
+    pending: "Submitting vacation request...",
+    success: "Vacation request submitted.",
+    failure: "The vacation request could not be submitted."
+  }, async () => {
+    state.vacationRequests.unshift(request);
+    audit("vacation.requested", "vacation_request", request.id, `${request.startDate} to ${request.endDate}`);
+    await dataStore.createVacationRequest(request);
+    await saveState();
+    ui.activeView = "requests";
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function decideRequest(requestId, decision) {
@@ -2873,38 +2979,44 @@ async function decideRequest(requestId, decision) {
   const profile = byId(state.profiles, request.profileId);
   if (!request || !profile || request.status !== "pending" || !canManageDepartment(profile.departmentId)) return;
   const days = workdayCount(profile.id, request.startDate, request.endDate);
-  if (dataStore?.mode === "supabase") {
-    await dataStore.updateVacationDecision({ ...request, status: decision }, profile, []);
-    audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
-    ui.drawer = null;
-    await reloadState();
-    return;
-  }
-
-  const changedOverrides = [];
-  request.status = decision;
-  request.decidedBy = currentUser().id;
-  request.decidedAt = new Date().toISOString();
-  request.deductedDays = decision === "approved" ? days : 0;
-
-  if (decision === "approved") {
-    profile.remainingVacationDays -= days;
-    for (let offset = 0; offset <= dateDiff(request.startDate, request.endDate); offset += 1) {
-      const date = addDays(request.startDate, offset);
-      if (scheduleFor(profile.id, date).kind !== "working") continue;
-      const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
-      const payload = { id: existing?.id || makeId("ovr"), profileId: profile.id, date, statusId: "vacation", note: `Vacation request ${request.id}` };
-      if (existing) Object.assign(existing, payload);
-      else state.scheduleOverrides.push(payload);
-      changedOverrides.push(payload);
+  await runMutation("vacation-decision", {
+    pending: decision === "approved" ? "Approving request..." : "Rejecting request...",
+    success: decision === "approved" ? "Request approved." : "Request rejected.",
+    failure: "The request decision could not be saved."
+  }, async () => {
+    if (dataStore?.mode === "supabase") {
+      await dataStore.updateVacationDecision({ ...request, status: decision }, profile, []);
+      audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
+      ui.drawer = null;
+      await reloadState();
+      return;
     }
-  }
 
-  audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
-  await dataStore.updateVacationDecision(request, profile, changedOverrides);
-  await saveState();
-  ui.drawer = null;
-  render();
+    const changedOverrides = [];
+    request.status = decision;
+    request.decidedBy = currentUser().id;
+    request.decidedAt = new Date().toISOString();
+    request.deductedDays = decision === "approved" ? days : 0;
+
+    if (decision === "approved") {
+      profile.remainingVacationDays -= days;
+      for (let offset = 0; offset <= dateDiff(request.startDate, request.endDate); offset += 1) {
+        const date = addDays(request.startDate, offset);
+        if (scheduleFor(profile.id, date).kind !== "working") continue;
+        const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
+        const payload = { id: existing?.id || makeId("ovr"), profileId: profile.id, date, statusId: "vacation", note: `Vacation request ${request.id}` };
+        if (existing) Object.assign(existing, payload);
+        else state.scheduleOverrides.push(payload);
+        changedOverrides.push(payload);
+      }
+    }
+
+    audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
+    await dataStore.updateVacationDecision(request, profile, changedOverrides);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveLead(event) {
@@ -2913,13 +3025,19 @@ async function saveLead(event) {
   const form = new FormData(event.currentTarget);
   const existing = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
   const payload = { id: existing?.id || makeId("lead"), departmentId: ui.selectedDepartmentId, date: ui.drawer.date, profileId: form.get("profileId") };
-  if (existing) Object.assign(existing, payload);
-  else state.departmentLeads.push(payload);
-  audit("department.lead_set", "department_lead", payload.id, `${payload.date} lead`);
-  await dataStore.upsertDailyLead(payload);
-  await saveState();
-  ui.drawer = null;
-  render();
+  await runMutation("daily-lead", {
+    pending: "Saving daily lead...",
+    success: "Daily lead saved.",
+    failure: "The daily lead could not be saved."
+  }, async () => {
+    if (existing) Object.assign(existing, payload);
+    else state.departmentLeads.push(payload);
+    audit("department.lead_set", "department_lead", payload.id, `${payload.date} lead`);
+    await dataStore.upsertDailyLead(payload);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 function bindDayEditorPreview() {
@@ -2958,6 +3076,7 @@ async function saveDayBulkOverrides(event) {
   const form = new FormData(event.currentTarget);
   const profiles = state.profiles.filter((profile) => profile.departmentId === ui.selectedDepartmentId);
   const changed = [];
+  const cleared = [];
 
   for (const profile of profiles) {
     const statusId = form.get(`status-${profile.id}`);
@@ -2967,9 +3086,7 @@ async function saveDayBulkOverrides(event) {
     const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
     if (shouldClear) {
       if (!existing) continue;
-      state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
-      audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
-      await dataStore.deleteScheduleOverride(existing);
+      cleared.push(existing);
       continue;
     }
     if (!existing && statusId === originalStatusId && !note) continue;
@@ -2981,19 +3098,31 @@ async function saveDayBulkOverrides(event) {
       statusId,
       note
     };
-    if (existing) Object.assign(existing, payload);
-    else state.scheduleOverrides.push(payload);
-    changed.push(payload);
+    changed.push({ existing, payload });
   }
 
-  for (const payload of changed) {
-    audit("schedule.override", "schedule_override", payload.id, `${payload.date} set to ${payload.statusId}`);
-    await dataStore.upsertScheduleOverride(payload);
-  }
+  await runMutation("day-bulk", {
+    pending: "Saving daily changes...",
+    success: "Daily changes saved.",
+    failure: "The daily changes could not be saved."
+  }, async () => {
+    for (const existing of cleared) {
+      state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
+      audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
+      await dataStore.deleteScheduleOverride(existing);
+    }
 
-  await saveState();
-  ui.drawer = null;
-  render();
+    for (const item of changed) {
+      if (item.existing) Object.assign(item.existing, item.payload);
+      else state.scheduleOverrides.push(item.payload);
+      audit("schedule.override", "schedule_override", item.payload.id, `${item.payload.date} set to ${item.payload.statusId}`);
+      await dataStore.upsertScheduleOverride(item.payload);
+    }
+
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveRotation(event) {
@@ -3010,13 +3139,19 @@ async function saveRotation(event) {
   }
   const existing = event.submitter?.value === "new-version" ? null : byId(state.rotationVersions, ui.drawer.rotationId);
   const payload = { id: existing?.id || makeId("rot"), profileId: form.get("profileId"), effectiveStart: form.get("effectiveStart"), pattern };
-  if (existing) Object.assign(existing, payload);
-  else state.rotationVersions.push(payload);
-  audit("rotation.saved", "rotation_version", payload.id, `${payload.pattern.length} day pattern`);
-  await dataStore.upsertRotation(payload);
-  await saveState();
-  ui.drawer = null;
-  render();
+  await runMutation("rotation-save", {
+    pending: "Saving rotation...",
+    success: existing ? "Rotation saved." : "Rotation created.",
+    failure: "The rotation could not be saved."
+  }, async () => {
+    if (existing) Object.assign(existing, payload);
+    else state.rotationVersions.push(payload);
+    audit("rotation.saved", "rotation_version", payload.id, `${payload.pattern.length} day pattern`);
+    await dataStore.upsertRotation(payload);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveDepartmentRotations(event) {
@@ -3036,9 +3171,11 @@ async function saveDepartmentRotations(event) {
   }
 
   const patterns = selectedProfiles.map((profile) => ({ profileId: profile.id, pattern }));
-  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
-  if (submitButton) submitButton.disabled = true;
-  try {
+  await runMutation("department-rotations", {
+    pending: "Saving department rotations...",
+    success: `Saved ${patterns.length} ${patterns.length === 1 ? "rotation" : "rotations"}.`,
+    failure: "The department rotations could not be saved."
+  }, async () => {
     const rotations = await dataStore.saveDepartmentRotations(ui.selectedDepartmentId, effectiveStart, patterns);
     state.rotationVersions.push(...rotations);
     rotations.forEach((rotation) => audit("rotation.saved", "rotation_version", rotation.id, `${rotation.pattern.length} day department pattern`));
@@ -3046,11 +3183,9 @@ async function saveDepartmentRotations(event) {
     ui.rotationDepartmentEdit = false;
     ui.rotationBulkEditing = false;
     ui.selectedRotationProfileIds = [];
-    notify(`Saved ${rotations.length} ${rotations.length === 1 ? "rotation" : "rotations"} starting ${effectiveStart}.`);
-  } catch (error) {
-    if (submitButton) submitButton.disabled = false;
-    notify(error.message || "The department rotations could not be saved.");
-  }
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveStatus(event) {
@@ -3064,13 +3199,19 @@ async function saveStatus(event) {
     color: "#991b1b",
     kind: form.get("kind")
   };
-  if (existing) Object.assign(existing, payload);
-  else state.statuses.push(payload);
-  audit("status.saved", "status", payload.id, payload.label);
-  await dataStore.upsertStatus(payload);
-  await saveState();
-  ui.drawer = null;
-  render();
+  await runMutation("status-save", {
+    pending: "Saving status...",
+    success: existing ? "Status saved." : "Status created.",
+    failure: "The status could not be saved."
+  }, async () => {
+    if (existing) Object.assign(existing, payload);
+    else state.statuses.push(payload);
+    audit("status.saved", "status", payload.id, payload.label);
+    await dataStore.upsertStatus(payload);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function reloadState() {
