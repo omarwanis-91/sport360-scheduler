@@ -120,6 +120,18 @@ Verified restrictions include:
 
 Run `supabase/audit/004_department_rotation_batch_audit.sql` after migration `012`. It verifies history preservation, valid Admin/Lead saves, invalid-status rejection, atomic failure, past-date restrictions, cross-department restrictions, and Employee denial. Every successful test write is rolled back.
 
+After applying migration `013_private_profile_photos.sql`, run `supabase/audit/005_profile_photo_storage_audit.sql`. It is read-only and verifies the private bucket, size limit, authenticated policy commands, and the count of storage versus legacy photo references.
+
+### Profile Photo Storage Audit Result - 2026-06-22
+
+All eight static Storage checks passed:
+
+- The `profile-photos` bucket exists, is private, and enforces the 750 KB limit.
+- Authenticated claimed users have signed-read access.
+- Admin and profile-owner INSERT, UPDATE, and DELETE policies are present.
+- The initial reference count is `storage=0, legacy=1`; the legacy image remains supported until replaced.
+- Live upload, save, reload, and private bucket visibility were verified after bucket creation.
+
 ### Department Rotation Batch Audit Result - 2026-06-21
 
 All eight checks passed:

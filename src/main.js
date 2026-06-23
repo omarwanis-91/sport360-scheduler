@@ -63,6 +63,8 @@ const ui = {
   rotationBulkEditing: false,
   rotationBulkPattern: [...defaultWeekPattern],
   rotationBulkEffectiveStart: todayIso,
+  pendingPhotoFile: null,
+  pendingPhotoDataUrl: "",
   drawer: null,
   loading: true,
   error: "",
@@ -1709,7 +1711,7 @@ function profileDrawer() {
           <span>${canEditPhoto ? "Drop an image here or choose from your PC." : "Photo editing is locked for your role."}</span>
         </div>
         <input id="photo-input" type="file" accept="image/*" ${canEditPhoto ? "" : "disabled"}>
-        <input name="photo" type="hidden" value="${profile?.photo || ""}">
+        <input name="photoRef" type="hidden" value="${profile?.photoRef || profile?.photo || ""}">
       </div>
       <label>Name<input name="name" required placeholder="Employee name" value="${profile?.name || ""}" ${canEdit ? "" : "disabled"}></label>
       <label>Email<input name="email" type="email" required placeholder="employee@sport360.test" value="${profile?.email || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
@@ -2270,6 +2272,10 @@ function bindEvents() {
 
   document.querySelectorAll("[data-open-drawer]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (button.dataset.openDrawer === "profile") {
+        ui.pendingPhotoFile = null;
+        ui.pendingPhotoDataUrl = "";
+      }
       ui.drawer = { type: button.dataset.openDrawer, ...button.dataset };
       render();
     });
@@ -2285,6 +2291,8 @@ function bindEvents() {
   });
 
   document.querySelector("#close-drawer")?.addEventListener("click", () => {
+    ui.pendingPhotoFile = null;
+    ui.pendingPhotoDataUrl = "";
     ui.drawer = null;
     render();
   });
@@ -2591,7 +2599,11 @@ function bindPhotoUploader() {
 }
 
 function handlePhotoFile(file) {
-  if (!file || !file.type.startsWith("image/")) return;
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!file || !allowedTypes.includes(file.type)) {
+    notify("Choose a JPG, PNG, WebP, or GIF image.");
+    return;
+  }
   if (file.size > 750000) {
     notify("Please choose an image under 750 KB for now.");
     return;
@@ -2599,9 +2611,9 @@ function handlePhotoFile(file) {
   const reader = new FileReader();
   reader.addEventListener("load", () => {
     const dataUrl = reader.result;
-    const photoInput = document.querySelector('input[name="photo"]');
     const preview = document.querySelector("#photo-preview");
-    if (photoInput) photoInput.value = dataUrl;
+    ui.pendingPhotoFile = file;
+    ui.pendingPhotoDataUrl = dataUrl;
     if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="">`;
   });
   reader.readAsDataURL(file);
@@ -2694,29 +2706,50 @@ async function saveProfile(event) {
     name: form.get("name"),
     title: hadProfileAdmin ? form.get("title") : existing.title,
     departmentId: hadProfileAdmin ? (form.get("departmentId") || null) : existing.departmentId,
-    photo: form.get("photo") || "",
+    photo: existing?.photo || "",
+    photoRef: existing?.photoRef || form.get("photoRef") || "",
     yearlyVacationDays: hadProfileAdmin ? Number(form.get("yearlyVacationDays")) : existing.yearlyVacationDays,
     remainingVacationDays: hadProfileAdmin ? Number(form.get("remainingVacationDays")) : existing.remainingVacationDays,
     userId: existing?.userId || null
   };
+  const previousPhotoRef = existing?.photoRef || "";
+  let uploadedPhoto = null;
+  try {
+    if (ui.pendingPhotoFile) {
+      uploadedPhoto = await dataStore.uploadProfilePhoto(profile.id, ui.pendingPhotoFile, ui.pendingPhotoDataUrl);
+      profile.photo = uploadedPhoto.url;
+      profile.photoRef = uploadedPhoto.reference;
+    }
+    if (existing && !hadProfileAdmin) await dataStore.updateOwnProfileName(profile);
+    else if (existing) await dataStore.updateProfile(profile);
+    else await dataStore.createProfile(profile);
+
+    if (hadProfileAdmin && existing?.userId && form.get("role")) {
+      const userRole = { userId: existing.userId, role: form.get("role") };
+      await dataStore.upsertUserRole(userRole);
+      const existingRole = state.userRoles?.find((role) => role.userId === userRole.userId);
+      if (existingRole) Object.assign(existingRole, userRole);
+      else {
+        state.userRoles ||= [];
+        state.userRoles.push(userRole);
+      }
+      if (existing.userId === currentUser()?.id) currentUser().role = userRole.role;
+      audit("role.updated", "user_role", userRole.userId, `${profile.name} set to ${userRole.role}`);
+    }
+  } catch (error) {
+    if (uploadedPhoto) await dataStore.deleteProfilePhoto(uploadedPhoto.reference).catch(() => {});
+    notify(error.message || "The profile could not be saved.");
+    return;
+  }
+
   if (existing) Object.assign(existing, profile);
   else state.profiles.push(profile);
-  if (hadProfileAdmin && existing?.userId && form.get("role")) {
-    const userRole = { userId: existing.userId, role: form.get("role") };
-    const existingRole = state.userRoles?.find((role) => role.userId === userRole.userId);
-    if (existingRole) Object.assign(existingRole, userRole);
-    else {
-      state.userRoles ||= [];
-      state.userRoles.push(userRole);
-    }
-    if (existing.userId === currentUser()?.id) currentUser().role = userRole.role;
-    await dataStore.upsertUserRole(userRole);
-    audit("role.updated", "user_role", userRole.userId, `${profile.name} set to ${userRole.role}`);
+  if (uploadedPhoto && previousPhotoRef && previousPhotoRef !== uploadedPhoto.reference) {
+    await dataStore.deleteProfilePhoto(previousPhotoRef).catch(() => {});
   }
+  ui.pendingPhotoFile = null;
+  ui.pendingPhotoDataUrl = "";
   audit(existing ? "profile.updated" : "profile.created", "profile", profile.id, profile.email);
-  if (existing && !hadProfileAdmin) await dataStore.updateOwnProfileName(profile);
-  else if (existing) await dataStore.updateProfile(profile);
-  else await dataStore.createProfile(profile);
   await saveState();
   ui.drawer = { type: "person", profileId: profile.id };
   render();

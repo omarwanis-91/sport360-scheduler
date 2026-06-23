@@ -92,8 +92,8 @@ Feature development freezes after Phase 3 while this production hardening phase 
   `window.__SPORT360_CONFIG__ = { supabaseUrl, supabaseAnonKey, allowSignup, release }`.
 - ✅ Generate production configuration from Netlify environment variables and local configuration from ignored `.env.local`.
 - ✅ Use Admin-created or invited accounts and hide public account creation when `allowSignup` is false.
-- ⏳ Store new profile photos in a private Supabase Storage bucket named `profile-photos`, with a legacy image fallback until old images are replaced.
-- ⬜ Add consistent loading, disabled, success, retry, offline, and failure states to every Supabase mutation.
+- ✅ Store new profile photos in a private Supabase Storage bucket named `profile-photos`, with a legacy image fallback until old images are replaced.
+- ⏳ Add consistent loading, disabled, success, retry, offline, and failure states to every Supabase mutation.
 - ⬜ Extract pure schedule and permission logic sufficiently to support automated Node tests.
 - ⬜ Add GitHub Actions for static checks, unit tests, the production build, and demo-mode Chromium smoke tests.
 - ⬜ Support current Chrome and Edge at 1024px, 1280px, 1440px, and 1920px widths. Mobile remains best-effort.

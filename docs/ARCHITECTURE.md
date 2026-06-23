@@ -125,6 +125,14 @@ Runtime environment values are not committed in frontend modules. `index.html` l
 - `SPORT360_ALLOW_SIGNUP=false` hides public account creation for the internal release.
 - `SPORT360_RELEASE` identifies the deployed release; Netlify falls back to `COMMIT_REF`.
 
+## Profile Photo Storage
+
+- New profile images are stored in the private Supabase Storage bucket `profile-photos`.
+- `employee_profiles.photo_url` stores a stable `storage:profile-photos/<profile-id>/<object>` reference rather than image bytes or a temporary URL.
+- Claimed users receive short-lived signed read URLs when application state loads.
+- Admins may write any profile folder; other users may write only the folder matching their claimed profile ID.
+- Existing data URLs and external photo URLs remain readable as legacy fallback until each image is replaced.
+
 ## Known Architectural Limits
 
 - `src/main.js` and `src/styles.css` are large and will eventually benefit from modularization.

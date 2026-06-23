@@ -1,6 +1,8 @@
 import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
 
+const profilePhotoPrefix = "storage:profile-photos/";
+
 export function shouldUseSupabase() {
   return Boolean(!appConfig.demoMode && supabaseConfig.url && supabaseConfig.anonKey);
 }
@@ -47,6 +49,10 @@ function createLocalStore() {
       }));
     },
     async upsertStatus() {},
+    async uploadProfilePhoto(profileId, file, dataUrl) {
+      return { reference: dataUrl, url: dataUrl };
+    },
+    async deleteProfilePhoto() {},
     async insertAudit() {}
   };
 }
@@ -89,7 +95,7 @@ function createRemoteStore(client) {
       await client.update("employee_profiles", `id=eq.${profile.id}`, toDbProfile(profile));
     },
     async updateOwnProfileName(profile) {
-      await client.rpc("update_own_profile", { p_profile_id: profile.id, p_full_name: profile.name, p_photo_url: profile.photo || null });
+      await client.rpc("update_own_profile", { p_profile_id: profile.id, p_full_name: profile.name, p_photo_url: profile.photoRef || profile.photo || null });
     },
     async upsertUserRole(userRole) {
       await client.upsert("user_roles", toDbUserRole(userRole), "user_id");
@@ -129,6 +135,22 @@ function createRemoteStore(client) {
     },
     async upsertStatus(status) {
       await client.upsert("shift_statuses", toDbStatus(status), "id");
+    },
+    async uploadProfilePhoto(profileId, file) {
+      const extension = photoExtension(file.type);
+      const path = `${profileId}/${crypto.randomUUID()}.${extension}`;
+      await client.uploadObject("profile-photos", path, file);
+      try {
+        const url = await client.signObject("profile-photos", path, 3600);
+        return { reference: `${profilePhotoPrefix}${path}`, url };
+      } catch (error) {
+        await client.deleteObject("profile-photos", path).catch(() => {});
+        throw error;
+      }
+    },
+    async deleteProfilePhoto(reference) {
+      const path = storagePhotoPath(reference);
+      if (path) await client.deleteObject("profile-photos", path);
     },
     async insertAudit(entry) {
       await client.insert("audit_log", toDbAudit(entry));
@@ -176,7 +198,7 @@ function createRestClient() {
         const session = getSession();
         return fetchJson(path, options, { ...headers, Authorization: `Bearer ${session?.access_token || supabaseConfig.anonKey}` }, true);
       }
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         clearStoredSession();
       }
       throw new Error(message);
@@ -294,8 +316,44 @@ function createRestClient() {
         method: "DELETE",
         headers: { Prefer: "return=minimal" }
       });
+    },
+    async uploadObject(bucket, objectPath, file) {
+      return request(`/storage/v1/object/${bucket}/${encodeObjectPath(objectPath)}`, {
+        method: "POST",
+        headers: { "Content-Type": file.type, "x-upsert": "false" },
+        body: file
+      });
+    },
+    async signObject(bucket, objectPath, expiresIn) {
+      const result = await request(`/storage/v1/object/sign/${bucket}/${encodeObjectPath(objectPath)}`, {
+        method: "POST",
+        body: JSON.stringify({ expiresIn })
+      });
+      const signedPath = result?.signedURL || result?.signedUrl || result?.signed_url;
+      if (!signedPath) throw new Error("Supabase did not return a signed photo URL.");
+      if (signedPath.startsWith("http")) return signedPath;
+      if (signedPath.startsWith("/storage/v1/")) return `${baseUrl}${signedPath}`;
+      return `${baseUrl}/storage/v1${signedPath.startsWith("/") ? signedPath : `/${signedPath}`}`;
+    },
+    async deleteObject(bucket, objectPath) {
+      return request(`/storage/v1/object/${bucket}`, {
+        method: "DELETE",
+        body: JSON.stringify({ prefixes: [objectPath] })
+      });
     }
   };
+}
+
+function encodeObjectPath(objectPath) {
+  return objectPath.split("/").map(encodeURIComponent).join("/");
+}
+
+function photoExtension(contentType) {
+  return ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" })[contentType] || "jpg";
+}
+
+function storagePhotoPath(reference = "") {
+  return reference.startsWith(profilePhotoPrefix) ? reference.slice(profilePhotoPrefix.length) : "";
 }
 
 function emptyState() {
@@ -326,7 +384,18 @@ async function loadRemoteState(client, session) {
     client.select("user_roles", "created_at")
   ]);
 
-  const mappedProfiles = profiles.map(fromDbProfile);
+  const mappedProfiles = await Promise.all(profiles.map(async (row) => {
+    const profile = fromDbProfile(row);
+    const photoPath = storagePhotoPath(profile.photoRef);
+    if (photoPath) {
+      try {
+        profile.photo = await client.signObject("profile-photos", photoPath, 3600);
+      } catch {
+        profile.photo = "";
+      }
+    }
+    return profile;
+  }));
   const currentProfile = mappedProfiles.find((profile) => profile.userId === session.user.id);
   const currentRole = roles.find((role) => role.user_id === session.user.id);
   const auditLog = currentRole?.role === "admin" ? await safeAuditLoad(client) : [];
@@ -373,6 +442,7 @@ function toDbDepartment(department) {
 }
 
 function fromDbProfile(row) {
+  const photoRef = row.photo_url || "";
   return {
     id: row.id,
     employeeId: row.employee_code,
@@ -380,7 +450,8 @@ function fromDbProfile(row) {
     name: row.full_name,
     title: row.title,
     departmentId: row.department_id,
-    photo: row.photo_url || "",
+    photo: storagePhotoPath(photoRef) ? "" : photoRef,
+    photoRef,
     yearlyVacationDays: row.yearly_vacation_days,
     remainingVacationDays: row.remaining_vacation_days,
     userId: row.user_id
@@ -395,7 +466,7 @@ function toDbProfile(profile) {
     full_name: profile.name,
     title: profile.title,
     department_id: profile.departmentId || null,
-    photo_url: profile.photo || null,
+    photo_url: profile.photoRef || profile.photo || null,
     yearly_vacation_days: profile.yearlyVacationDays,
     remaining_vacation_days: profile.remainingVacationDays,
     user_id: profile.userId

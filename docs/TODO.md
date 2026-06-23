@@ -7,11 +7,10 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Replace committed environment details with generated runtime configuration.
 - [x] Generate production configuration from Netlify variables and ignored local configuration.
 - [x] Disable public signup in production and verify Admin-created onboarding.
+- [~] Add consistent mutation loading, disabled, success, retry, offline, and failure states.
 
 ## Next
 
-- [~] Move new profile photos to private Supabase Storage with legacy fallback. (In progress)
-- [ ] Add consistent mutation loading, disabled, success, retry, offline, and failure states.
 - [ ] Add Node unit tests and GitHub Actions checks, build, and Chromium smoke tests.
 - [ ] Verify Chrome/Edge layouts at all supported desktop widths.
 - [ ] Document and rehearse production backup, restore, health check, monitoring, and rollback.
@@ -29,6 +28,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Moved new profile photos to private Supabase Storage with legacy fallback.
 - [x] Completed department-wide rotation editing with multi-person selection and shared weekly patterns.
 - [x] Added and verified atomic, history-preserving batch rotation saves for Admin and Department Leads.
 - [x] Passed all eight department rotation history, validation, atomicity, and role-boundary audit checks.
