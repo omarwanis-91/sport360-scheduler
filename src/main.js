@@ -1,6 +1,21 @@
 import { seedState } from "./data.js";
 import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
+import {
+  addDays as addDaysLogic,
+  byId,
+  dateDiff as dateDiffLogic,
+  datesBetween as datesBetweenLogic,
+  latestRotationForProfile as latestRotationForProfileLogic,
+  normalizeWeekPattern as normalizeWeekPatternLogic,
+  parseDate as parseDateLogic,
+  roleForProfile as roleForProfileLogic,
+  sanitizeRotationPattern as sanitizeRotationPatternLogic,
+  scheduleFor as scheduleForLogic,
+  toIso as toIsoLogic,
+  weekdayIndex as weekdayIndexLogic,
+  workdayCount as workdayCountLogic
+} from "./scheduleLogic.mjs";
 
 const storageKey = "sport360-scheduler-state";
 const todayIso = toIso(new Date());
@@ -145,7 +160,7 @@ function dailyStatusGroups() {
 }
 
 function sanitizeRotationPattern(pattern) {
-  return normalizeWeekPattern(pattern).map((statusId) => rotationStatusIds.includes(statusId) ? statusId : "weekend");
+  return sanitizeRotationPatternLogic(pattern, rotationStatusIds, defaultWeekPattern);
 }
 
 async function saveState() {
@@ -157,31 +172,21 @@ async function resetDemo() {
   location.reload();
 }
 
-function byId(collection, id) {
-  return collection.find((item) => item.id === id);
-}
-
 function makeId(prefix) {
   if (dataStore?.mode === "supabase" && crypto.randomUUID) return crypto.randomUUID();
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function parseDate(iso) {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  return parseDateLogic(iso);
 }
 
 function toIso(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return toIsoLogic(date);
 }
 
 function addDays(iso, amount) {
-  const date = parseDate(iso);
-  date.setDate(date.getDate() + amount);
-  return toIso(date);
+  return addDaysLogic(iso, amount);
 }
 
 function addMonths(monthIso, amount) {
@@ -190,12 +195,11 @@ function addMonths(monthIso, amount) {
 }
 
 function dateDiff(startIso, endIso) {
-  return Math.round((parseDate(endIso) - parseDate(startIso)) / 86400000);
+  return dateDiffLogic(startIso, endIso);
 }
 
 function weekdayIndex(iso) {
-  const jsDay = parseDate(iso).getDay();
-  return jsDay === 0 ? 6 : jsDay - 1;
+  return weekdayIndexLogic(iso);
 }
 
 function formatDay(iso) {
@@ -211,8 +215,7 @@ function datesInRange() {
 }
 
 function datesBetween(startIso, endIso) {
-  const days = Math.max(0, dateDiff(startIso, endIso));
-  return Array.from({ length: days + 1 }, (_, index) => addDays(startIso, index));
+  return datesBetweenLogic(startIso, endIso);
 }
 
 function currentUser() {
@@ -224,10 +227,7 @@ function currentProfile() {
 }
 
 function roleForProfile(profile) {
-  if (!profile?.userId) return "unclaimed";
-  return state.userRoles?.find((role) => role.userId === profile.userId)?.role
-    || state.users?.find((user) => user.id === profile.userId)?.role
-    || "employee";
+  return roleForProfileLogic(state, profile);
 }
 
 function departmentProfiles() {
@@ -319,36 +319,18 @@ function editableDate(iso) {
 }
 
 function activeRotation(profileId, dateIso) {
-  return state.rotationVersions
-    .filter((rotation) => rotation.profileId === profileId && rotation.effectiveStart <= dateIso)
-    .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
+  return latestRotationForProfileLogic(
+    state.rotationVersions.filter((rotation) => rotation.effectiveStart <= dateIso),
+    profileId
+  );
 }
 
 function scheduleFor(profileId, dateIso) {
-  const override = state.scheduleOverrides.find((entry) => entry.profileId === profileId && entry.date === dateIso);
-  const rotation = activeRotation(profileId, dateIso);
-  const rotationStatus = rotation ? byId(state.statuses, rotation.pattern.length === 7
-    ? rotation.pattern[weekdayIndex(dateIso)]
-    : rotation.pattern[Math.max(0, dateDiff(rotation.effectiveStart, dateIso)) % rotation.pattern.length]) : null;
-  if (override) {
-    return {
-      ...byId(state.statuses, override.statusId),
-      source: "Override",
-      note: override.note,
-      override,
-      rotation,
-      rotationStatus
-    };
-  }
-
-  if (!rotation) return { id: "empty", label: "Unassigned", color: "#3f3f46", kind: "off", source: "No rotation" };
-
-  return { ...rotationStatus, source: "Rotation", rotation, rotationStatus };
+  return scheduleForLogic(state, profileId, dateIso);
 }
 
 function workdayCount(profileId, startIso, endIso) {
-  const days = dateDiff(startIso, endIso) + 1;
-  return Array.from({ length: days }, (_, index) => addDays(startIso, index)).filter((date) => scheduleFor(profileId, date).kind === "working").length;
+  return workdayCountLogic(state, profileId, startIso, endIso);
 }
 
 function coverageForDate(profiles, date) {
@@ -2265,8 +2247,7 @@ function patternSlot(statusId, index, canEdit = true) {
 }
 
 function normalizeWeekPattern(pattern = defaultWeekPattern) {
-  if (pattern.length === 7) return [...pattern];
-  return Array.from({ length: 7 }, (_, index) => pattern[index % pattern.length] || defaultWeekPattern[index]);
+  return normalizeWeekPatternLogic(pattern, defaultWeekPattern);
 }
 
 function rotationPatternStats(pattern) {
