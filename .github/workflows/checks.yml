@@ -30,3 +30,10 @@ jobs:
           SPORT360_SUPABASE_URL: ${{ secrets.SPORT360_SUPABASE_URL }}
           SPORT360_SUPABASE_ANON_KEY: ${{ secrets.SPORT360_SUPABASE_ANON_KEY }}
           SPORT360_ALLOW_SIGNUP: "false"
+          SPORT360_DEMO_MODE: "true"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Chromium smoke test
+        run: npm run test:smoke
