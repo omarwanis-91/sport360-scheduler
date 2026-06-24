@@ -46,3 +46,18 @@ test("profile calendar keeps the open day visibly selected", async ({ page }) =>
   await expect(calendarDays.first()).toHaveAttribute("aria-pressed", "false");
   await expect(calendarDays.nth(1)).toHaveAttribute("aria-pressed", "true");
 });
+
+test("personal profile shift details stay read-only and route edits to Scheduler", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+
+  const upcomingShift = page.locator('.my-shifts [data-open-drawer="calendar-day"]').first();
+  await upcomingShift.click();
+
+  await expect(page.getByRole("heading", { name: "Day Details", exact: true })).toBeVisible();
+  await expect(page.locator("#shift-form")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open in Scheduler", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Open in Scheduler", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Operations", exact: true })).toBeVisible();
+});

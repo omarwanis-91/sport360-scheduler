@@ -586,7 +586,7 @@ function renderMyProfile() {
         ${upcoming.map((date) => {
           const status = scheduleFor(profile.id, date);
           return `
-            <button class="request-row ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">
+            <button class="request-row ${status.id}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}">
               <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
               <div>
                 <strong>${formatDay(date)} ${formatDate(date)}</strong>
@@ -638,7 +638,7 @@ function renderProfilePage() {
           ${upcoming.map((date) => {
             const status = scheduleFor(profile.id, date);
             return `
-              <button class="request-row ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">
+              <button class="request-row ${status.id}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}">
                 <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
                 <div>
                   <strong>${formatDay(date)} ${formatDate(date)}</strong>
@@ -1879,6 +1879,7 @@ function calendarDayDrawer() {
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
   const canRequest = canRequestVacationFor(profile);
+  const canOpenScheduler = canManageDepartment(profile.departmentId);
   return `
     <div class="drawer-stack">
       <div class="person-summary">
@@ -1908,7 +1909,7 @@ function calendarDayDrawer() {
           <span>${approvedVacation.startDate} to ${approvedVacation.endDate}</span>
         </button>
       ` : ""}
-      <button type="button" class="ghost wide" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">View Shift Details</button>
+      ${canOpenScheduler ? `<button type="button" class="ghost wide" data-open-scheduler-date="${date}" data-department-id="${profile.departmentId}">Open in Scheduler</button>` : ""}
       <button type="button" class="primary wide" data-open-drawer="request" data-profile-id="${profile.id}" data-date="${date}" ${canRequest ? "" : "disabled"}>Request Vacation From This Day</button>
     </div>
   `;
@@ -2573,6 +2574,16 @@ function bindEvents() {
     button.addEventListener("click", () => {
       ui.selectedDepartmentId = button.dataset.goRotations;
       ui.activeView = "rotations";
+      ui.drawer = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-open-scheduler-date]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.selectedDepartmentId = button.dataset.departmentId;
+      ui.startDate = button.dataset.openSchedulerDate;
+      ui.activeView = "scheduler";
       ui.drawer = null;
       render();
     });
