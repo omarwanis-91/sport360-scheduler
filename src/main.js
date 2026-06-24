@@ -790,12 +790,15 @@ function renderCalendarDay(profile, date) {
   const schedule = scheduleFor(profile.id, date);
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
+  const isSelected = ui.drawer?.type === "calendar-day"
+    && ui.drawer.profileId === profile.id
+    && ui.drawer.date === date;
   const sourceClass = schedule.source.toLowerCase().replace(/\s+/g, "-");
   const dayClass = schedule.id === "ground" ? "away" : schedule.kind;
   const weekendClass = weekdayIndex(date) >= 5 ? "weekend-day" : "";
-  const calendarClass = `month-day ${dayClass} ${schedule.id} ${sourceClass} ${weekendClass} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""}`;
+  const calendarClass = `month-day ${dayClass} ${schedule.id} ${sourceClass} ${weekendClass} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
   return `
-    <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" title="${schedule.label} - ${schedule.source}">
+    <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${schedule.label} - ${schedule.source}">
       <span>${parseDate(date).getDate()}</span>
       <em>${statusIcons[schedule.id] || icons.scheduler}</em>
       ${pendingVacation ? `<i class="day-marker pending"></i>` : ""}

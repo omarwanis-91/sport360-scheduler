@@ -1682,6 +1682,23 @@ label {
   border-color: var(--red-border);
 }
 
+.month-day.selected {
+  z-index: 1;
+  border-color: rgba(251, 113, 133, 0.82);
+  box-shadow:
+    0 0 0 2px rgba(225, 29, 72, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.month-day.selected::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(251, 113, 133, 0.24);
+  border-radius: 5px;
+  pointer-events: none;
+}
+
 .month-day.empty {
   min-height: 46px;
   border-color: transparent;

@@ -32,3 +32,17 @@ test("creation opens centered while editing stays in the right sidebar", async (
   await expect(page.locator(".drawer.edit-sidebar")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Department", exact: true })).toBeVisible();
 });
+
+test("profile calendar keeps the open day visibly selected", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+
+  const calendarDays = page.locator('.person-calendar.page [data-open-drawer="calendar-day"]');
+  await expect(calendarDays.first()).toBeVisible();
+  await calendarDays.first().click();
+  await expect(calendarDays.first()).toHaveAttribute("aria-pressed", "true");
+
+  await calendarDays.nth(1).click();
+  await expect(calendarDays.first()).toHaveAttribute("aria-pressed", "false");
+  await expect(calendarDays.nth(1)).toHaveAttribute("aria-pressed", "true");
+});
