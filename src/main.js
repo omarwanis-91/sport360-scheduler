@@ -1530,10 +1530,11 @@ function renderMiniActivity(entries) {
 
 function renderDrawer() {
   if (!ui.drawer) return "";
+  const isCreation = isCreationDrawer();
   const titleMap = {
     shift: "Shift Override",
     person: "Employee Profile",
-    profile: "New Profile",
+    profile: ui.drawer.profileId ? "Edit Profile" : "New Profile",
     request: "New Vacation",
     "request-detail": "Vacation Request",
     lead: "Day Editor",
@@ -1549,17 +1550,23 @@ function renderDrawer() {
   };
 
   return `
-    <aside class="drawer open">
+    <aside class="drawer open ${isCreation ? "creation-modal" : "edit-sidebar"}" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
       <div class="drawer-head">
         <div>
-          <span class="eyebrow">Details</span>
-          <h2>${titleMap[ui.drawer.type]}</h2>
+          <span class="eyebrow">${isCreation ? "Create" : "Details"}</span>
+          <h2 id="drawer-title">${titleMap[ui.drawer.type]}</h2>
         </div>
         <button class="icon-button" id="close-drawer">${icons.close}</button>
       </div>
       ${drawerBody()}
     </aside>
   `;
+}
+
+function isCreationDrawer() {
+  if (!ui.drawer) return false;
+  if (ui.drawer.type === "profile") return !ui.drawer.profileId;
+  return ["request", "department", "department-member", "rotation", "status"].includes(ui.drawer.type);
 }
 
 function drawerBody() {
