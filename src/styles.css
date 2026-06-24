@@ -2384,11 +2384,55 @@ label {
 }
 
 .member-choice-card {
+  position: relative;
   display: grid;
   gap: 5px;
   min-height: 86px;
   align-content: center;
   padding: 13px;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.member-choice-card::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--red);
+  opacity: 0;
+  transform: scaleY(0.45);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.member-choice-card:hover,
+.member-choice-card:focus-visible {
+  border-color: rgba(251, 113, 133, 0.62);
+  background:
+    linear-gradient(90deg, rgba(225, 29, 72, 0.13), rgba(255, 255, 255, 0.035) 48%, rgba(255, 255, 255, 0.018)),
+    #121212;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.member-choice-card:hover::before,
+.member-choice-card:focus-visible::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.member-choice-card:hover strong,
+.member-choice-card:focus-visible strong {
+  color: #fff;
 }
 
 .member-choice-card strong,
