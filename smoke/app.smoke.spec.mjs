@@ -57,9 +57,29 @@ test("personal profile shift details stay read-only and route edits to Scheduler
   await upcomingShift.click();
 
   await expect(page.getByRole("heading", { name: "Day Details", exact: true })).toBeVisible();
+  await expect(page.locator(".person-summary-copy > span")).toHaveText("Thu Jun 25");
+  await expect(page.locator(".person-summary-copy > small")).toHaveText("Operations");
   await expect(page.locator("#shift-form")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open in Scheduler", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Open in Scheduler", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Operations", exact: true })).toBeVisible();
+});
+
+test("admins can assign seniority and weekly or daily department leads", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Seniority", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Department role", exact: true })).toHaveValue("lead");
+
+  await page.locator("#close-drawer").click();
+  await page.getByRole("button", { name: "Rotations", exact: true }).click();
+  await expect(page.getByText("Department Lead Rotation", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Sat", exact: true })).toHaveValue("emp-003");
+
+  await page.getByRole("button", { name: "Scheduler", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Sat Jun 27 Lead: Karim", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Thu Jun 25 Lead: Mona", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
 });

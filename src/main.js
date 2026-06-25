@@ -6,6 +6,7 @@ import {
   byId,
   dateDiff as dateDiffLogic,
   datesBetween as datesBetweenLogic,
+  departmentLeadForDate as departmentLeadForDateLogic,
   latestRotationForProfile as latestRotationForProfileLogic,
   normalizeWeekPattern as normalizeWeekPatternLogic,
   parseDate as parseDateLogic,
@@ -55,6 +56,13 @@ const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const defaultWeekPattern = ["morning", "morning", "morning", "morning", "morning", "weekend", "weekend"];
 const rotationStatusIds = ["morning", "midday", "night", "weekend"];
 const exceptionStatusIds = ["vacation", "sick", "ground"];
+const seniorityLevels = [
+  ["junior", "Junior"],
+  ["mid", "Mid-level"],
+  ["senior", "Senior"],
+  ["lead", "Lead"],
+  ["manager", "Manager"]
+];
 
 let dataStore;
 let state = structuredClone(seedState);
@@ -323,6 +331,20 @@ function activeRotation(profileId, dateIso) {
     state.rotationVersions.filter((rotation) => rotation.effectiveStart <= dateIso),
     profileId
   );
+}
+
+function leadCandidates(departmentId) {
+  return state.profiles.filter((profile) => profile.departmentId === departmentId && profile.leadEligible);
+}
+
+function latestLeadRotation(departmentId) {
+  return (state.departmentLeadRotations || [])
+    .filter((rotation) => rotation.departmentId === departmentId)
+    .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
+}
+
+function departmentLeadForDate(departmentId, dateIso) {
+  return departmentLeadForDateLogic(state, departmentId, dateIso);
 }
 
 function scheduleFor(profileId, dateIso) {
@@ -905,13 +927,12 @@ function coverageTargetForDepartment(department) {
 }
 
 function renderDateHead(date) {
-  const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === date);
-  const leadProfile = byId(state.profiles, lead?.profileId);
+  const lead = departmentLeadForDate(ui.selectedDepartmentId, date);
   return `
     <button class="date-head ${date === todayIso ? "today" : ""}" data-open-drawer="lead" data-date="${date}">
       <span>${formatDay(date)}</span>
       <strong>${formatDate(date)}</strong>
-      <em>${leadProfile ? `Lead: ${leadProfile.name.split(" ")[0]}` : "No lead"}</em>
+      <em>${lead.profile ? `Lead: ${lead.profile.name.split(" ")[0]}` : "No lead"}</em>
     </button>
   `;
 }
@@ -1163,7 +1184,7 @@ function renderDepartments() {
       <template>
       ${state.departments.map((department) => {
         const members = state.profiles.filter((profile) => profile.departmentId === department.id);
-        const leadCount = dates.filter((date) => state.departmentLeads.some((lead) => lead.departmentId === department.id && lead.date === date)).length;
+        const leadCount = dates.filter((date) => departmentLeadForDate(department.id, date).profile).length;
         return `
           <button class="metric-card" data-open-drawer="department-detail" data-department-id="${department.id}">
             <span class="eyebrow">${department.name}</span>
@@ -1179,7 +1200,7 @@ function renderDepartments() {
 
 function departmentStats(department, dates = datesInRange()) {
   const members = state.profiles.filter((profile) => profile.departmentId === department.id);
-  const leadCount = dates.filter((date) => state.departmentLeads.some((lead) => lead.departmentId === department.id && lead.date === date)).length;
+  const leadCount = dates.filter((date) => departmentLeadForDate(department.id, date).profile).length;
   const pendingRequests = state.vacationRequests.filter((request) => {
     const profile = byId(state.profiles, request.profileId);
     return profile?.departmentId === department.id && request.status === "pending";
@@ -1246,6 +1267,7 @@ function renderRotations() {
         <span><strong>${stats.nextEffective || "None"}</strong> next start</span>
       </div>
     </section>
+    ${renderLeadRotationPanel(department)}
     ${ui.rotationDepartmentEdit ? renderDepartmentRotationToolbar(profiles) : ""}
     <section class="rotation-board">
       <div class="rotation-grid">
@@ -1308,6 +1330,45 @@ function renderRotationRow(profile) {
       </button>
     `}
     ${pattern.map((statusId) => renderRotationCell(profile, rotation, statusId)).join("")}
+  `;
+}
+
+function renderLeadRotationPanel(department) {
+  if (!department) return "";
+  const candidates = leadCandidates(department.id);
+  const rotation = latestLeadRotation(department.id);
+  const fallbackId = candidates[0]?.id || "";
+  const pattern = Array.from({ length: 7 }, (_, index) => rotation?.pattern?.[index] || fallbackId);
+  const canEdit = canManageDepartment(department.id);
+  return `
+    <form class="lead-rotation-panel" id="lead-rotation-form">
+      <div class="lead-rotation-head">
+        <div>
+          <span class="eyebrow">Department Lead Rotation</span>
+          <strong>${rotation ? `Effective ${formatDay(rotation.effectiveStart)} ${formatDate(rotation.effectiveStart)}` : "No weekly lead rotation"}</strong>
+          <p>Choose the default lead for each weekday. Scheduler day assignments override this pattern.</p>
+        </div>
+        <label>Effective start<input type="date" name="effectiveStart" value="${rotation?.effectiveStart || todayIso}" ${canEdit ? "" : "disabled"} required></label>
+      </div>
+      ${candidates.length ? `
+        <div class="lead-rotation-days">
+          ${weekDays.map((day, index) => `
+            <label>
+              <span>${day}</span>
+              <select name="lead-${index}" ${canEdit ? "" : "disabled"}>
+                ${candidates.map((profile) => `<option value="${profile.id}" ${pattern[index] === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}
+              </select>
+            </label>
+          `).join("")}
+        </div>
+        <button class="primary" ${canEdit ? "" : "disabled"}>Save Lead Rotation</button>
+      ` : `
+        <div class="empty-state compact">
+          <strong>No eligible department leads</strong>
+          <span>Edit a profile and enable Department Lead Candidate first.</span>
+        </div>
+      `}
+    </form>
   `;
 }
 
@@ -1639,7 +1700,11 @@ function shiftDrawer() {
     <form id="shift-form" class="drawer-form">
       <div class="person-summary">
         <div class="avatar large">${avatar(profile)}</div>
-        <div><strong>${profile.name}</strong><span>${ui.drawer.date} · ${schedule.source}</span></div>
+        <div class="person-summary-copy">
+          <strong>${profile.name}</strong>
+          <span>${formatDay(ui.drawer.date)} ${formatDate(ui.drawer.date)}</span>
+          <small>${schedule.source}</small>
+        </div>
       </div>
       ${pendingVacation ? `
         <button type="button" class="request-context pending" data-open-drawer="request-detail" data-request-id="${pendingVacation.id}">
@@ -1695,6 +1760,8 @@ function personDrawer() {
       </div>
       <div class="detail-line"><span>Department</span><strong>${department?.name || "Unassigned"}</strong></div>
       <div class="detail-line"><span>Email</span><strong>${profile.email}</strong></div>
+      <div class="detail-line"><span>Seniority</span><strong>${seniorityLevels.find(([id]) => id === profile.seniorityLevel)?.[1] || "Mid-level"}</strong></div>
+      <div class="detail-line"><span>Department lead</span><strong>${profile.leadEligible ? "Eligible" : "No"}</strong></div>
       <div class="detail-line"><span>Role</span><strong>${profile.userId ? roleForProfile(profile) : "Unclaimed"}</strong></div>
       <div class="detail-line"><span>Vacation</span><strong>${profile.remainingVacationDays} / ${profile.yearlyVacationDays}</strong></div>
       <div class="detail-line"><span>Claiming</span><strong>${profile.userId ? "Account linked" : "Waiting for matching sign-in"}</strong></div>
@@ -1740,6 +1807,13 @@ function profileDrawer() {
       <label>Name<input name="name" required placeholder="Employee name" value="${profile?.name || ""}" ${canEdit ? "" : "disabled"}></label>
       <label>Email<input name="email" type="email" required placeholder="employee@sport360.test" value="${profile?.email || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
       <label>Title<input name="title" required placeholder="Agent" value="${profile?.title || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
+      <label>Seniority<select name="seniorityLevel" ${canEditAdminFields ? "" : "disabled"}>
+        ${seniorityLevels.map(([id, label]) => `<option value="${id}" ${(profile?.seniorityLevel || "mid") === id ? "selected" : ""}>${label}</option>`).join("")}
+      </select></label>
+      <label>Department role<select name="departmentRole" ${canEditAdminFields ? "" : "disabled"}>
+        <option value="member" ${profile?.leadEligible ? "" : "selected"}>Member</option>
+        <option value="lead" ${profile?.leadEligible ? "selected" : ""}>Department Lead</option>
+      </select></label>
       <label>Employee ID<input name="employeeId" required placeholder="SCH-100" value="${profile?.employeeId || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
       <label>Department<select name="departmentId" ${canEditAdminFields ? "" : "disabled"}>
         <option value="" ${!(profile?.departmentId || ui.drawer.departmentId) ? "selected" : ""}>Unassigned</option>
@@ -1748,11 +1822,11 @@ function profileDrawer() {
       <label>Yearly vacation days<input name="yearlyVacationDays" type="number" min="0" value="${profile?.yearlyVacationDays || 21}" ${canEditAdminFields ? "" : "disabled"}></label>
       <label>Remaining vacation days<input name="remainingVacationDays" type="number" min="0" value="${profile?.remainingVacationDays ?? profile?.yearlyVacationDays ?? 21}" ${canEditAdminFields ? "" : "disabled"}></label>
       ${canEditAdminFields && profile?.userId ? `
-        <label>Role<select name="role">
+        <label>Application access role<select name="role">
           ${["employee", "lead", "admin"].map((role) => `<option value="${role}" ${roleForProfile(profile) === role ? "selected" : ""}>${role}</option>`).join("")}
         </select></label>
       ` : ""}
-      <p class="hint">${canEditAdminFields ? (profile?.userId ? "This profile is claimed. Changing email affects future sign-ins, not the linked account." : "The employee can claim this profile by signing in with the same email.") : "Employees can only update their display name here. Admins manage role, department, email, and balances."}</p>
+      <p class="hint">${canEditAdminFields ? (profile?.userId ? "Lead candidacy controls schedule assignments. Application access controls permissions." : "Lead candidacy can be assigned now. Application access is assigned after profile claiming.") : "Employees can only update their display name here. Admins manage seniority, lead candidacy, access, department, email, and balances."}</p>
       <button class="primary wide" ${canEdit ? "" : "disabled"}>${profile ? "Save Profile" : "Create Profile"}</button>
     </form>
   `;
@@ -1764,7 +1838,7 @@ function departmentDrawer() {
   const coverageTarget = department ? coverageTargetForDepartment(department) : 1;
   const canEdit = canManageDepartments();
   const dates = datesInRange();
-  const assignedLeadDays = department ? dates.filter((date) => state.departmentLeads.some((lead) => lead.departmentId === department.id && lead.date === date)).length : 0;
+  const assignedLeadDays = department ? dates.filter((date) => departmentLeadForDate(department.id, date).profile).length : 0;
   const stats = department ? departmentStats(department, dates) : null;
   return `
     <form id="department-form" class="drawer-form">
@@ -1885,7 +1959,11 @@ function calendarDayDrawer() {
     <div class="drawer-stack">
       <div class="person-summary">
         <div class="avatar large">${avatar(profile)}</div>
-        <div><strong>${profile.name}</strong><span>${formatDay(date)} ${formatDate(date)} · ${department?.name || "No department"}</span></div>
+        <div class="person-summary-copy">
+          <strong>${profile.name}</strong>
+          <span>${formatDay(date)} ${formatDate(date)}</span>
+          <small>${department?.name || "No department"}</small>
+        </div>
       </div>
       <div class="calendar-day-summary ${schedule.kind}">
         <span class="shift-icon">${statusIcons[schedule.id] || icons.scheduler}</span>
@@ -2079,7 +2157,9 @@ function bulkRotationDay(statusId, index) {
 
 function leadDrawer() {
   const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
+  const resolvedLead = departmentLeadForDate(ui.selectedDepartmentId, ui.drawer.date);
   const profiles = state.profiles.filter((profile) => profile.departmentId === ui.selectedDepartmentId);
+  const candidates = leadCandidates(ui.selectedDepartmentId);
   const canEdit = canManageDepartment(ui.selectedDepartmentId) && editableDate(ui.drawer.date);
   const department = byId(state.departments, ui.selectedDepartmentId);
   const coverage = coverageForDate(profiles, ui.drawer.date);
@@ -2123,7 +2203,10 @@ function leadDrawer() {
       </div>
 
       <form id="lead-form" class="day-lead-form">
-        <label>Day Lead<select name="profileId" ${canEdit ? "" : "disabled"}>${profiles.map((profile) => `<option value="${profile.id}" ${lead?.profileId === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}</select></label>
+        <label>Daily lead override<select name="profileId" ${canEdit ? "" : "disabled"}>
+          <option value="">Use weekly rotation${resolvedLead.rotation && resolvedLead.profile ? ` (${resolvedLead.profile.name})` : ""}</option>
+          ${candidates.map((profile) => `<option value="${profile.id}" ${lead?.profileId === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}
+        </select></label>
         <button class="ghost" ${canEdit ? "" : "disabled"}>Save</button>
       </form>
 
@@ -2503,6 +2586,7 @@ function bindEvents() {
   document.querySelector("#delete-department")?.addEventListener("click", deleteDepartment);
   document.querySelector("#department-member-form")?.addEventListener("submit", assignDepartmentMembers);
   document.querySelector("#rotation-form")?.addEventListener("submit", saveRotation);
+  document.querySelector("#lead-rotation-form")?.addEventListener("submit", saveLeadRotation);
   document.querySelector("#status-form")?.addEventListener("submit", saveStatus);
 
   document.querySelector("#save-rotation-preset")?.addEventListener("click", () => {
@@ -2783,6 +2867,8 @@ async function saveProfile(event) {
     email: hadProfileAdmin ? form.get("email") : existing.email,
     name: form.get("name"),
     title: hadProfileAdmin ? form.get("title") : existing.title,
+    seniorityLevel: hadProfileAdmin ? form.get("seniorityLevel") : existing.seniorityLevel,
+    leadEligible: hadProfileAdmin ? form.get("departmentRole") === "lead" : existing.leadEligible,
     departmentId: hadProfileAdmin ? (form.get("departmentId") || null) : existing.departmentId,
     photo: existing?.photo || "",
     photoRef: existing?.photoRef || form.get("photoRef") || "",
@@ -3070,18 +3156,61 @@ async function saveLead(event) {
   if (!canManageDepartment(ui.selectedDepartmentId) || !editableDate(ui.drawer.date)) return;
   const form = new FormData(event.currentTarget);
   const existing = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
-  const payload = { id: existing?.id || makeId("lead"), departmentId: ui.selectedDepartmentId, date: ui.drawer.date, profileId: form.get("profileId") };
+  const profileId = form.get("profileId");
+  const payload = { id: existing?.id || makeId("lead"), departmentId: ui.selectedDepartmentId, date: ui.drawer.date, profileId };
   await runMutation("daily-lead", {
     pending: "Saving daily lead...",
-    success: "Daily lead saved.",
+    success: profileId ? "Daily lead override saved." : "Daily lead returned to weekly rotation.",
     failure: "The daily lead could not be saved."
   }, async () => {
-    if (existing) Object.assign(existing, payload);
-    else state.departmentLeads.push(payload);
-    audit("department.lead_set", "department_lead", payload.id, `${payload.date} lead`);
-    await dataStore.upsertDailyLead(payload);
+    if (!profileId) {
+      if (existing) {
+        state.departmentLeads = state.departmentLeads.filter((item) => item.id !== existing.id);
+        await dataStore.deleteDailyLead(existing);
+        audit("department.lead_cleared", "department_lead", existing.id, `${existing.date} returned to weekly lead rotation`);
+      }
+    } else {
+      if (existing) Object.assign(existing, payload);
+      else state.departmentLeads.push(payload);
+      audit("department.lead_set", "department_lead", payload.id, `${payload.date} lead`);
+      await dataStore.upsertDailyLead(payload);
+    }
     await saveState();
     ui.drawer = null;
+    render();
+  });
+}
+
+async function saveLeadRotation(event) {
+  event.preventDefault();
+  const departmentId = ui.selectedDepartmentId;
+  if (!canManageDepartment(departmentId)) return;
+  const form = new FormData(event.currentTarget);
+  const effectiveStart = form.get("effectiveStart");
+  if (!effectiveStart || (!editableDate(effectiveStart) && !isAdmin())) return;
+  const pattern = weekDays.map((_, index) => form.get(`lead-${index}`));
+  if (pattern.some((profileId) => !leadCandidates(departmentId).some((profile) => profile.id === profileId))) {
+    notify("Every weekday needs an eligible lead from this department.", "error");
+    return;
+  }
+  const existing = (state.departmentLeadRotations || []).find((rotation) => rotation.departmentId === departmentId && rotation.effectiveStart === effectiveStart);
+  const payload = {
+    id: existing?.id || makeId("lead-rotation"),
+    departmentId,
+    effectiveStart,
+    pattern
+  };
+  await runMutation("lead-rotation", {
+    pending: "Saving department lead rotation...",
+    success: "Department lead rotation saved.",
+    failure: "The department lead rotation could not be saved."
+  }, async () => {
+    await dataStore.upsertDepartmentLeadRotation(payload);
+    state.departmentLeadRotations ||= [];
+    if (existing) Object.assign(existing, payload);
+    else state.departmentLeadRotations.push(payload);
+    audit("department.lead_rotation_saved", "department_lead_rotation", payload.id, `${effectiveStart} weekly lead pattern`);
+    await saveState();
     render();
   });
 }

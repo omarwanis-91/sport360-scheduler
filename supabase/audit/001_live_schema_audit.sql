@@ -10,6 +10,7 @@ with expected_tables(table_name) as (
     ('rotation_versions'),
     ('schedule_overrides'),
     ('department_daily_leads'),
+    ('department_lead_rotation_versions'),
     ('vacation_requests'),
     ('audit_log')
 ),
@@ -89,6 +90,20 @@ audit_checks as (
         and is_nullable = 'YES'
     ) then 'pass' else 'fail' end,
     'required for unassigned profiles'
+
+  union all
+
+  select
+    'column',
+    'employee_profiles lead fields',
+    case when (
+      select count(*)
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'employee_profiles'
+        and column_name in ('seniority_level', 'is_department_lead')
+    ) = 2 then 'pass' else 'fail' end,
+    'seniority and department lead eligibility'
 
   union all
 

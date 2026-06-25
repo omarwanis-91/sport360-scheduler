@@ -62,6 +62,26 @@ export function latestRotationForProfile(rotationVersions, profileId) {
     .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
 }
 
+export function activeLeadRotation(leadRotations, departmentId, dateIso) {
+  return leadRotations
+    .filter((rotation) => rotation.departmentId === departmentId && rotation.effectiveStart <= dateIso)
+    .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
+}
+
+export function departmentLeadForDate(state, departmentId, dateIso) {
+  const validProfile = (profileId) => {
+    const profile = byId(state.profiles, profileId);
+    return profile?.departmentId === departmentId && profile.leadEligible ? profile : null;
+  };
+  const override = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === dateIso);
+  const overrideProfile = validProfile(override?.profileId);
+  if (override && overrideProfile) return { profile: overrideProfile, source: "Daily override", override };
+
+  const rotation = activeLeadRotation(state.departmentLeadRotations || [], departmentId, dateIso);
+  const profile = validProfile(rotation?.pattern?.[weekdayIndex(dateIso)]);
+  return { profile, source: rotation && profile ? "Lead rotation" : "Unassigned", rotation };
+}
+
 export function scheduleFor(state, profileId, dateIso) {
   const override = state.scheduleOverrides.find((entry) => entry.profileId === profileId && entry.date === dateIso);
   const rotation = activeRotation(state.rotationVersions, profileId, dateIso);

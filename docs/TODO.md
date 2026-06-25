@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added profile seniority, department-lead eligibility, weekly lead rotations, and Scheduler daily lead overrides.
 - [x] Added consistent mutation loading, disabled, success, retry, offline, and failure states.
 - [x] Extracted pure schedule logic and added Node unit tests plus GitHub Actions syntax/test/build checks.
 - [x] Added a production-build Chromium smoke test covering app load and primary navigation.

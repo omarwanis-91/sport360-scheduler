@@ -161,3 +161,12 @@ Production accounts are created or invited by an Admin. Public account creation 
 **Status:** Accepted
 
 The initial production guarantee covers current Chrome and Edge on desktop and laptop displays 1024px wide and above. Mobile behavior remains best-effort until mobile is explicitly promoted to a supported target.
+
+## D-026 - Department Lead Eligibility And Rotation
+
+**Date:** 2026-06-25
+**Status:** Accepted
+
+Department lead eligibility is stored on the employee profile and is separate from the authenticated application access role. A person can be eligible for operational lead assignment without automatically receiving Department Lead permissions.
+
+Each department has an effective-dated seven-day lead rotation. The Scheduler resolves that weekly default for every date, while `department_daily_leads` remains a one-day override. This allows weekend and weekday leads to differ without duplicating daily assignments or rewriting historical patterns.

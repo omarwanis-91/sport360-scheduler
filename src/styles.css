@@ -110,6 +110,28 @@ svg {
   border-bottom: 1px solid var(--line-soft);
 }
 
+.person-summary-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.person-summary-copy strong,
+.person-summary-copy span,
+.person-summary-copy small {
+  display: block;
+}
+
+.person-summary-copy span {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.person-summary-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .brand-mark {
   display: grid;
   width: 34px;
@@ -3317,6 +3339,55 @@ label {
   white-space: nowrap;
 }
 
+.lead-rotation-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(19, 19, 19, 0.88);
+}
+
+.lead-rotation-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 18px;
+  align-items: end;
+}
+
+.lead-rotation-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.lead-rotation-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lead-rotation-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 7px;
+}
+
+.lead-rotation-days label {
+  gap: 5px;
+}
+
+.lead-rotation-days label > span {
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.lead-rotation-panel > .primary {
+  justify-self: end;
+}
+
 .rotation-grid {
   display: grid;
   grid-template-columns: 250px repeat(7, minmax(120px, 1fr));
@@ -3612,5 +3683,13 @@ button:disabled {
 
   .profile-page-side {
     position: static;
+  }
+
+  .lead-rotation-head {
+    grid-template-columns: 1fr;
+  }
+
+  .lead-rotation-days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

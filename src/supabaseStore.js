@@ -40,6 +40,8 @@ function createLocalStore() {
     async createVacationRequest() {},
     async updateVacationDecision() {},
     async upsertDailyLead() {},
+    async deleteDailyLead() {},
+    async upsertDepartmentLeadRotation() {},
     async upsertRotation() {},
     async saveDepartmentRotations(departmentId, effectiveStart, patterns) {
       return patterns.map((item) => ({
@@ -125,6 +127,12 @@ function createRemoteStore(client) {
     },
     async upsertDailyLead(lead) {
       await client.upsert("department_daily_leads", toDbLead(lead), "department_id,lead_date");
+    },
+    async deleteDailyLead(lead) {
+      await client.delete("department_daily_leads", `department_id=eq.${lead.departmentId}&lead_date=eq.${lead.date}`);
+    },
+    async upsertDepartmentLeadRotation(rotation) {
+      await client.upsert("department_lead_rotation_versions", toDbLeadRotation(rotation), "department_id,effective_start");
     },
     async upsertRotation(rotation) {
       await client.upsert("rotation_versions", toDbRotation(rotation), "id");
@@ -370,6 +378,7 @@ function emptyState() {
     rotationVersions: [],
     scheduleOverrides: [],
     departmentLeads: [],
+    departmentLeadRotations: [],
     vacationRequests: [],
     userRoles: [],
     auditLog: []
@@ -377,13 +386,14 @@ function emptyState() {
 }
 
 async function loadRemoteState(client, session) {
-  const [departments, profiles, statuses, rotations, overrides, leads, requests, roles] = await Promise.all([
+  const [departments, profiles, statuses, rotations, overrides, leads, leadRotations, requests, roles] = await Promise.all([
     client.select("departments", "created_at"),
     client.select("employee_profiles", "full_name"),
     client.select("shift_statuses", "sort_order"),
     client.select("rotation_versions", "effective_start"),
     client.select("schedule_overrides", "shift_date"),
     client.select("department_daily_leads", "lead_date"),
+    safeSelect(client, "department_lead_rotation_versions", "effective_start"),
     client.select("vacation_requests", "requested_at", false),
     client.select("user_roles", "created_at")
   ]);
@@ -414,6 +424,7 @@ async function loadRemoteState(client, session) {
     rotationVersions: rotations.map(fromDbRotation),
     scheduleOverrides: overrides.map(fromDbOverride),
     departmentLeads: leads.map(fromDbLead),
+    departmentLeadRotations: leadRotations.map(fromDbLeadRotation),
     vacationRequests: requests.map(fromDbVacationRequest),
     auditLog
   };
@@ -423,6 +434,14 @@ async function safeAuditLoad(client) {
   try {
     const rows = await client.select("audit_log", "created_at", false);
     return rows.map(fromDbAudit);
+  } catch {
+    return [];
+  }
+}
+
+async function safeSelect(client, table, orderColumn, ascending = true) {
+  try {
+    return await client.select(table, orderColumn, ascending);
   } catch {
     return [];
   }
@@ -453,6 +472,8 @@ function fromDbProfile(row) {
     email: row.email,
     name: row.full_name,
     title: row.title,
+    seniorityLevel: row.seniority_level || "mid",
+    leadEligible: row.is_department_lead === true,
     departmentId: row.department_id,
     photo: storagePhotoPath(photoRef) ? "" : photoRef,
     photoRef,
@@ -469,6 +490,8 @@ function toDbProfile(profile) {
     email: profile.email,
     full_name: profile.name,
     title: profile.title,
+    seniority_level: profile.seniorityLevel || "mid",
+    is_department_lead: profile.leadEligible === true,
     department_id: profile.departmentId || null,
     photo_url: profile.photoRef || profile.photo || null,
     yearly_vacation_days: profile.yearlyVacationDays,
@@ -515,6 +538,24 @@ function fromDbLead(row) {
 
 function toDbLead(lead) {
   return { id: lead.id, department_id: lead.departmentId, lead_date: lead.date, lead_profile_id: lead.profileId };
+}
+
+function fromDbLeadRotation(row) {
+  return {
+    id: row.id,
+    departmentId: row.department_id,
+    effectiveStart: row.effective_start,
+    pattern: Array.isArray(row.pattern) ? row.pattern : []
+  };
+}
+
+function toDbLeadRotation(rotation) {
+  return {
+    id: rotation.id,
+    department_id: rotation.departmentId,
+    effective_start: rotation.effectiveStart,
+    pattern: rotation.pattern
+  };
 }
 
 function fromDbVacationRequest(row) {

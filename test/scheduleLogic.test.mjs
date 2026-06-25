@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   addDays,
   datesBetween,
+  departmentLeadForDate,
   latestRotationForProfile,
   roleForProfile,
   sanitizeRotationPattern,
@@ -38,6 +39,22 @@ function testState() {
     scheduleOverrides: [
       { id: "ovr-1", profileId: "emp-1", date: "2026-05-21", statusId: "vacation", note: "Approved request" },
       { id: "ovr-2", profileId: "emp-1", date: "2026-05-22", statusId: "ground", note: "On site" }
+    ],
+    profiles: [
+      { id: "lead-weekday", departmentId: "ops", leadEligible: true },
+      { id: "lead-weekend", departmentId: "ops", leadEligible: true },
+      { id: "not-eligible", departmentId: "ops", leadEligible: false }
+    ],
+    departmentLeads: [
+      { id: "daily", departmentId: "ops", date: "2026-05-23", profileId: "lead-weekday" }
+    ],
+    departmentLeadRotations: [
+      {
+        id: "lead-rotation",
+        departmentId: "ops",
+        effectiveStart: "2026-05-01",
+        pattern: ["lead-weekday", "lead-weekday", "lead-weekday", "lead-weekday", "lead-weekday", "lead-weekend", "lead-weekend"]
+      }
     ]
   };
 }
@@ -75,4 +92,11 @@ test("role lookup prefers stored user role, falls back to user, then unclaimed",
   assert.equal(roleForProfile(state, { userId: "user-lead" }), "admin");
   assert.equal(roleForProfile(state, { userId: "user-fallback" }), "employee");
   assert.equal(roleForProfile(state, { userId: null }), "unclaimed");
+});
+
+test("department lead uses daily override before the effective weekly rotation", () => {
+  const state = testState();
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-22").profile.id, "lead-weekday");
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-23").source, "Daily override");
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-24").profile.id, "lead-weekend");
 });

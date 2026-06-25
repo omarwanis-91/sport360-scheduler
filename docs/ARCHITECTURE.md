@@ -83,7 +83,10 @@ For a person and date:
 - `schedule_overrides`: manual per-person, per-date changes.
 - `vacation_requests`: request dates, status, decision data, and deducted days.
 - `department_leads`: daily lead assignments.
+- `department_lead_rotation_versions`: effective-dated Mon-Sun default lead patterns by department.
 - `user_roles`: application access roles.
+
+Employee profiles also carry `seniority_level` and `is_department_lead`. Lead eligibility is an operational scheduling attribute; `user_roles.lead` remains the separate authorization role for application permissions.
 - `audit_log`: important operational changes.
 
 ## Authorization Model

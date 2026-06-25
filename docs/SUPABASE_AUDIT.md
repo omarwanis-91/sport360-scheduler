@@ -122,6 +122,8 @@ Run `supabase/audit/004_department_rotation_batch_audit.sql` after migration `01
 
 After applying migration `013_private_profile_photos.sql`, run `supabase/audit/005_profile_photo_storage_audit.sql`. It is read-only and verifies the private bucket, size limit, authenticated policy commands, and the count of storage versus legacy photo references.
 
+After applying migration `014_profile_seniority_and_lead_rotations.sql`, run `supabase/audit/006_department_lead_rotation_audit.sql`. It verifies profile seniority and lead-eligibility columns, the effective-dated lead-rotation table, RLS, and its read/write policies.
+
 ### Profile Photo Storage Audit Result - 2026-06-22
 
 All eight static Storage checks passed:

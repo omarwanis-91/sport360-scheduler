@@ -26,6 +26,8 @@ export const seedState = {
       email: "admin@company.test",
       name: "Omar Wanis",
       title: "Workforce Admin",
+      seniorityLevel: "manager",
+      leadEligible: true,
       departmentId: "ops",
       photo: "",
       yearlyVacationDays: 24,
@@ -38,6 +40,8 @@ export const seedState = {
       email: "mona@company.test",
       name: "Mona Saleh",
       title: "Department Lead",
+      seniorityLevel: "lead",
+      leadEligible: true,
       departmentId: "ops",
       photo: "",
       yearlyVacationDays: 24,
@@ -50,6 +54,8 @@ export const seedState = {
       email: "karim@company.test",
       name: "Karim Adel",
       title: "Scheduler",
+      seniorityLevel: "senior",
+      leadEligible: true,
       departmentId: "ops",
       photo: "",
       yearlyVacationDays: 21,
@@ -62,6 +68,8 @@ export const seedState = {
       email: "youssef@company.test",
       name: "Youssef Nabil",
       title: "Agent",
+      seniorityLevel: "mid",
+      leadEligible: true,
       departmentId: "support",
       photo: "",
       yearlyVacationDays: 21,
@@ -74,6 +82,8 @@ export const seedState = {
       email: "layla@company.test",
       name: "Layla Hassan",
       title: "Field Specialist",
+      seniorityLevel: "senior",
+      leadEligible: true,
       departmentId: "field",
       photo: "",
       yearlyVacationDays: 21,
@@ -121,6 +131,26 @@ export const seedState = {
     { id: "lead-001", departmentId: "ops", date: "2026-05-16", profileId: "emp-002" },
     { id: "lead-002", departmentId: "support", date: "2026-05-16", profileId: "emp-004" },
     { id: "lead-003", departmentId: "field", date: "2026-05-16", profileId: "emp-005" }
+  ],
+  departmentLeadRotations: [
+    {
+      id: "lead-rot-001",
+      departmentId: "ops",
+      effectiveStart: "2026-05-01",
+      pattern: ["emp-002", "emp-002", "emp-002", "emp-002", "emp-002", "emp-003", "emp-003"]
+    },
+    {
+      id: "lead-rot-002",
+      departmentId: "support",
+      effectiveStart: "2026-05-01",
+      pattern: ["emp-004", "emp-004", "emp-004", "emp-004", "emp-004", "emp-004", "emp-004"]
+    },
+    {
+      id: "lead-rot-003",
+      departmentId: "field",
+      effectiveStart: "2026-05-01",
+      pattern: ["emp-005", "emp-005", "emp-005", "emp-005", "emp-005", "emp-005", "emp-005"]
+    }
   ],
   vacationRequests: [
     {
