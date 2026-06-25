@@ -30,7 +30,8 @@ function createLocalStore() {
     async signOut() {},
     async createProfile() {},
     async updateProfile() {},
-    async updateOwnProfileName() {},
+    async updateOwnProfile() {},
+    async setProfileDepartments() {},
     async upsertUserRole() {},
     async unlinkProfileAccount() {},
     async upsertDepartment() {},
@@ -97,8 +98,21 @@ function createRemoteStore(client) {
     async updateProfile(profile) {
       await client.update("employee_profiles", `id=eq.${profile.id}`, toDbProfile(profile));
     },
-    async updateOwnProfileName(profile) {
-      await client.rpc("update_own_profile", { p_profile_id: profile.id, p_full_name: profile.name, p_photo_url: profile.photoRef || profile.photo || null });
+    async updateOwnProfile(profile) {
+      await client.rpc("update_own_profile", {
+        p_profile_id: profile.id,
+        p_full_name: profile.name,
+        p_photo_url: profile.photoRef || profile.photo || null,
+        p_title: profile.title
+      });
+    },
+    async setProfileDepartments(profile) {
+      await client.delete("employee_profile_departments", `profile_id=eq.${profile.id}`);
+      const rows = (profile.departmentIds || []).map((departmentId) => ({
+        profile_id: profile.id,
+        department_id: departmentId
+      }));
+      if (rows.length) await client.insert("employee_profile_departments", rows);
     },
     async upsertUserRole(userRole) {
       await client.upsert("user_roles", toDbUserRole(userRole), "user_id");
@@ -386,9 +400,10 @@ function emptyState() {
 }
 
 async function loadRemoteState(client, session) {
-  const [departments, profiles, statuses, rotations, overrides, leads, leadRotations, requests, roles] = await Promise.all([
+  const [departments, profiles, profileDepartments, statuses, rotations, overrides, leads, leadRotations, requests, roles] = await Promise.all([
     client.select("departments", "created_at"),
     client.select("employee_profiles", "full_name"),
+    safeSelect(client, "employee_profile_departments", "profile_id"),
     client.select("shift_statuses", "sort_order"),
     client.select("rotation_versions", "effective_start"),
     client.select("schedule_overrides", "shift_date"),
@@ -400,6 +415,10 @@ async function loadRemoteState(client, session) {
 
   const mappedProfiles = await Promise.all(profiles.map(async (row) => {
     const profile = fromDbProfile(row);
+    profile.departmentIds = [
+      profile.departmentId,
+      ...profileDepartments.filter((membership) => membership.profile_id === profile.id).map((membership) => membership.department_id)
+    ].filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index);
     const photoPath = storagePhotoPath(profile.photoRef);
     if (photoPath) {
       try {
@@ -475,6 +494,7 @@ function fromDbProfile(row) {
     seniorityLevel: row.seniority_level || "mid",
     leadEligible: row.is_department_lead === true,
     departmentId: row.department_id,
+    departmentIds: row.department_id ? [row.department_id] : [],
     photo: storagePhotoPath(photoRef) ? "" : photoRef,
     photoRef,
     yearlyVacationDays: row.yearly_vacation_days,

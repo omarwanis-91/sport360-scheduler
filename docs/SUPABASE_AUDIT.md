@@ -124,6 +124,8 @@ After applying migration `013_private_profile_photos.sql`, run `supabase/audit/0
 
 After applying migration `014_profile_seniority_and_lead_rotations.sql`, run `supabase/audit/006_department_lead_rotation_audit.sql`. It verifies profile seniority and lead-eligibility columns, the effective-dated lead-rotation table, RLS, and its read/write policies.
 
+After applying migration `015_multi_department_memberships_and_self_title.sql`, run `supabase/audit/007_multi_department_membership_audit.sql`. It verifies the membership table, RLS, primary-membership backfill, and the four-argument owner profile update RPC that persists titles.
+
 ### Profile Photo Storage Audit Result - 2026-06-22
 
 All eight static Storage checks passed:

@@ -11,6 +11,7 @@ with expected_tables(table_name) as (
     ('schedule_overrides'),
     ('department_daily_leads'),
     ('department_lead_rotation_versions'),
+    ('employee_profile_departments'),
     ('vacation_requests'),
     ('audit_log')
 ),

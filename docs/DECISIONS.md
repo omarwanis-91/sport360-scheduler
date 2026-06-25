@@ -170,3 +170,17 @@ The initial production guarantee covers current Chrome and Edge on desktop and l
 Department lead eligibility is stored on the employee profile and is separate from the authenticated application access role. A person can be eligible for operational lead assignment without automatically receiving Department Lead permissions.
 
 Each department has an effective-dated seven-day lead rotation. The Scheduler resolves that weekly default for every date, while `department_daily_leads` remains a one-day override. This allows weekend and weekday leads to differ without duplicating daily assignments or rewriting historical patterns.
+
+## D-027 - Primary And Additional Departments
+
+**Date:** 2026-06-25
+**Status:** Accepted
+
+An employee has one primary department plus optional additional operational memberships. The primary department remains the permission and ownership anchor. Additional memberships make the employee visible in those departments' People, Scheduler, Rotations, and hierarchy context without automatically granting management permission.
+
+## D-028 - Seniority Hierarchy View
+
+**Date:** 2026-06-25
+**Status:** Accepted
+
+The Hierarchy workspace groups employees from Manager through Department Lead, Senior, Mid-level, and Junior. It is a people-structure view based on profile seniority, not a replacement for application access roles or department lead scheduling.

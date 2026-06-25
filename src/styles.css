@@ -2080,6 +2080,160 @@ label {
   min-width: 62px;
 }
 
+.department-memberships {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: #101010;
+}
+
+.department-memberships legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.department-memberships label {
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.department-memberships input {
+  width: 15px;
+  min-height: 15px;
+  accent-color: var(--red);
+}
+
+.department-memberships small {
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.hierarchy-board {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.hierarchy-level {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  min-height: 104px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hierarchy-level-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-right: 1px solid var(--line);
+}
+
+.hierarchy-level-head > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.hierarchy-level-head div {
+  display: grid;
+  gap: 3px;
+}
+
+.hierarchy-level-head strong {
+  font-size: 13px;
+}
+
+.hierarchy-level-head small,
+.hierarchy-empty {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.hierarchy-people {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 8px;
+  align-content: center;
+  padding: 12px;
+}
+
+.hierarchy-person {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 68px;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #111111;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hierarchy-person:hover,
+.hierarchy-person:focus-visible {
+  border-color: rgba(244, 244, 245, 0.28);
+  background: #161616;
+  outline: none;
+}
+
+.hierarchy-person > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+
+.hierarchy-person strong {
+  font-size: 12px;
+}
+
+.hierarchy-person span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.hierarchy-departments {
+  display: flex;
+  grid-column: 2 / -1;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.hierarchy-departments em,
+.hierarchy-person mark {
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #0d0d0d;
+  color: var(--muted);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.hierarchy-person mark {
+  grid-column: 3;
+  grid-row: 1;
+  color: #fda4af;
+  border-color: var(--red-border);
+  background: var(--red-soft);
+}
+
 .bulk-shift-list {
   display: grid;
   overflow: hidden;
@@ -3691,5 +3845,14 @@ button:disabled {
 
   .lead-rotation-days {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hierarchy-level {
+    grid-template-columns: 1fr;
+  }
+
+  .hierarchy-level-head {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-soft);
   }
 }

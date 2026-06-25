@@ -41,6 +41,7 @@ The application uses view-level render functions rather than routes. Primary vie
 - Scheduler
 - Vacation Requests
 - People
+- Hierarchy
 - Departments
 - Rotations
 - Activity
@@ -76,7 +77,8 @@ For a person and date:
 
 ## Main Domain Data
 
-- `profiles`: employee identity, role-related details, department, leave balance, and optional auth link.
+- `profiles`: employee identity, role-related details, primary department, leave balance, and optional auth link.
+- `employee_profile_departments`: additional operational department memberships.
 - `departments`: organizational grouping and minimum coverage target.
 - `statuses`: schedule labels, kinds, and visual metadata.
 - `rotation_versions`: versioned weekly schedule patterns.
