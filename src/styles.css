@@ -1679,7 +1679,23 @@ label {
 }
 
 .month-day.today {
-  border-color: var(--red-border);
+  border-color: rgba(52, 211, 153, 0.86);
+  background:
+    linear-gradient(145deg, rgba(16, 185, 129, 0.14), rgba(16, 185, 129, 0.045)),
+    #0d1210;
+  box-shadow:
+    0 0 0 1px rgba(16, 185, 129, 0.24),
+    inset 0 0 0 1px rgba(110, 231, 183, 0.1);
+}
+
+.today-label {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  color: #6ee7b7;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .month-day.selected {
@@ -1697,6 +1713,17 @@ label {
   border: 1px solid rgba(251, 113, 133, 0.24);
   border-radius: 5px;
   pointer-events: none;
+}
+
+.month-day.today.selected {
+  border-color: #34d399;
+  box-shadow:
+    0 0 0 2px rgba(16, 185, 129, 0.38),
+    inset 0 0 0 1px rgba(167, 243, 208, 0.24);
+}
+
+.month-day.today.selected::after {
+  border-color: rgba(110, 231, 183, 0.42);
 }
 
 .month-day.empty {

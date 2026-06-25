@@ -37,6 +37,8 @@ test("profile calendar keeps the open day visibly selected", async ({ page }) =>
   await page.goto("/");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
 
+  await expect(page.locator(".person-calendar.page .month-day.today .today-label")).toHaveText("Today");
+
   const calendarDays = page.locator('.person-calendar.page [data-open-drawer="calendar-day"]');
   await expect(calendarDays.first()).toBeVisible();
   await calendarDays.first().click();

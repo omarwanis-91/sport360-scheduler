@@ -800,6 +800,7 @@ function renderCalendarDay(profile, date) {
   return `
     <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${schedule.label} - ${schedule.source}">
       <span>${parseDate(date).getDate()}</span>
+      ${date === todayIso ? `<small class="today-label">Today</small>` : ""}
       <em>${statusIcons[schedule.id] || icons.scheduler}</em>
       ${pendingVacation ? `<i class="day-marker pending"></i>` : ""}
       ${approvedVacation ? `<i class="day-marker approved"></i>` : ""}
