@@ -855,7 +855,25 @@ h2 {
 }
 
 .date-head.today {
-  box-shadow: inset 0 2px 0 var(--red);
+  background: rgba(34, 197, 94, 0.09);
+  box-shadow: inset 0 2px 0 rgba(34, 197, 94, 0.95);
+}
+
+.date-head span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-head span small {
+  padding: 2px 6px;
+  border: 1px solid rgba(34, 197, 94, 0.36);
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .date-head em {
@@ -2118,8 +2136,38 @@ label {
 
 .hierarchy-board {
   display: grid;
-  gap: 0;
-  border-top: 1px solid var(--line);
+  gap: 18px;
+}
+
+.hierarchy-department {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #0f0f0f;
+}
+
+.hierarchy-department-head {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 18px;
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(190, 18, 60, 0.08), rgba(255, 255, 255, 0.01));
+}
+
+.hierarchy-department-head strong {
+  font-size: 18px;
+}
+
+.hierarchy-department-head small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.hierarchy-levels {
+  display: grid;
 }
 
 .hierarchy-level {
@@ -3852,6 +3900,15 @@ button:disabled {
   }
 
   .hierarchy-level-head {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .hierarchy-department {
+    grid-template-columns: 1fr;
+  }
+
+  .hierarchy-department-head {
     border-right: 0;
     border-bottom: 1px solid var(--line-soft);
   }

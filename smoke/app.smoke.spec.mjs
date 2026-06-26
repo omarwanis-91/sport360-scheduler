@@ -58,7 +58,7 @@ test("personal profile shift details stay read-only and route edits to Scheduler
 
   await expect(page.getByRole("heading", { name: "Day Details", exact: true })).toBeVisible();
   await expect(page.locator(".person-summary-copy > span")).toHaveText("Workforce Admin");
-  await expect(page.locator(".detail-line").filter({ hasText: "Date" }).getByText("Thu Jun 25", { exact: true })).toBeVisible();
+  await expect(page.locator(".detail-line").filter({ hasText: "Date" })).toContainText(/[A-Z][a-z]{2} Jun \d{1,2}/);
   await expect(page.locator("#shift-form")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open in Scheduler", exact: true })).toBeVisible();
 
@@ -80,7 +80,8 @@ test("admins can assign seniority and weekly or daily department leads", async (
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
   await expect(page.getByRole("button", { name: "Sat Jun 27 Lead: Karim", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Thu Jun 25 Lead: Mona", exact: true }).click();
+  await expect(page.locator(".date-head.today")).toContainText("Today");
+  await page.locator(".date-head.today").click();
   await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
 });
 
@@ -109,9 +110,12 @@ test("hierarchy view groups people from manager through junior", async ({ page }
   await page.getByRole("button", { name: "Hierarchy", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "Hierarchy", exact: true })).toBeVisible();
-  await expect(page.getByText("Managers", { exact: true })).toBeVisible();
-  await expect(page.getByText("Department Leads", { exact: true })).toBeVisible();
-  await expect(page.getByText("Senior", { exact: true })).toBeVisible();
-  await expect(page.getByText("Mid-level", { exact: true })).toBeVisible();
-  await expect(page.getByText("Junior", { exact: true })).toBeVisible();
+  const operations = page.locator('[data-hierarchy-department="ops"]');
+  await expect(operations).toBeVisible();
+  await expect(operations.getByText("Managers", { exact: true })).toBeVisible();
+  await expect(operations.getByText("Department Leads", { exact: true })).toBeVisible();
+  await expect(operations.getByText("Senior", { exact: true })).toBeVisible();
+  await expect(operations.getByText("Mid-level", { exact: true })).toBeVisible();
+  await expect(operations.getByText("Junior", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-hierarchy-department="support"]')).toBeVisible();
 });

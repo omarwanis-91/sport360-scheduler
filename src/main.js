@@ -939,9 +939,10 @@ function coverageTargetForDepartment(department) {
 
 function renderDateHead(date) {
   const lead = departmentLeadForDate(ui.selectedDepartmentId, date);
+  const isToday = date === todayIso;
   return `
-    <button class="date-head ${date === todayIso ? "today" : ""}" data-open-drawer="lead" data-date="${date}">
-      <span>${formatDay(date)}</span>
+    <button class="date-head ${isToday ? "today" : ""}" data-open-drawer="lead" data-date="${date}">
+      <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
       <em>${lead.profile ? `Lead: ${lead.profile.name.split(" ")[0]}` : "No lead"}</em>
     </button>
@@ -1352,32 +1353,64 @@ function renderHierarchy() {
     ["mid", "Mid-level"],
     ["junior", "Junior"]
   ];
+  const unassignedProfiles = state.profiles.filter((profile) => !profileDepartmentIds(profile).length);
+  const departmentSections = [
+    ...state.departments.map((department) => ({
+      id: department.id,
+      name: department.name,
+      meta: `${departmentProfiles(department.id).length} ${departmentProfiles(department.id).length === 1 ? "person" : "people"}`,
+      profiles: departmentProfiles(department.id)
+    })),
+    ...(unassignedProfiles.length ? [{
+      id: "unassigned",
+      name: "Unassigned",
+      meta: `${unassignedProfiles.length} ${unassignedProfiles.length === 1 ? "person" : "people"}`,
+      profiles: unassignedProfiles
+    }] : [])
+  ];
   return `
-    ${renderTopbar("Hierarchy", "People organized by seniority, department responsibility, and reporting level.", "")}
+    ${renderTopbar("Hierarchy", "People organized by department first, then manager-to-junior seniority.", "")}
     <section class="hierarchy-board">
-      ${levels.map(([level, label], index) => {
-        const profiles = state.profiles.filter((profile) => (profile.seniorityLevel || "mid") === level);
-        return `
-          <section class="hierarchy-level level-${level}">
-            <div class="hierarchy-level-head">
-              <span>${String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <strong>${label}</strong>
-                <small>${profiles.length} ${profiles.length === 1 ? "person" : "people"}</small>
-              </div>
-            </div>
-            <div class="hierarchy-people">
-              ${profiles.length ? profiles.map(renderHierarchyPerson).join("") : `<span class="hierarchy-empty">No people assigned</span>`}
-            </div>
-          </section>
-        `;
-      }).join("")}
+      ${departmentSections.map((section) => renderHierarchyDepartment(section, levels)).join("")}
     </section>
   `;
 }
 
-function renderHierarchyPerson(profile) {
+function renderHierarchyDepartment(section, levels) {
+  return `
+    <section class="hierarchy-department" data-hierarchy-department="${section.id}">
+      <div class="hierarchy-department-head">
+        <span class="eyebrow">Department</span>
+        <strong>${section.name}</strong>
+        <small>${section.meta}</small>
+      </div>
+      <div class="hierarchy-levels">
+        ${levels.map(([level, label], index) => {
+          const profiles = section.profiles.filter((profile) => (profile.seniorityLevel || "mid") === level);
+          return `
+            <section class="hierarchy-level level-${level}">
+              <div class="hierarchy-level-head">
+                <span>${String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <strong>${label}</strong>
+                  <small>${profiles.length} ${profiles.length === 1 ? "person" : "people"}</small>
+                </div>
+              </div>
+              <div class="hierarchy-people">
+                ${profiles.length ? profiles.map((profile) => renderHierarchyPerson(profile, section.id)).join("") : `<span class="hierarchy-empty">No people assigned</span>`}
+              </div>
+            </section>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderHierarchyPerson(profile, activeDepartmentId) {
   const departments = profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
+  const activeDepartmentName = byId(state.departments, activeDepartmentId)?.name;
+  const otherDepartments = activeDepartmentName ? departments.filter((department) => department !== activeDepartmentName) : departments;
   return `
     <button class="hierarchy-person" data-open-drawer="person" data-profile-id="${profile.id}">
       <div class="avatar">${avatar(profile)}</div>
@@ -1386,7 +1419,8 @@ function renderHierarchyPerson(profile) {
         <span>${profile.title}</span>
       </div>
       <div class="hierarchy-departments">
-        ${departments.length ? departments.map((department) => `<em>${department}</em>`).join("") : `<em>Unassigned</em>`}
+        ${activeDepartmentName ? `<em>${activeDepartmentName}</em>` : ""}
+        ${otherDepartments.length ? otherDepartments.map((department) => `<em>${department}</em>`).join("") : activeDepartmentName ? "" : `<em>Unassigned</em>`}
       </div>
       ${profile.leadEligible ? `<mark>Department Lead</mark>` : ""}
     </button>
