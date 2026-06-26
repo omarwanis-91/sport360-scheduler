@@ -72,6 +72,10 @@ test("admins can assign seniority and weekly or daily department leads", async (
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Seniority", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Department role", exact: true })).toHaveValue("lead");
+  await page.getByRole("combobox", { name: "Seniority", exact: true }).selectOption("lead");
+  await page.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Seniority", exact: true })).toHaveValue("lead");
 
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Rotations", exact: true }).click();

@@ -96,7 +96,21 @@ function createRemoteStore(client) {
       await client.insert("employee_profiles", toDbProfile(profile));
     },
     async updateProfile(profile) {
-      await client.update("employee_profiles", `id=eq.${profile.id}`, toDbProfile(profile));
+      const row = await client.rpc("update_admin_profile", {
+        p_profile_id: profile.id,
+        p_employee_code: profile.employeeId,
+        p_email: profile.email,
+        p_full_name: profile.name,
+        p_title: profile.title,
+        p_seniority_level: profile.seniorityLevel || "mid",
+        p_is_department_lead: profile.leadEligible === true,
+        p_department_id: profile.departmentId || null,
+        p_photo_url: profile.photoRef || profile.photo || null,
+        p_yearly_vacation_days: profile.yearlyVacationDays,
+        p_remaining_vacation_days: profile.remainingVacationDays,
+        p_user_id: profile.userId || null
+      });
+      return row ? fromDbProfile(row) : null;
     },
     async updateOwnProfile(profile) {
       await client.rpc("update_own_profile", {
