@@ -27,7 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
-- [x] Made the Hierarchy view department-scoped and labeled today directly on Scheduler date headers.
+- [x] Made the Hierarchy view department-scoped with primary-only/all-departments modes and labeled today directly on Scheduler date headers.
 - [x] Added primary/additional department memberships, self-service title updates, and the hierarchy workspace.
 - [x] Added profile seniority, department-lead eligibility, weekly lead rotations, and Scheduler daily lead overrides.
 - [x] Added consistent mutation loading, disabled, success, retry, offline, and failure states.

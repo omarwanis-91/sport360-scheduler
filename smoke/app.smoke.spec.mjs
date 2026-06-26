@@ -107,15 +107,26 @@ test("profile title and multiple department memberships persist in the UI", asyn
 
 test("hierarchy view groups people from manager through junior", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Customer Support", exact: true }).check();
+  await page.getByRole("button", { name: "Save Profile", exact: true }).click();
+
   await page.getByRole("button", { name: "Hierarchy", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "Hierarchy", exact: true })).toBeVisible();
   const operations = page.locator('[data-hierarchy-department="ops"]');
+  const support = page.locator('[data-hierarchy-department="support"]');
   await expect(operations).toBeVisible();
   await expect(operations.getByText("Managers", { exact: true })).toBeVisible();
   await expect(operations.getByText("Department Leads", { exact: true })).toBeVisible();
   await expect(operations.getByText("Senior", { exact: true })).toBeVisible();
   await expect(operations.getByText("Mid-level", { exact: true })).toBeVisible();
   await expect(operations.getByText("Junior", { exact: true })).toBeVisible();
-  await expect(page.locator('[data-hierarchy-department="support"]')).toBeVisible();
+  await expect(operations.getByText("Omar Wanis", { exact: true })).toBeVisible();
+  await expect(support).toBeVisible();
+  await expect(support.getByText("Omar Wanis", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "All departments", exact: true }).click();
+  await expect(support.getByText("Omar Wanis", { exact: true })).toBeVisible();
 });

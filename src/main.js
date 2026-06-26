@@ -81,6 +81,7 @@ const ui = {
   requestFilter: "pending",
   activityType: "all",
   activitySearch: "",
+  hierarchyDepartmentMode: "primary",
   rotationDepartmentEdit: false,
   selectedRotationProfileIds: [],
   rotationBulkEditing: false,
@@ -245,6 +246,13 @@ function profileDepartmentIds(profile) {
 
 function profileBelongsToDepartment(profile, departmentId) {
   return profileDepartmentIds(profile).includes(departmentId);
+}
+
+function hierarchyProfilesForDepartment(departmentId) {
+  if (ui.hierarchyDepartmentMode === "all") {
+    return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId));
+  }
+  return state.profiles.filter((profile) => profile.departmentId === departmentId);
 }
 
 function departmentProfiles() {
@@ -1353,14 +1361,19 @@ function renderHierarchy() {
     ["mid", "Mid-level"],
     ["junior", "Junior"]
   ];
-  const unassignedProfiles = state.profiles.filter((profile) => !profileDepartmentIds(profile).length);
+  const unassignedProfiles = ui.hierarchyDepartmentMode === "all"
+    ? state.profiles.filter((profile) => !profileDepartmentIds(profile).length)
+    : state.profiles.filter((profile) => !profile.departmentId);
   const departmentSections = [
-    ...state.departments.map((department) => ({
-      id: department.id,
-      name: department.name,
-      meta: `${departmentProfiles(department.id).length} ${departmentProfiles(department.id).length === 1 ? "person" : "people"}`,
-      profiles: departmentProfiles(department.id)
-    })),
+    ...state.departments.map((department) => {
+      const profiles = hierarchyProfilesForDepartment(department.id);
+      return {
+        id: department.id,
+        name: department.name,
+        meta: `${profiles.length} ${profiles.length === 1 ? "person" : "people"}`,
+        profiles
+      };
+    }),
     ...(unassignedProfiles.length ? [{
       id: "unassigned",
       name: "Unassigned",
@@ -1368,8 +1381,14 @@ function renderHierarchy() {
       profiles: unassignedProfiles
     }] : [])
   ];
+  const action = `
+    <div class="top-actions compact-actions">
+      <button class="segment ${ui.hierarchyDepartmentMode === "primary" ? "active" : ""}" data-hierarchy-mode="primary">Primary only</button>
+      <button class="segment ${ui.hierarchyDepartmentMode === "all" ? "active" : ""}" data-hierarchy-mode="all">All departments</button>
+    </div>
+  `;
   return `
-    ${renderTopbar("Hierarchy", "People organized by department first, then manager-to-junior seniority.", "")}
+    ${renderTopbar("Hierarchy", "People organized by department first, then manager-to-junior seniority.", action)}
     <section class="hierarchy-board">
       ${departmentSections.map((section) => renderHierarchyDepartment(section, levels)).join("")}
     </section>
@@ -2586,6 +2605,13 @@ function bindEvents() {
   document.querySelectorAll("[data-people-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.peopleView = button.dataset.peopleView;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-hierarchy-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.hierarchyDepartmentMode = button.dataset.hierarchyMode;
       render();
     });
   });
