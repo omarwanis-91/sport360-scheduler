@@ -186,3 +186,12 @@ A legacy `department_id` value is still kept internally as a compatibility ancho
 **Status:** Accepted
 
 The Hierarchy workspace lets the user select one or more departments, then groups visible employees from Manager through Department Lead, Senior, Mid-level, and Junior within each selected department. It is a people-structure view based on profile seniority, not a replacement for application access roles or daily lead scheduling.
+
+## D-029 - Temporary Admin Control For Pseudo Profiles
+
+**Date:** 2026-06-27
+**Status:** Accepted
+
+During setup, profiles are pseudo profiles created and controlled by Admins. Admins can create, edit, unlink, and delete these profiles while the team structure is still being shaped.
+
+Longer term, employees should be able to create or claim their own profile and edit basic personal information, while Admins retain control over operational fields such as roles, departments, rotations, and scheduling rules.

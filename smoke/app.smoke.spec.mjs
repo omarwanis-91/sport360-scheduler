@@ -110,6 +110,20 @@ test("profile title and multiple department memberships persist in the UI", asyn
   await expect(page.getByRole("button", { name: "OW Omar Wanis Editorial Operations Director · 22 vac days", exact: true })).toBeVisible();
 });
 
+test("admins can delete pseudo profiles", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "People", exact: true }).click();
+
+  await page.locator('[data-profile-id="emp-003"]').click();
+  await expect(page.getByRole("button", { name: "Delete Profile", exact: true })).toBeVisible();
+
+  page.once("dialog", async (dialog) => {
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: "Delete Profile", exact: true }).click();
+  await expect(page.getByText("Karim Adel", { exact: true })).toHaveCount(0);
+});
+
 test("hierarchy view groups people from manager through junior", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();

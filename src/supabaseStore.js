@@ -34,6 +34,7 @@ function createLocalStore() {
     async setProfileDepartments() {},
     async upsertUserRole() {},
     async unlinkProfileAccount() {},
+    async deleteProfile() {},
     async upsertDepartment() {},
     async deleteDepartment() {},
     async upsertScheduleOverride() {},
@@ -144,6 +145,15 @@ function createRemoteStore(client) {
     async unlinkProfileAccount(profile) {
       if (profile.userId) await client.delete("user_roles", `user_id=eq.${profile.userId}`);
       await client.update("employee_profiles", `id=eq.${profile.id}`, { user_id: null });
+    },
+    async deleteProfile(profile) {
+      try {
+        await client.rpc("delete_admin_profile", { p_profile_id: profile.id });
+      } catch (error) {
+        if (!/schema cache|Could not find the function|delete_admin_profile/i.test(error.message || "")) throw error;
+        if (profile.userId) await client.delete("user_roles", `user_id=eq.${profile.userId}`);
+        await client.delete("employee_profiles", `id=eq.${profile.id}`);
+      }
     },
     async upsertDepartment(department) {
       await client.upsert("departments", toDbDepartment(department), "id");

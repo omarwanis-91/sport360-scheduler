@@ -1905,6 +1905,7 @@ function personDrawer() {
       ${canManageProfiles() && profile.departmentId ? `<button type="button" class="ghost wide" id="remove-department">Remove From Department</button>` : ""}
       ${canRequestVacationFor(profile) ? `<button class="ghost wide" data-open-drawer="request" data-profile-id="${profile.id}">Create Vacation Request</button>` : ""}
       ${canManageProfiles() && profile.userId ? `<button class="danger wide" id="unlink-profile">Unlink Account</button>` : ""}
+      ${canManageProfiles() ? `<button type="button" class="danger wide" id="delete-profile">Delete Profile</button>` : ""}
       <div class="mini-activity">
         <span class="eyebrow">Vacation Requests</span>
         ${vacationRequests.length ? vacationRequests.map((request) => `
@@ -2729,6 +2730,7 @@ function bindEvents() {
   document.querySelector("#shift-form")?.addEventListener("submit", saveShiftOverride);
   document.querySelector("#clear-override")?.addEventListener("click", clearShiftOverride);
   document.querySelector("#unlink-profile")?.addEventListener("click", unlinkProfileAccount);
+  document.querySelector("#delete-profile")?.addEventListener("click", deleteProfile);
   document.querySelector("#remove-department")?.addEventListener("click", removeProfileDepartment);
   document.querySelector("#profile-form")?.addEventListener("submit", saveProfile);
   bindPhotoUploader();
@@ -3099,6 +3101,37 @@ async function unlinkProfileAccount() {
     await dataStore.unlinkProfileAccount({ ...profile, userId: previousUserId });
     await saveState();
     ui.drawer = { type: "person", profileId: profile.id };
+    render();
+  });
+}
+
+async function deleteProfile() {
+  const profile = byId(state.profiles, ui.drawer.profileId);
+  if (!profile || !canManageProfiles()) return;
+  const confirmed = confirm(`Delete ${profile.name}'s profile? This removes their schedule history, requests, rotations, and profile link from this app.`);
+  if (!confirmed) return;
+
+  const deletedPhotoRef = profile.photoRef || "";
+  await runMutation("profile-delete", {
+    pending: "Deleting profile...",
+    success: "Profile deleted.",
+    failure: "The profile could not be deleted."
+  }, async () => {
+    state.profiles = state.profiles.filter((item) => item.id !== profile.id);
+    state.rotationVersions = state.rotationVersions.filter((rotation) => rotation.profileId !== profile.id);
+    state.scheduleOverrides = state.scheduleOverrides.filter((override) => override.profileId !== profile.id);
+    state.vacationRequests = state.vacationRequests.filter((request) => request.profileId !== profile.id);
+    state.departmentLeads = state.departmentLeads.filter((lead) => lead.profileId !== profile.id);
+    state.departmentLeadRotations = (state.departmentLeadRotations || []).filter((rotation) => !rotation.pattern.includes(profile.id));
+    state.userRoles = (state.userRoles || []).filter((role) => role.userId !== profile.userId);
+    state.auditLog = (state.auditLog || []).filter((entry) => entry.entityId !== profile.id && !entry.detail?.includes(profile.email));
+
+    audit("profile.deleted", "profile", profile.id, `${profile.name} deleted`);
+    await dataStore.deleteProfile(profile);
+    if (deletedPhotoRef) await dataStore.deleteProfilePhoto(deletedPhotoRef).catch(() => {});
+    await saveState();
+    if (ui.profileViewId === profile.id) ui.profileViewId = null;
+    ui.drawer = null;
     render();
   });
 }
