@@ -81,7 +81,7 @@ const ui = {
   requestFilter: "pending",
   activityType: "all",
   activitySearch: "",
-  hierarchyDepartmentMode: "primary",
+  hierarchyDepartmentIds: state.departments.map((department) => department.id),
   rotationDepartmentEdit: false,
   selectedRotationProfileIds: [],
   rotationBulkEditing: false,
@@ -176,6 +176,13 @@ async function saveState() {
   await dataStore.persist(state);
 }
 
+function syncHierarchyDepartmentSelection() {
+  const departmentIds = state.departments.map((department) => department.id);
+  const valid = new Set(departmentIds);
+  const selected = (ui.hierarchyDepartmentIds || []).filter((departmentId) => valid.has(departmentId));
+  ui.hierarchyDepartmentIds = selected.length ? selected : departmentIds;
+}
+
 async function resetDemo() {
   await dataStore.reset();
   location.reload();
@@ -244,15 +251,21 @@ function profileDepartmentIds(profile) {
     .filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index);
 }
 
+function profileDepartmentNames(profile) {
+  return profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
+}
+
 function profileBelongsToDepartment(profile, departmentId) {
   return profileDepartmentIds(profile).includes(departmentId);
 }
 
+function selectedHierarchyDepartments() {
+  const selected = new Set(ui.hierarchyDepartmentIds || []);
+  return state.departments.filter((department) => selected.has(department.id));
+}
+
 function hierarchyProfilesForDepartment(departmentId) {
-  if (ui.hierarchyDepartmentMode === "all") {
-    return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId));
-  }
-  return state.profiles.filter((profile) => profile.departmentId === departmentId);
+  return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId));
 }
 
 function departmentProfiles() {
@@ -351,7 +364,7 @@ function activeRotation(profileId, dateIso) {
 }
 
 function leadCandidates(departmentId) {
-  return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId) && profile.leadEligible);
+  return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId));
 }
 
 function latestLeadRotation(departmentId) {
@@ -604,6 +617,7 @@ function renderMyProfile() {
     `;
   }
   const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "No department";
   const upcoming = datesInRange().slice(0, 7);
   return `
     ${renderTopbar("My Profile", "Your profile, vacation balance, and upcoming shifts.", `<button class="primary" data-open-drawer="profile" data-profile-id="${profile.id}">Edit My Profile</button>`)}
@@ -647,6 +661,7 @@ function renderProfilePage() {
   const profile = byId(state.profiles, ui.profileViewId) || currentProfile();
   if (!profile) return renderMyProfile();
   const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "No department";
   const vacationRequests = vacationRequestsForProfile(profile.id).slice(0, 6);
   const upcoming = datesInRange().slice(0, 7);
   const actions = `
@@ -656,7 +671,7 @@ function renderProfilePage() {
     </div>
   `;
   return `
-    ${renderTopbar(profile.name, `${profile.title} Â· ${department?.name || "No department"}`, actions)}
+    ${renderTopbar(profile.name, `${profile.title} · ${departmentSummary}`, actions)}
     <section class="profile-page-layout">
       <aside class="profile-page-side">
         ${renderProfileHero(profile)}
@@ -708,7 +723,8 @@ function renderProfilePage() {
 }
 
 function renderProfileHero(profile) {
-  const department = byId(state.departments, profile.departmentId);
+  const departments = profileDepartmentNames(profile);
+  const departmentSummary = departments.join(", ") || "No department";
   const role = profile.userId ? roleForProfile(profile) : "unclaimed";
   return `
     <article class="profile-hero-card">
@@ -716,11 +732,11 @@ function renderProfileHero(profile) {
       <div>
         <span class="eyebrow">${role}</span>
         <h2>${profile.name}</h2>
-        <p>${profile.employeeId} - ${profile.title} - ${department?.name || "No department"}</p>
+        <p>${profile.employeeId} - ${profile.title} - ${departmentSummary}</p>
         <div class="profile-tags">
           <span>${role}</span>
           <span>${profile.userId ? "claimed" : "unclaimed"}</span>
-          <span>${department?.name || "no department"}</span>
+          ${departments.length ? departments.map((department) => `<span>${department}</span>`).join("") : `<span>no department</span>`}
         </div>
       </div>
     </article>
@@ -745,7 +761,7 @@ function renderProfileQuickStats(profile) {
 }
 
 function renderProfileInfoCards(profile, density = "regular") {
-  const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "None";
   const role = profile.userId ? roleForProfile(profile) : "Unclaimed";
   const rotation = latestRotationForProfile(profile.id);
   const nextWorkingDate = datesBetween(todayIso, addDays(todayIso, 30)).find((date) => {
@@ -758,7 +774,7 @@ function renderProfileInfoCards(profile, density = "regular") {
   return `
     <section class="profile-info-grid ${density}">
       <article class="profile-info-card">
-        <div class="profile-card-head"><span>Department</span><em>${department?.name || "None"}</em></div>
+        <div class="profile-card-head"><span>Departments</span><em>${departmentSummary}</em></div>
         <strong>${profile.title}</strong>
         <small>${profile.email}</small>
       </article>
@@ -1361,11 +1377,10 @@ function renderHierarchy() {
     ["mid", "Mid-level"],
     ["junior", "Junior"]
   ];
-  const unassignedProfiles = ui.hierarchyDepartmentMode === "all"
-    ? state.profiles.filter((profile) => !profileDepartmentIds(profile).length)
-    : state.profiles.filter((profile) => !profile.departmentId);
+  const visibleDepartments = selectedHierarchyDepartments();
+  const unassignedProfiles = state.profiles.filter((profile) => !profileDepartmentIds(profile).length);
   const departmentSections = [
-    ...state.departments.map((department) => {
+    ...visibleDepartments.map((department) => {
       const profiles = hierarchyProfilesForDepartment(department.id);
       return {
         id: department.id,
@@ -1374,7 +1389,7 @@ function renderHierarchy() {
         profiles
       };
     }),
-    ...(unassignedProfiles.length ? [{
+    ...(unassignedProfiles.length && visibleDepartments.length === state.departments.length ? [{
       id: "unassigned",
       name: "Unassigned",
       meta: `${unassignedProfiles.length} ${unassignedProfiles.length === 1 ? "person" : "people"}`,
@@ -1382,15 +1397,20 @@ function renderHierarchy() {
     }] : [])
   ];
   const action = `
-    <div class="top-actions compact-actions">
-      <button class="segment ${ui.hierarchyDepartmentMode === "primary" ? "active" : ""}" data-hierarchy-mode="primary">Primary only</button>
-      <button class="segment ${ui.hierarchyDepartmentMode === "all" ? "active" : ""}" data-hierarchy-mode="all">All departments</button>
+    <div class="top-actions compact-actions hierarchy-filters">
+      <button class="segment" data-hierarchy-select="all">All</button>
+      <button class="segment" data-hierarchy-select="none">Clear</button>
+      ${state.departments.map((department) => `
+        <button class="segment ${ui.hierarchyDepartmentIds.includes(department.id) ? "active" : ""}" data-hierarchy-department-filter="${department.id}">
+          ${department.name}
+        </button>
+      `).join("")}
     </div>
   `;
   return `
-    ${renderTopbar("Hierarchy", "People organized by department first, then manager-to-junior seniority.", action)}
+    ${renderTopbar("Hierarchy", "Pick one or more departments and view people by seniority inside each.", action)}
     <section class="hierarchy-board">
-      ${departmentSections.map((section) => renderHierarchyDepartment(section, levels)).join("")}
+      ${departmentSections.length ? departmentSections.map((section) => renderHierarchyDepartment(section, levels)).join("") : `<div class="empty-state"><strong>No departments selected</strong><span>Choose one or more departments above.</span></div>`}
     </section>
   `;
 }
@@ -1441,7 +1461,6 @@ function renderHierarchyPerson(profile, activeDepartmentId) {
         ${activeDepartmentName ? `<em>${activeDepartmentName}</em>` : ""}
         ${otherDepartments.length ? otherDepartments.map((department) => `<em>${department}</em>`).join("") : activeDepartmentName ? "" : `<em>Unassigned</em>`}
       </div>
-      ${profile.leadEligible ? `<mark>Department Lead</mark>` : ""}
     </button>
   `;
 }
@@ -1477,8 +1496,8 @@ function renderLeadRotationPanel(department) {
         <button class="primary" ${canEdit ? "" : "disabled"}>Save Lead Rotation</button>
       ` : `
         <div class="empty-state compact">
-          <strong>No eligible department leads</strong>
-          <span>Edit a profile and enable Department Lead Candidate first.</span>
+          <strong>No department members</strong>
+          <span>Add people to this department before setting a lead rotation.</span>
         </div>
       `}
     </form>
@@ -1862,7 +1881,7 @@ function renderDailyStatusGroups(inputName, selectedStatusId, canEdit) {
 
 function personDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
-  const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "Unassigned";
   const vacationRequests = vacationRequestsForProfile(profile.id).slice(0, 4);
   const history = relatedAuditEntries((entry) => entry.entityId === profile.id || entry.detail.includes(profile.email) || entry.detail.includes(profile.name));
   return `
@@ -1871,10 +1890,9 @@ function personDrawer() {
         <div class="avatar large">${avatar(profile)}</div>
         <div><strong>${profile.name}</strong><span>${profile.employeeId} · ${profile.title}</span></div>
       </div>
-      <div class="detail-line"><span>Department</span><strong>${department?.name || "Unassigned"}</strong></div>
+      <div class="detail-line"><span>Departments</span><strong>${departmentSummary}</strong></div>
       <div class="detail-line"><span>Email</span><strong>${profile.email}</strong></div>
       <div class="detail-line"><span>Seniority</span><strong>${seniorityLevels.find(([id]) => id === profile.seniorityLevel)?.[1] || "Mid-level"}</strong></div>
-      <div class="detail-line"><span>Department lead</span><strong>${profile.leadEligible ? "Eligible" : "No"}</strong></div>
       <div class="detail-line"><span>Role</span><strong>${profile.userId ? roleForProfile(profile) : "Unclaimed"}</strong></div>
       <div class="detail-line"><span>Vacation</span><strong>${profile.remainingVacationDays} / ${profile.yearlyVacationDays}</strong></div>
       <div class="detail-line"><span>Claiming</span><strong>${profile.userId ? "Account linked" : "Waiting for matching sign-in"}</strong></div>
@@ -1923,29 +1941,19 @@ function profileDrawer() {
       <label>Seniority<select name="seniorityLevel" ${canEditAdminFields ? "" : "disabled"}>
         ${seniorityLevels.map(([id, label]) => `<option value="${id}" ${(profile?.seniorityLevel || "mid") === id ? "selected" : ""}>${label}</option>`).join("")}
       </select></label>
-      <label>Department role<select name="departmentRole" ${canEditAdminFields ? "" : "disabled"}>
-        <option value="member" ${profile?.leadEligible ? "" : "selected"}>Member</option>
-        <option value="lead" ${profile?.leadEligible ? "selected" : ""}>Department Lead</option>
-      </select></label>
       <label>Employee ID<input name="employeeId" required placeholder="SCH-100" value="${profile?.employeeId || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <label>Department<select name="departmentId" ${canEditAdminFields ? "" : "disabled"}>
-        <option value="" ${!(profile?.departmentId || ui.drawer.departmentId) ? "selected" : ""}>Unassigned</option>
-        ${state.departments.map((department) => `<option value="${department.id}" ${(profile?.departmentId || ui.drawer.departmentId) === department.id ? "selected" : ""}>${department.name}</option>`).join("")}
-      </select></label>
       <fieldset class="department-memberships" ${canEditAdminFields ? "" : "disabled"}>
-        <legend>Additional departments</legend>
+        <legend>Departments</legend>
         ${state.departments.map((department) => {
-          const primaryDepartmentId = profile?.departmentId || ui.drawer.departmentId || "";
-          const isPrimary = department.id === primaryDepartmentId;
-          const isMember = profileDepartmentIds(profile).includes(department.id);
+          const isMember = profileDepartmentIds(profile).includes(department.id) || ui.drawer.departmentId === department.id;
           return `
             <label>
-              <input type="checkbox" name="departmentMembership" value="${department.id}" ${isPrimary || isMember ? "checked" : ""} ${isPrimary ? "disabled" : ""}>
-              <span>${department.name}${isPrimary ? " · Primary" : ""}</span>
+              <input type="checkbox" name="departmentMembership" value="${department.id}" ${isMember ? "checked" : ""}>
+              <span>${department.name}</span>
             </label>
           `;
         }).join("")}
-        <small>Primary department controls permissions. Additional departments add this person to their schedules and rotations.</small>
+        <small>Each selected department is equal for schedules, rotations, and hierarchy.</small>
       </fieldset>
       <label>Yearly vacation days<input name="yearlyVacationDays" type="number" min="0" value="${profile?.yearlyVacationDays || 21}" ${canEditAdminFields ? "" : "disabled"}></label>
       <label>Remaining vacation days<input name="remainingVacationDays" type="number" min="0" value="${profile?.remainingVacationDays ?? profile?.yearlyVacationDays ?? 21}" ${canEditAdminFields ? "" : "disabled"}></label>
@@ -1954,7 +1962,7 @@ function profileDrawer() {
           ${["employee", "lead", "admin"].map((role) => `<option value="${role}" ${roleForProfile(profile) === role ? "selected" : ""}>${role}</option>`).join("")}
         </select></label>
       ` : ""}
-      <p class="hint">${canEditAdminFields ? (profile?.userId ? "Department role controls lead assignments. Application access controls permissions." : "Department role can be assigned now. Application access is assigned after profile claiming.") : "You can update your display name, title, and photo. Admins manage seniority, departments, access, email, and balances."}</p>
+      <p class="hint">${canEditAdminFields ? "Application access controls permissions. Daily and weekly lead assignments are handled in Scheduler and Rotations." : "You can update your display name, title, and photo. Admins manage seniority, departments, access, email, and balances."}</p>
       <button class="primary wide" ${canEdit ? "" : "disabled"}>${profile ? "Save Profile" : "Create Profile"}</button>
     </form>
   `;
@@ -2609,9 +2617,20 @@ function bindEvents() {
     });
   });
 
-  document.querySelectorAll("[data-hierarchy-mode]").forEach((button) => {
+  document.querySelectorAll("[data-hierarchy-select]").forEach((button) => {
     button.addEventListener("click", () => {
-      ui.hierarchyDepartmentMode = button.dataset.hierarchyMode;
+      ui.hierarchyDepartmentIds = button.dataset.hierarchySelect === "all" ? state.departments.map((department) => department.id) : [];
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-hierarchy-department-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const departmentId = button.dataset.hierarchyDepartmentFilter;
+      const selected = new Set(ui.hierarchyDepartmentIds || []);
+      if (selected.has(departmentId)) selected.delete(departmentId);
+      else selected.add(departmentId);
+      ui.hierarchyDepartmentIds = [...selected];
       render();
     });
   });
@@ -2996,10 +3015,10 @@ async function saveProfile(event) {
   const existing = byId(state.profiles, ui.drawer.profileId);
   const hadProfileAdmin = canManageProfiles();
   if (!hadProfileAdmin && (!existing || currentProfile()?.id !== existing.id)) return;
-  const primaryDepartmentId = hadProfileAdmin ? (form.get("departmentId") || null) : existing.departmentId;
   const departmentIds = hadProfileAdmin
-    ? [primaryDepartmentId, ...form.getAll("departmentMembership")].filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index)
+    ? form.getAll("departmentMembership").filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index)
     : profileDepartmentIds(existing);
+  const departmentId = hadProfileAdmin ? (departmentIds[0] || null) : existing.departmentId;
   const profile = {
     id: existing?.id || makeId("emp"),
     employeeId: hadProfileAdmin ? form.get("employeeId") : existing.employeeId,
@@ -3007,8 +3026,8 @@ async function saveProfile(event) {
     name: form.get("name"),
     title: form.get("title"),
     seniorityLevel: hadProfileAdmin ? form.get("seniorityLevel") : existing.seniorityLevel,
-    leadEligible: hadProfileAdmin ? form.get("departmentRole") === "lead" : existing.leadEligible,
-    departmentId: primaryDepartmentId,
+    leadEligible: existing?.leadEligible ?? true,
+    departmentId,
     departmentIds,
     photo: existing?.photo || "",
     photoRef: existing?.photoRef || form.get("photoRef") || "",
@@ -3545,6 +3564,7 @@ async function reloadState() {
   try {
     state = await dataStore.load();
     ui.selectedDepartmentId = state.departments[0]?.id;
+    syncHierarchyDepartmentSelection();
   } catch (error) {
     ui.error = error.message || "Unable to load live scheduler data.";
     if (/session|jwt|invalid|expired/i.test(ui.error)) {
@@ -3562,6 +3582,7 @@ async function boot() {
     dataStore = await createSupabaseStore();
     state = await dataStore.load();
     ui.selectedDepartmentId = state.departments[0]?.id;
+    syncHierarchyDepartmentSelection();
   } catch (error) {
     ui.error = error.message || "Unable to load scheduler.";
     if (dataStore?.mode === "supabase" && /session|jwt|invalid|expired/i.test(ui.error)) {
@@ -3575,6 +3596,7 @@ async function boot() {
         async reset() {}
       };
       state = loadState();
+      syncHierarchyDepartmentSelection();
     }
   } finally {
     ui.loading = false;

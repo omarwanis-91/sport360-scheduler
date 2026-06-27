@@ -71,7 +71,7 @@ test("admins can assign seniority and weekly or daily department leads", async (
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Seniority", exact: true })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Department role", exact: true })).toHaveValue("lead");
+  await expect(page.getByRole("combobox", { name: "Department role", exact: true })).toHaveCount(0);
   await page.getByRole("combobox", { name: "Seniority", exact: true }).selectOption("lead");
   await page.getByRole("button", { name: "Save Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
@@ -102,6 +102,7 @@ test("profile title and multiple department memberships persist in the UI", asyn
   await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Editorial Operations Director");
   await expect(page.getByRole("checkbox", { name: "Customer Support", exact: true })).toBeChecked();
+  await expect(page.getByText("Primary", { exact: true })).toHaveCount(0);
 
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
@@ -129,8 +130,13 @@ test("hierarchy view groups people from manager through junior", async ({ page }
   await expect(operations.getByText("Junior", { exact: true })).toBeVisible();
   await expect(operations.getByText("Omar Wanis", { exact: true })).toBeVisible();
   await expect(support).toBeVisible();
-  await expect(support.getByText("Omar Wanis", { exact: true })).toHaveCount(0);
-
-  await page.getByRole("button", { name: "All departments", exact: true }).click();
   await expect(support.getByText("Omar Wanis", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(page.getByText("No departments selected", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Operations", exact: true }).click();
+  await page.getByRole("button", { name: "Customer Support", exact: true }).click();
+  await expect(operations).toBeVisible();
+  await expect(support).toBeVisible();
+  await expect(page.locator('[data-hierarchy-department="field"]')).toHaveCount(0);
 });

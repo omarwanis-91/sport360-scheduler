@@ -162,25 +162,27 @@ Production accounts are created or invited by an Admin. Public account creation 
 
 The initial production guarantee covers current Chrome and Edge on desktop and laptop displays 1024px wide and above. Mobile behavior remains best-effort until mobile is explicitly promoted to a supported target.
 
-## D-026 - Department Lead Eligibility And Rotation
+## D-026 - Department Lead Rotation
 
 **Date:** 2026-06-25
 **Status:** Accepted
-
-Department lead eligibility is stored on the employee profile and is separate from the authenticated application access role. A person can be eligible for operational lead assignment without automatically receiving Department Lead permissions.
 
 Each department has an effective-dated seven-day lead rotation. The Scheduler resolves that weekly default for every date, while `department_daily_leads` remains a one-day override. This allows weekend and weekday leads to differ without duplicating daily assignments or rewriting historical patterns.
 
-## D-027 - Primary And Additional Departments
+Lead assignment candidates come from current department membership, not from a permanent profile-level Department Lead tag. A senior can therefore lead while the usual lead is on vacation.
+
+## D-027 - Equal Department Memberships
 
 **Date:** 2026-06-25
 **Status:** Accepted
 
-An employee has one primary department plus optional additional operational memberships. The primary department remains the permission and ownership anchor. Additional memberships make the employee visible in those departments' People, Scheduler, Rotations, and hierarchy context without automatically granting management permission.
+An employee can belong to multiple equal departments. The profile editor shows departments as one checklist, and hierarchy, schedule, and rotation views use those memberships directly.
+
+A legacy `department_id` value is still kept internally as a compatibility anchor for existing permission checks and older database objects, but the UI does not present it as primary.
 
 ## D-028 - Seniority Hierarchy View
 
 **Date:** 2026-06-25
 **Status:** Accepted
 
-The Hierarchy workspace groups employees from Manager through Department Lead, Senior, Mid-level, and Junior. It is a people-structure view based on profile seniority, not a replacement for application access roles or department lead scheduling.
+The Hierarchy workspace lets the user select one or more departments, then groups visible employees from Manager through Department Lead, Senior, Mid-level, and Junior within each selected department. It is a people-structure view based on profile seniority, not a replacement for application access roles or daily lead scheduling.

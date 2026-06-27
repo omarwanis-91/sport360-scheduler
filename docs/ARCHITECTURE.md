@@ -77,8 +77,8 @@ For a person and date:
 
 ## Main Domain Data
 
-- `profiles`: employee identity, role-related details, primary department, leave balance, and optional auth link.
-- `employee_profile_departments`: additional operational department memberships.
+- `profiles`: employee identity, role-related details, compatibility department anchor, leave balance, and optional auth link.
+- `employee_profile_departments`: equal operational department memberships.
 - `departments`: organizational grouping and minimum coverage target.
 - `statuses`: schedule labels, kinds, and visual metadata.
 - `rotation_versions`: versioned weekly schedule patterns.
@@ -88,7 +88,7 @@ For a person and date:
 - `department_lead_rotation_versions`: effective-dated Mon-Sun default lead patterns by department.
 - `user_roles`: application access roles.
 
-Employee profiles also carry `seniority_level` and `is_department_lead`. Lead eligibility is an operational scheduling attribute; `user_roles.lead` remains the separate authorization role for application permissions.
+Employee profiles also carry `seniority_level`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; `user_roles.lead` remains the separate authorization role for application permissions.
 - `audit_log`: important operational changes.
 
 ## Authorization Model
