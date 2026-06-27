@@ -55,3 +55,5 @@ $$;
 
 revoke all on function public.update_admin_profile(uuid, text, text, text, text, text, boolean, uuid, text, integer, integer, uuid) from public, anon;
 grant execute on function public.update_admin_profile(uuid, text, text, text, text, text, boolean, uuid, text, integer, integer, uuid) to authenticated;
+
+select pg_notify('pgrst', 'reload schema');

@@ -27,7 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
-- [x] Added an authorized Admin profile update RPC so seniority and department lead fields persist in live Supabase.
+- [x] Added an authorized Admin profile update RPC and schema-cache reload fallback so seniority and department lead fields persist in live Supabase.
 - [x] Made the Hierarchy view department-scoped with primary-only/all-departments modes and labeled today directly on Scheduler date headers.
 - [x] Added primary/additional department memberships, self-service title updates, and the hierarchy workspace.
 - [x] Added profile seniority, department-lead eligibility, weekly lead rotations, and Scheduler daily lead overrides.

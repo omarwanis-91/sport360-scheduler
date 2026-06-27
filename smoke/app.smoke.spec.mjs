@@ -83,7 +83,7 @@ test("admins can assign seniority and weekly or daily department leads", async (
   await expect(page.getByRole("combobox", { name: "Sat", exact: true })).toHaveValue("emp-003");
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Sat Jun 27 Lead: Karim", exact: true })).toBeVisible();
+  await expect(page.locator('.date-head[data-date="2026-06-27"]')).toContainText("Lead: Karim");
   await expect(page.locator(".date-head.today")).toContainText("Today");
   await page.locator(".date-head.today").click();
   await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
