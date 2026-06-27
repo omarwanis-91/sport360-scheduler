@@ -127,12 +127,16 @@ function createRemoteStore(client) {
       });
     },
     async setProfileDepartments(profile) {
-      await client.delete("employee_profile_departments", `profile_id=eq.${profile.id}`);
-      const rows = (profile.departmentIds || []).map((departmentId) => ({
-        profile_id: profile.id,
-        department_id: departmentId
-      }));
-      if (rows.length) await client.insert("employee_profile_departments", rows);
+      try {
+        await client.delete("employee_profile_departments", `profile_id=eq.${profile.id}`);
+        const rows = (profile.departmentIds || []).map((departmentId) => ({
+          profile_id: profile.id,
+          department_id: departmentId
+        }));
+        if (rows.length) await client.insert("employee_profile_departments", rows);
+      } catch (error) {
+        if (!/schema cache|employee_profile_departments|Could not find the table/i.test(error.message || "")) throw error;
+      }
     },
     async upsertUserRole(userRole) {
       await client.upsert("user_roles", toDbUserRole(userRole), "user_id");

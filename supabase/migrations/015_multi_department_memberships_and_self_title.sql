@@ -64,3 +64,5 @@ $$;
 
 revoke all on function public.update_own_profile(uuid, text, text, text) from public;
 grant execute on function public.update_own_profile(uuid, text, text, text) to authenticated;
+
+select pg_notify('pgrst', 'reload schema');
