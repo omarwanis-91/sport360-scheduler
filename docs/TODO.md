@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Persisted Admin profile department memberships through one guarded Supabase RPC so multi-department edits survive refresh.
 - [x] Added Admin-only profile deletion for setup-stage pseudo profiles.
 - [x] Changed departments to equal memberships, removed Department Lead tags from hierarchy, and added multi-department hierarchy filters.
 - [x] Added authorized Admin profile update and membership-table schema-cache fallbacks so profile edits persist in live Supabase.

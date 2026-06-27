@@ -3052,8 +3052,10 @@ async function saveProfile(event) {
       }
       if (existing && !hadProfileAdmin) await dataStore.updateOwnProfile(profile);
       else if (existing) await dataStore.updateProfile(profile);
-      else await dataStore.createProfile(profile);
-      if (hadProfileAdmin) await dataStore.setProfileDepartments(profile);
+      else {
+        await dataStore.createProfile(profile);
+        if (hadProfileAdmin) await dataStore.setProfileDepartments(profile);
+      }
 
       if (hadProfileAdmin && existing?.userId && form.get("role")) {
         const userRole = { userId: existing.userId, role: form.get("role") };
@@ -3164,7 +3166,6 @@ async function removeProfileDepartment() {
     ui.drawer = null;
     render();
     await dataStore.updateProfile(profile);
-    await dataStore.setProfileDepartments(profile);
     if (dataStore?.mode === "supabase") void dataStore.insertAudit(auditEntry);
     await saveState();
   }).then((result) => {
@@ -3224,7 +3225,6 @@ async function deleteDepartment() {
       profile.departmentIds = profileDepartmentIds(profile).filter((departmentId) => departmentId !== department.id);
       if (profile.departmentId === department.id) profile.departmentId = profile.departmentIds[0] || null;
       await dataStore.updateProfile(profile);
-      await dataStore.setProfileDepartments(profile);
     }
     state.departmentLeads = state.departmentLeads.filter((lead) => lead.departmentId !== department.id);
     state.departments = state.departments.filter((item) => item.id !== department.id);
@@ -3267,7 +3267,6 @@ async function assignDepartmentMembers(event) {
       profile.departmentIds = [department.id];
       audit("profile.department_assigned", "profile", profile.id, `${profile.name} added to ${department.name}`);
       await dataStore.updateProfile(profile);
-      await dataStore.setProfileDepartments(profile);
     }
     await saveState();
     ui.drawer = { type: "department-detail", departmentId: department.id };

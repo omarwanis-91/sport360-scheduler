@@ -25,6 +25,7 @@ expected_functions(routine_name) as (
     ('claim_profile_for_current_user'),
     ('update_own_profile'),
     ('update_admin_profile'),
+    ('save_admin_profile'),
     ('delete_admin_profile'),
     ('vacation_workday_count'),
     ('apply_vacation_overrides'),

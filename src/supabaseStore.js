@@ -98,15 +98,14 @@ function createRemoteStore(client) {
     },
     async updateProfile(profile) {
       try {
-        const row = await client.rpc("update_admin_profile", {
+        const row = await client.rpc("save_admin_profile", {
           p_profile_id: profile.id,
           p_employee_code: profile.employeeId,
           p_email: profile.email,
           p_full_name: profile.name,
           p_title: profile.title,
           p_seniority_level: profile.seniorityLevel || "mid",
-          p_is_department_lead: profile.leadEligible === true,
-          p_department_id: profile.departmentId || null,
+          p_department_ids: profile.departmentIds || [],
           p_photo_url: profile.photoRef || profile.photo || null,
           p_yearly_vacation_days: profile.yearlyVacationDays,
           p_remaining_vacation_days: profile.remainingVacationDays,
@@ -114,9 +113,23 @@ function createRemoteStore(client) {
         });
         return row ? fromDbProfile(row) : null;
       } catch (error) {
-        if (!/schema cache|Could not find the function|update_admin_profile/i.test(error.message || "")) throw error;
-        await client.update("employee_profiles", `id=eq.${profile.id}`, toDbProfile(profile));
-        return null;
+        if (!/schema cache|Could not find the function|save_admin_profile/i.test(error.message || "")) throw error;
+        const row = await client.rpc("update_admin_profile", {
+          p_profile_id: profile.id,
+          p_employee_code: profile.employeeId,
+          p_email: profile.email,
+          p_full_name: profile.name,
+          p_title: profile.title,
+          p_seniority_level: profile.seniorityLevel || "mid",
+          p_is_department_lead: false,
+          p_department_id: profile.departmentId || null,
+          p_photo_url: profile.photoRef || profile.photo || null,
+          p_yearly_vacation_days: profile.yearlyVacationDays,
+          p_remaining_vacation_days: profile.remainingVacationDays,
+          p_user_id: profile.userId || null
+        });
+        await saveProfileMemberships(client, profile);
+        return row ? fromDbProfile(row) : null;
       }
     },
     async updateOwnProfile(profile) {
@@ -128,16 +141,7 @@ function createRemoteStore(client) {
       });
     },
     async setProfileDepartments(profile) {
-      try {
-        await client.delete("employee_profile_departments", `profile_id=eq.${profile.id}`);
-        const rows = (profile.departmentIds || []).map((departmentId) => ({
-          profile_id: profile.id,
-          department_id: departmentId
-        }));
-        if (rows.length) await client.insert("employee_profile_departments", rows);
-      } catch (error) {
-        if (!/schema cache|employee_profile_departments|Could not find the table/i.test(error.message || "")) throw error;
-      }
+      await saveProfileMemberships(client, profile);
     },
     async upsertUserRole(userRole) {
       await client.upsert("user_roles", toDbUserRole(userRole), "user_id");
@@ -402,6 +406,15 @@ function createRestClient() {
       });
     }
   };
+}
+
+async function saveProfileMemberships(client, profile) {
+  await client.delete("employee_profile_departments", `profile_id=eq.${profile.id}`);
+  const rows = (profile.departmentIds || []).map((departmentId) => ({
+    profile_id: profile.id,
+    department_id: departmentId
+  }));
+  if (rows.length) await client.insert("employee_profile_departments", rows);
 }
 
 function encodeObjectPath(objectPath) {

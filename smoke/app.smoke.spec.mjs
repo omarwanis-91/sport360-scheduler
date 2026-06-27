@@ -104,6 +104,12 @@ test("profile title and multiple department memberships persist in the UI", asyn
   await expect(page.getByRole("checkbox", { name: "Customer Support", exact: true })).toBeChecked();
   await expect(page.getByText("Primary", { exact: true })).toHaveCount(0);
 
+  await page.reload();
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Editorial Operations Director");
+  await expect(page.getByRole("checkbox", { name: "Customer Support", exact: true })).toBeChecked();
+
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
   await page.locator("#department-select").selectOption("support");
