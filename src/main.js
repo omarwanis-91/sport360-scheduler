@@ -39,7 +39,9 @@ const icons = {
   ground: '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.4 7-11a7 7 0 1 0-14 0c0 6.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   chevron: '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
-  close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+  close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
+  lead: '<svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88Z"/></svg>'
 };
 
 const statusIcons = {
@@ -228,6 +230,19 @@ function formatDate(iso) {
 
 function datesInRange() {
   return Array.from({ length: ui.rangeDays }, (_, index) => addDays(ui.startDate, index));
+}
+
+function schedulerRangeClass() {
+  if (ui.rangeDays >= 30) return "range-month";
+  if (ui.rangeDays >= 14) return "range-two-weeks";
+  return "range-week";
+}
+
+function zoomScheduleRange(direction) {
+  const ranges = [7, 14, 30];
+  const currentIndex = Math.max(0, ranges.indexOf(ui.rangeDays));
+  const nextIndex = Math.min(ranges.length - 1, Math.max(0, currentIndex + direction));
+  ui.rangeDays = ranges[nextIndex];
 }
 
 function datesBetween(startIso, endIso) {
@@ -890,11 +905,13 @@ function renderScheduler() {
       <select id="department-select">
         ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
       </select>
-      <select id="range-select">
-        <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>Week</option>
+      <button class="ghost icon-button" id="zoom-in-range" title="Zoom in">${icons.plus}</button>
+      <select id="range-select" title="Schedule zoom">
+        <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>1 Week</option>
         <option value="14" ${ui.rangeDays === 14 ? "selected" : ""}>2 Weeks</option>
-        <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>Month</option>
+        <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>1 Month</option>
       </select>
+      <button class="ghost icon-button" id="zoom-out-range" title="Zoom out">${icons.minus}</button>
       <button class="ghost" id="prev-range">Previous</button>
       <button class="ghost" id="today-range">Today</button>
       <button class="ghost" id="next-range">Next</button>
@@ -911,7 +928,7 @@ function renderScheduler() {
       ${filterButton("vacation", "On vacation")}
     </section>
     <section class="scheduler-shell">
-      <div class="schedule-grid" style="--days: ${dates.length}">
+      <div class="schedule-grid ${schedulerRangeClass()}" style="--days: ${dates.length}">
         <div class="employee-head">
           <span>People</span>
           <strong>${profiles.length} profiles</strong>
@@ -989,13 +1006,16 @@ function renderProfileRow(profile, dates) {
 function renderShiftCell(profile, date) {
   const status = scheduleFor(profile.id, date);
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
+  const lead = departmentLeadForDate(ui.selectedDepartmentId, date);
+  const isDayLead = lead.profile?.id === profile.id;
   const icon = statusIcons[status.id] || icons.scheduler;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   const availabilityLabel = availabilityState === "state-working" ? "Available" : "Unavailable";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
       <span class="shift-icon">${icon}</span>
+      ${isDayLead ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status.label}</span>
       <small><span class="availability-badge">${availabilityLabel}</span>${status.source}</small>
       ${pendingVacation ? `<span class="cell-alert">Pending vacation</span>` : ""}
@@ -2638,6 +2658,16 @@ function bindEvents() {
 
   document.querySelector("#range-select")?.addEventListener("change", (event) => {
     ui.rangeDays = Number(event.target.value);
+    render();
+  });
+
+  document.querySelector("#zoom-in-range")?.addEventListener("click", () => {
+    zoomScheduleRange(-1);
+    render();
+  });
+
+  document.querySelector("#zoom-out-range")?.addEventListener("click", () => {
+    zoomScheduleRange(1);
     render();
   });
 

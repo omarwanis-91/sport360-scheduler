@@ -815,6 +815,18 @@ h2 {
   min-width: max-content;
 }
 
+.schedule-grid.range-week {
+  grid-template-columns: 204px repeat(var(--days), minmax(156px, 1fr));
+}
+
+.schedule-grid.range-two-weeks {
+  grid-template-columns: 204px repeat(var(--days), minmax(118px, 1fr));
+}
+
+.schedule-grid.range-month {
+  grid-template-columns: 180px repeat(var(--days), minmax(62px, 76px));
+}
+
 .employee-head,
 .date-head,
 .employee-cell,
@@ -910,6 +922,38 @@ h2 {
   overflow: hidden;
 }
 
+.schedule-grid.range-month .employee-head,
+.schedule-grid.range-month .date-head,
+.schedule-grid.range-month .employee-cell,
+.schedule-grid.range-month .shift-cell {
+  min-height: 46px;
+}
+
+.schedule-grid.range-month .date-head {
+  padding: 7px 8px;
+}
+
+.schedule-grid.range-month .date-head em,
+.schedule-grid.range-month .coverage-cell small,
+.schedule-grid.range-month .shift-label,
+.schedule-grid.range-month .shift-cell small {
+  display: none;
+}
+
+.schedule-grid.range-month .employee-cell {
+  padding: 8px;
+}
+
+.schedule-grid.range-month .employee-cell span {
+  display: none;
+}
+
+.schedule-grid.range-month .shift-cell {
+  grid-template-columns: 1fr;
+  place-items: center;
+  padding: 8px;
+}
+
 .shift-cell::before {
   content: "";
   position: absolute;
@@ -949,7 +993,7 @@ h2 {
 .shift-cell.state-working {
   border-color: rgba(255, 255, 255, 0.02);
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.012)),
     #161616;
 }
 
@@ -958,15 +1002,15 @@ h2 {
 }
 
 .shift-cell.morning::before {
-  background: #fbbf24;
+  background: #c6a236;
 }
 
 .shift-cell.midday::before {
-  background: #f97316;
+  background: #c1793c;
 }
 
 .shift-cell.night::before {
-  background: #818cf8;
+  background: #747bb8;
 }
 
 .shift-cell.state-off {
@@ -985,8 +1029,8 @@ h2 {
 
 .shift-cell.state-away {
   background:
-    repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.13) 0 1px, transparent 1px 8px),
-    linear-gradient(90deg, rgba(71, 85, 105, 0.18), rgba(17, 17, 17, 0.88)),
+    repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.08) 0 1px, transparent 1px 8px),
+    linear-gradient(90deg, rgba(71, 85, 105, 0.12), rgba(17, 17, 17, 0.9)),
     #111315;
   color: #cbd5e1;
 }
@@ -1010,6 +1054,40 @@ h2 {
   place-items: center;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
+}
+
+.lead-marker {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid rgba(34, 197, 94, 0.42);
+  border-radius: 999px;
+  background: rgba(20, 83, 45, 0.35);
+  color: #86efac;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.08);
+}
+
+.lead-marker svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
+}
+
+.schedule-grid.range-month .lead-marker {
+  top: 5px;
+  right: 5px;
+  width: 16px;
+  height: 16px;
+}
+
+.schedule-grid.range-month .lead-marker svg {
+  width: 10px;
+  height: 10px;
 }
 
 .shift-label {
@@ -1058,26 +1136,26 @@ h2 {
 
 .shift-cell.morning {
   background:
-    radial-gradient(circle at 88% 16%, rgba(253, 224, 71, 0.46), transparent 36%),
-    linear-gradient(145deg, rgba(251, 191, 36, 0.28), rgba(41, 37, 36, 0.88)),
-    #201707;
-  color: #fef3c7;
+    radial-gradient(circle at 88% 16%, rgba(253, 224, 71, 0.16), transparent 34%),
+    linear-gradient(145deg, rgba(202, 138, 4, 0.14), rgba(31, 29, 22, 0.9)),
+    #17140d;
+  color: #f5e8bd;
 }
 
 .shift-cell.night {
   background:
-    radial-gradient(circle at 88% 16%, rgba(129, 140, 248, 0.28), transparent 34%),
-    linear-gradient(145deg, rgba(99, 102, 241, 0.34), rgba(10, 14, 28, 0.94)),
-    #070a16;
-  color: #ddd6fe;
+    radial-gradient(circle at 88% 16%, rgba(129, 140, 248, 0.13), transparent 34%),
+    linear-gradient(145deg, rgba(79, 70, 229, 0.16), rgba(15, 17, 31, 0.94)),
+    #0d0f1c;
+  color: #d8dcff;
 }
 
 .shift-cell.midday {
   background:
-    radial-gradient(circle at 88% 16%, rgba(251, 146, 60, 0.42), transparent 36%),
-    linear-gradient(145deg, rgba(249, 115, 22, 0.34), rgba(69, 26, 3, 0.88)),
-    #211006;
-  color: #ffedd5;
+    radial-gradient(circle at 88% 16%, rgba(251, 146, 60, 0.15), transparent 36%),
+    linear-gradient(145deg, rgba(194, 120, 58, 0.14), rgba(37, 24, 16, 0.9)),
+    #17110d;
+  color: #f4dcc7;
 }
 
 .shift-cell.weekend {
@@ -1093,24 +1171,24 @@ h2 {
 
 .shift-cell.vacation {
   background:
-    linear-gradient(90deg, rgba(34, 197, 94, 0.1), rgba(17, 17, 17, 0.86)),
+    linear-gradient(90deg, rgba(34, 197, 94, 0.065), rgba(17, 17, 17, 0.9)),
     #111312;
   color: #bbf7d0;
 }
 
 .shift-cell.vacation::before {
-  background: rgba(34, 197, 94, 0.62);
+  background: rgba(34, 197, 94, 0.48);
 }
 
 .shift-cell.sick {
   background:
-    linear-gradient(90deg, rgba(225, 29, 72, 0.11), rgba(17, 17, 17, 0.86)),
+    linear-gradient(90deg, rgba(225, 29, 72, 0.07), rgba(17, 17, 17, 0.9)),
     #131111;
   color: #fecaca;
 }
 
 .shift-cell.sick::before {
-  background: rgba(225, 29, 72, 0.68);
+  background: rgba(225, 29, 72, 0.5);
 }
 
 .shift-cell.ground {

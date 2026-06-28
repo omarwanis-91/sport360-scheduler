@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+function localIso(date = new Date()) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 test("demo workspace loads and primary navigation works", async ({ page }) => {
   await page.goto("/");
 
@@ -67,6 +74,8 @@ test("personal profile shift details stay read-only and route edits to Scheduler
 });
 
 test("admins can assign seniority and weekly or daily department leads", async ({ page }) => {
+  const today = localIso();
+
   await page.goto("/");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
@@ -83,10 +92,23 @@ test("admins can assign seniority and weekly or daily department leads", async (
   await expect(page.getByRole("combobox", { name: "Sat", exact: true })).toHaveValue("emp-003");
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
-  await expect(page.locator('.date-head[data-date="2026-06-27"]')).toContainText("Lead: Karim");
+  await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText("Lead: Karim");
   await expect(page.locator(".date-head.today")).toContainText("Today");
+  await expect(page.locator(`.shift-cell[data-profile-id="emp-003"][data-date="${today}"] .lead-marker`)).toBeVisible();
   await page.locator(".date-head.today").click();
   await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
+});
+
+test("scheduler zoom switches week, two-week, and month density", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator(".schedule-grid.range-two-weeks")).toBeVisible();
+  await page.getByTitle("Zoom in").click();
+  await expect(page.locator(".schedule-grid.range-week")).toBeVisible();
+  await page.getByTitle("Zoom out").click();
+  await page.getByTitle("Zoom out").click();
+  await expect(page.locator(".schedule-grid.range-month")).toBeVisible();
+  await expect(page.locator("#range-select")).toHaveValue("30");
 });
 
 test("profile title and multiple department memberships persist in the UI", async ({ page }) => {
