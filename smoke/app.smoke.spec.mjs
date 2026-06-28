@@ -110,6 +110,8 @@ test("scheduler zoom switches week, two-week, and month density", async ({ page 
   await page.getByTitle("Zoom out").click();
   await expect(page.locator(".schedule-grid.range-month")).toBeVisible();
   await expect(page.locator("#range-select")).toHaveValue("30");
+  await page.locator("#schedule-start-date").fill("2026-07-15");
+  await expect(page.locator('.date-head[data-date="2026-07-15"]')).toBeVisible();
   await page.getByTitle("Next range").click();
   await expect(page.locator(".scheduler-month-bar")).toContainText(/July|August/);
 });

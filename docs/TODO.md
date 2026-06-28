@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Moved Scheduler controls into the month bar, added start-date picking, Monday week dividers, Rotation lead icons, and quieter unavailable cells.
 - [x] Added a horizontal Scheduler month bar with left/right range arrows above the date headers.
 - [x] Added Scheduler lead icons on shift cards, softer schedule colors, and explicit 1-week/2-week/1-month zoom controls.
 - [x] Persisted Admin profile department memberships through one guarded Supabase RPC so multi-department edits survive refresh.

@@ -258,6 +258,15 @@ function schedulerMonthLabel(dates) {
   return firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
 }
 
+function isWeekStart(date) {
+  return weekdayIndex(date) === 0;
+}
+
+function leadForWeekday(departmentId, weekday) {
+  const rotation = latestLeadRotation(departmentId);
+  return byId(state.profiles, rotation?.pattern?.[weekday]);
+}
+
 function datesBetween(startIso, endIso) {
   return datesBetweenLogic(startIso, endIso);
 }
@@ -913,27 +922,9 @@ function renderScheduler() {
   if (!department) {
     return renderTopbar("No Departments", "Create at least one department in Supabase before building schedules.", "");
   }
-  const action = `
-    <div class="top-actions">
-      <select id="department-select">
-        ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
-      </select>
-      <button class="ghost icon-button" id="zoom-in-range" title="Zoom in">${icons.plus}</button>
-      <select id="range-select" title="Schedule zoom">
-        <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>1 Week</option>
-        <option value="14" ${ui.rangeDays === 14 ? "selected" : ""}>2 Weeks</option>
-        <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>1 Month</option>
-      </select>
-      <button class="ghost icon-button" id="zoom-out-range" title="Zoom out">${icons.minus}</button>
-      <button class="ghost" id="prev-range">Previous</button>
-      <button class="ghost" id="today-range">Today</button>
-      <button class="ghost" id="next-range">Next</button>
-      ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
-    </div>
-  `;
 
   return `
-    ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.", action)}
+    ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.")}
     <section class="control-row">
       ${filterButton("all", "All people")}
       ${filterButton("leads", "Leads")}
@@ -942,10 +933,24 @@ function renderScheduler() {
     </section>
     <section class="scheduler-shell">
       <div class="schedule-grid ${schedulerRangeClass()}" style="--days: ${dates.length}">
-        <div class="month-corner"></div>
+        <div class="month-corner">
+          <select id="department-select" title="Department">
+            ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
+          </select>
+        </div>
         <div class="scheduler-month-bar">
           <button class="ghost icon-button" id="month-prev-range" title="Previous range">${icons.chevron}</button>
           <strong>${schedulerMonthLabel(dates)}</strong>
+          <label class="bar-date-control">Start <input id="schedule-start-date" type="date" value="${ui.startDate}"></label>
+          <button class="ghost icon-button" id="zoom-in-range" title="Zoom in">${icons.plus}</button>
+          <select id="range-select" title="Schedule zoom">
+            <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>1 Week</option>
+            <option value="14" ${ui.rangeDays === 14 ? "selected" : ""}>2 Weeks</option>
+            <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>1 Month</option>
+          </select>
+          <button class="ghost icon-button" id="zoom-out-range" title="Zoom out">${icons.minus}</button>
+          <button class="ghost" id="today-range">Today</button>
+          ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
           <button class="ghost icon-button" id="month-next-range" title="Next range">${icons.chevron}</button>
         </div>
         <div class="employee-head">
@@ -971,7 +976,7 @@ function renderCoverageRow(profiles, dates, department) {
       const coverage = coverageForDate(profiles, date);
       const isLow = coverage.available < target;
       return `
-        <button class="coverage-cell ${isLow ? "low" : ""}" data-open-drawer="coverage" data-date="${date}">
+        <button class="coverage-cell ${isLow ? "low" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="coverage" data-date="${date}">
           <span class="coverage-count">${coverage.available}</span>
           <span class="coverage-meta">avail</span>
           <small>${coverage.unavailable} off · ${coverage.away} ground</small>
@@ -1001,7 +1006,7 @@ function renderDateHead(date) {
   const lead = departmentLeadForDate(ui.selectedDepartmentId, date);
   const isToday = date === todayIso;
   return `
-    <button class="date-head ${isToday ? "today" : ""}" data-open-drawer="lead" data-date="${date}">
+    <button class="date-head ${isToday ? "today" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="lead" data-date="${date}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
       <em>${lead.profile ? `Lead: ${lead.profile.name.split(" ")[0]}` : "No lead"}</em>
@@ -1029,14 +1034,13 @@ function renderShiftCell(profile, date) {
   const isDayLead = lead.profile?.id === profile.id;
   const icon = statusIcons[status.id] || icons.scheduler;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
-  const availabilityLabel = availabilityState === "state-working" ? "Available" : "Unavailable";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
       <span class="shift-icon">${icon}</span>
       ${isDayLead ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status.label}</span>
-      <small><span class="availability-badge">${availabilityLabel}</span>${status.source}</small>
+      <small>${status.source}</small>
       ${pendingVacation ? `<span class="cell-alert">Pending vacation</span>` : ""}
     </button>
   `;
@@ -1404,7 +1408,7 @@ function renderRotationRow(profile) {
         ${personContent}
       </button>
     `}
-    ${pattern.map((statusId) => renderRotationCell(profile, rotation, statusId)).join("")}
+    ${pattern.map((statusId, index) => renderRotationCell(profile, rotation, statusId, index)).join("")}
   `;
 }
 
@@ -1543,24 +1547,26 @@ function renderLeadRotationPanel(department) {
   `;
 }
 
-function renderRotationCell(profile, rotation, statusId) {
+function renderRotationCell(profile, rotation, statusId, weekday = 0) {
+  const isLeadSlot = leadForWeekday(ui.selectedDepartmentId, weekday)?.id === profile.id;
   if (!rotation) {
     return `
       <button class="rotation-cell shift-cell state-off missing" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="">
         <span class="shift-icon">${icons.scheduler}</span>
+        ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
         <span class="shift-label">No template</span>
-        <small><span class="availability-badge">Missing</span>Template</small>
+        <small>Template</small>
       </button>
     `;
   }
   const status = byId(state.statuses, statusId) || byId(state.statuses, "weekend");
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
-  const availabilityLabel = availabilityState === "state-working" ? "Available" : "Unavailable";
   return `
     <button class="rotation-cell shift-cell ${availabilityState} ${status?.id || ""}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
       <span class="shift-icon">${statusIcons[status?.id] || icons.scheduler}</span>
+      ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status?.label || "Unassigned"}</span>
-      <small><span class="availability-badge">${availabilityLabel}</span>Template</small>
+      <small>Template</small>
     </button>
   `;
 }
@@ -2680,6 +2686,12 @@ function bindEvents() {
     render();
   });
 
+  document.querySelector("#schedule-start-date")?.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    ui.startDate = event.target.value;
+    render();
+  });
+
   document.querySelector("#zoom-in-range")?.addEventListener("click", () => {
     zoomScheduleRange(-1);
     render();
@@ -2690,18 +2702,8 @@ function bindEvents() {
     render();
   });
 
-  document.querySelector("#prev-range")?.addEventListener("click", () => {
-    ui.startDate = addDays(ui.startDate, -ui.rangeDays);
-    render();
-  });
-
   document.querySelector("#month-prev-range")?.addEventListener("click", () => {
     ui.startDate = addDays(ui.startDate, -ui.rangeDays);
-    render();
-  });
-
-  document.querySelector("#next-range")?.addEventListener("click", () => {
-    ui.startDate = addDays(ui.startDate, ui.rangeDays);
     render();
   });
 
