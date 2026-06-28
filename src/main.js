@@ -228,6 +228,10 @@ function formatDate(iso) {
   return parseDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function formatMonthYear(iso) {
+  return parseDate(iso).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 function datesInRange() {
   return Array.from({ length: ui.rangeDays }, (_, index) => addDays(ui.startDate, index));
 }
@@ -243,6 +247,15 @@ function zoomScheduleRange(direction) {
   const currentIndex = Math.max(0, ranges.indexOf(ui.rangeDays));
   const nextIndex = Math.min(ranges.length - 1, Math.max(0, currentIndex + direction));
   ui.rangeDays = ranges[nextIndex];
+}
+
+function schedulerMonthLabel(dates) {
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  if (!first || !last) return "";
+  const firstLabel = formatMonthYear(first);
+  const lastLabel = formatMonthYear(last);
+  return firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
 }
 
 function datesBetween(startIso, endIso) {
@@ -929,6 +942,12 @@ function renderScheduler() {
     </section>
     <section class="scheduler-shell">
       <div class="schedule-grid ${schedulerRangeClass()}" style="--days: ${dates.length}">
+        <div class="month-corner"></div>
+        <div class="scheduler-month-bar">
+          <button class="ghost icon-button" id="month-prev-range" title="Previous range">${icons.chevron}</button>
+          <strong>${schedulerMonthLabel(dates)}</strong>
+          <button class="ghost icon-button" id="month-next-range" title="Next range">${icons.chevron}</button>
+        </div>
         <div class="employee-head">
           <span>People</span>
           <strong>${profiles.length} profiles</strong>
@@ -2676,7 +2695,17 @@ function bindEvents() {
     render();
   });
 
+  document.querySelector("#month-prev-range")?.addEventListener("click", () => {
+    ui.startDate = addDays(ui.startDate, -ui.rangeDays);
+    render();
+  });
+
   document.querySelector("#next-range")?.addEventListener("click", () => {
+    ui.startDate = addDays(ui.startDate, ui.rangeDays);
+    render();
+  });
+
+  document.querySelector("#month-next-range")?.addEventListener("click", () => {
     ui.startDate = addDays(ui.startDate, ui.rangeDays);
     render();
   });

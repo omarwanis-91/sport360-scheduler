@@ -256,7 +256,7 @@ function createRestClient() {
     const text = await response.text();
     const body = text ? JSON.parse(text) : null;
     if (!response.ok) {
-      const message = body?.msg || body?.message || body?.error_description || body?.hint || `Supabase request failed (${response.status})`;
+      const message = normalizeSupabaseMessage(body?.msg || body?.message || body?.error_description || body?.hint || `Supabase request failed (${response.status})`);
       if (!retrying && response.status === 401 && /jwt expired/i.test(message)) {
         await refreshSession();
         const session = getSession();
@@ -406,6 +406,13 @@ function createRestClient() {
       });
     }
   };
+}
+
+function normalizeSupabaseMessage(message) {
+  if (/employee_profile_departments/i.test(message || "")) {
+    return "Profile department memberships are not ready in Supabase. Run migration 020_ensure_profile_department_memberships.sql, then reload the app.";
+  }
+  return message;
 }
 
 async function saveProfileMemberships(client, profile) {

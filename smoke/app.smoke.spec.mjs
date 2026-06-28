@@ -102,6 +102,7 @@ test("admins can assign seniority and weekly or daily department leads", async (
 test("scheduler zoom switches week, two-week, and month density", async ({ page }) => {
   await page.goto("/");
 
+  await expect(page.locator(".scheduler-month-bar")).toContainText(/June|July/);
   await expect(page.locator(".schedule-grid.range-two-weeks")).toBeVisible();
   await page.getByTitle("Zoom in").click();
   await expect(page.locator(".schedule-grid.range-week")).toBeVisible();
@@ -109,6 +110,8 @@ test("scheduler zoom switches week, two-week, and month density", async ({ page 
   await page.getByTitle("Zoom out").click();
   await expect(page.locator(".schedule-grid.range-month")).toBeVisible();
   await expect(page.locator("#range-select")).toHaveValue("30");
+  await page.getByTitle("Next range").click();
+  await expect(page.locator(".scheduler-month-bar")).toContainText(/July|August/);
 });
 
 test("profile title and multiple department memberships persist in the UI", async ({ page }) => {

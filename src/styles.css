@@ -827,6 +827,44 @@ h2 {
   grid-template-columns: 180px repeat(var(--days), minmax(62px, 76px));
 }
 
+.month-corner,
+.scheduler-month-bar {
+  min-height: 44px;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  background: #101010;
+}
+
+.month-corner {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+}
+
+.scheduler-month-bar {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 10px;
+  background:
+    linear-gradient(90deg, rgba(34, 197, 94, 0.055), rgba(255, 255, 255, 0.018)),
+    #101010;
+}
+
+.scheduler-month-bar strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.scheduler-month-bar .icon-button:first-child svg {
+  transform: rotate(180deg);
+}
+
 .employee-head,
 .date-head,
 .employee-cell,
