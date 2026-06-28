@@ -86,6 +86,19 @@ audit_checks as (
 
   select
     'column',
+    'departments.parent_department_id',
+    case when exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'departments'
+        and column_name = 'parent_department_id'
+    ) then 'pass' else 'fail' end,
+    'optional parent department for sub-departments'
+
+  union all
+
+  select
+    'column',
     'employee_profiles.department_id nullable',
     case when exists (
       select 1 from information_schema.columns

@@ -412,6 +412,9 @@ function normalizeSupabaseMessage(message) {
   if (/employee_profile_departments/i.test(message || "")) {
     return "Profile department memberships are not ready in Supabase. Run migration 020_ensure_profile_department_memberships.sql, then reload the app.";
   }
+  if (/parent_department_id/i.test(message || "")) {
+    return "Sub-departments are not ready in Supabase. Run migration 021_department_parent_structure.sql, then reload the app.";
+  }
   return message;
 }
 
@@ -526,13 +529,14 @@ async function claimProfileForSession(client, session) {
 }
 
 function fromDbDepartment(row) {
-  return { id: row.id, name: row.name, coverageTarget: row.min_available_people ?? 1 };
+  return { id: row.id, name: row.name, parentDepartmentId: row.parent_department_id || null, coverageTarget: row.min_available_people ?? 1 };
 }
 
 function toDbDepartment(department) {
   return {
     id: department.id,
     name: department.name,
+    parent_department_id: department.parentDepartmentId || null,
     min_available_people: department.coverageTarget ?? 1
   };
 }

@@ -33,6 +33,10 @@ test("creation opens centered while editing stays in the right sidebar", async (
   await page.getByRole("button", { name: "New Department", exact: true }).click();
   await expect(page.locator(".drawer.creation-modal")).toBeVisible();
   await expect(page.getByRole("heading", { name: "New Department", exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Department name", exact: true }).fill("Motion Graphics");
+  await page.getByRole("combobox", { name: "Parent department", exact: true }).selectOption("ops");
+  await page.getByRole("button", { name: "Create Department", exact: true }).click();
+  await expect(page.getByText("Sub-department of Operations", { exact: true })).toBeVisible();
 
   await page.locator("#close-drawer").click();
   await page.locator('[data-open-drawer="department-detail"]').first().click();
@@ -103,6 +107,7 @@ test("scheduler zoom switches week, two-week, and month density", async ({ page 
   await page.goto("/");
 
   await expect(page.locator(".scheduler-month-bar")).toContainText(/June|July/);
+  await expect(page.getByRole("button", { name: /New Profile/, exact: false })).toHaveCount(0);
   await expect(page.locator(".schedule-grid.range-two-weeks")).toBeVisible();
   await page.getByTitle("Zoom in").click();
   await expect(page.locator(".schedule-grid.range-week")).toBeVisible();
@@ -112,6 +117,8 @@ test("scheduler zoom switches week, two-week, and month density", async ({ page 
   await expect(page.locator("#range-select")).toHaveValue("30");
   await page.locator("#schedule-start-date").fill("2026-07-15");
   await expect(page.locator('.date-head[data-date="2026-07-15"]')).toBeVisible();
+  await page.getByRole("button", { name: "Month Start", exact: true }).click();
+  await expect(page.locator('.date-head[data-date="2026-07-01"]')).toBeVisible();
   await page.getByTitle("Next range").click();
   await expect(page.locator(".scheduler-month-bar")).toContainText(/July|August/);
 });

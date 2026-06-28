@@ -258,6 +258,10 @@ function schedulerMonthLabel(dates) {
   return firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
 }
 
+function monthStart(iso) {
+  return `${iso.slice(0, 7)}-01`;
+}
+
 function isWeekStart(date) {
   return weekdayIndex(date) === 0;
 }
@@ -265,6 +269,38 @@ function isWeekStart(date) {
 function leadForWeekday(departmentId, weekday) {
   const rotation = latestLeadRotation(departmentId);
   return byId(state.profiles, rotation?.pattern?.[weekday]);
+}
+
+function departmentLabel(department) {
+  const parent = byId(state.departments, department?.parentDepartmentId);
+  return parent ? `${parent.name} / ${department.name}` : department?.name || "";
+}
+
+function departmentOptions(selectedId, { excludeId = "", includeNone = false, noneLabel = "Top-level department" } = {}) {
+  return `
+    ${includeNone ? `<option value="" ${selectedId ? "" : "selected"}>${noneLabel}</option>` : ""}
+    ${state.departments
+      .filter((department) => department.id !== excludeId)
+      .map((department) => `<option value="${department.id}" ${department.id === selectedId ? "selected" : ""}>${departmentLabel(department)}</option>`)
+      .join("")}
+  `;
+}
+
+function orderedDepartments() {
+  const byParent = new Map();
+  state.departments.forEach((department) => {
+    const parentId = department.parentDepartmentId || "";
+    if (!byParent.has(parentId)) byParent.set(parentId, []);
+    byParent.get(parentId).push(department);
+  });
+  const sorted = (items = []) => [...items].sort((a, b) => a.name.localeCompare(b.name));
+  const output = [];
+  const visit = (department, depth = 0) => {
+    output.push({ department, depth });
+    sorted(byParent.get(department.id)).forEach((child) => visit(child, depth + 1));
+  };
+  sorted(byParent.get("")).forEach((department) => visit(department));
+  return output;
 }
 
 function datesBetween(startIso, endIso) {
@@ -935,13 +971,17 @@ function renderScheduler() {
       <div class="schedule-grid ${schedulerRangeClass()}" style="--days: ${dates.length}">
         <div class="month-corner">
           <select id="department-select" title="Department">
-            ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
+            ${departmentOptions(ui.selectedDepartmentId)}
           </select>
         </div>
         <div class="scheduler-month-bar">
-          <button class="ghost icon-button" id="month-prev-range" title="Previous range">${icons.chevron}</button>
-          <strong>${schedulerMonthLabel(dates)}</strong>
+          <div class="month-title-control">
+            <button class="ghost icon-button" id="month-prev-range" title="Previous range">${icons.chevron}</button>
+            <strong>${schedulerMonthLabel(dates)}</strong>
+            <button class="ghost icon-button" id="month-next-range" title="Next range">${icons.chevron}</button>
+          </div>
           <label class="bar-date-control">Start <input id="schedule-start-date" type="date" value="${ui.startDate}"></label>
+          <button class="ghost" id="month-start-range">Month Start</button>
           <button class="ghost icon-button" id="zoom-in-range" title="Zoom in">${icons.plus}</button>
           <select id="range-select" title="Schedule zoom">
             <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>1 Week</option>
@@ -950,8 +990,6 @@ function renderScheduler() {
           </select>
           <button class="ghost icon-button" id="zoom-out-range" title="Zoom out">${icons.minus}</button>
           <button class="ghost" id="today-range">Today</button>
-          ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
-          <button class="ghost icon-button" id="month-next-range" title="Next range">${icons.chevron}</button>
         </div>
         <div class="employee-head">
           <span>People</span>
@@ -1098,7 +1136,7 @@ function renderPeople() {
       </div>
       <select id="people-department-select">
         <option value="all" ${ui.peopleDepartmentId === "all" ? "selected" : ""}>All departments</option>
-        ${state.departments.map((department) => `<option value="${department.id}" ${ui.peopleDepartmentId === department.id ? "selected" : ""}>${department.name}</option>`).join("")}
+        ${state.departments.map((department) => `<option value="${department.id}" ${ui.peopleDepartmentId === department.id ? "selected" : ""}>${departmentLabel(department)}</option>`).join("")}
       </select>
       ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
     </div>
@@ -1259,7 +1297,7 @@ function renderDepartments() {
   return `
     ${renderTopbar("Departments", "Create departments, review team size, and jump into each schedule.", canManageDepartments() ? `<button class="primary" data-open-drawer="department">${icons.plus} New Department</button>` : "")}
     <section class="department-grid">
-      ${state.departments.map((department) => renderDepartmentCard(department, dates)).join("")}
+      ${orderedDepartments().map(({ department, depth }) => renderDepartmentCard(department, dates, depth)).join("")}
       <template>
       ${state.departments.map((department) => {
         const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
@@ -1289,13 +1327,15 @@ function departmentStats(department, dates = datesInRange()) {
   return { members, leadCount, pendingRequests, rotations, unclaimed, target: coverageTargetForDepartment(department) };
 }
 
-function renderDepartmentCard(department, dates) {
+function renderDepartmentCard(department, dates, depth = 0) {
   const stats = departmentStats(department, dates);
+  const children = state.departments.filter((item) => item.parentDepartmentId === department.id);
+  const parent = byId(state.departments, department.parentDepartmentId);
   return `
-    <article class="department-card">
+    <article class="department-card ${depth ? "sub-department-card" : ""}" style="--department-depth: ${depth}">
       <button class="department-card-main" data-open-drawer="department-detail" data-department-id="${department.id}">
         <div class="department-card-head">
-          <span class="eyebrow">Department</span>
+          <span class="eyebrow">${parent ? `Sub-department of ${parent.name}` : "Department"}</span>
           <strong>${department.name}</strong>
         </div>
         <div class="department-card-stats">
@@ -1304,7 +1344,7 @@ function renderDepartmentCard(department, dates) {
           <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
           <span><strong>${stats.pendingRequests}</strong> pending</span>
         </div>
-        <p>${stats.unclaimed} unclaimed profiles - ${stats.rotations} rotation versions</p>
+        <p>${children.length ? `${children.length} sub-${children.length === 1 ? "department" : "departments"} - ` : ""}${stats.unclaimed} unclaimed profiles - ${stats.rotations} rotation versions</p>
       </button>
       <div class="department-card-actions">
         ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
@@ -1322,7 +1362,7 @@ function renderRotations() {
     ${renderTopbar("Rotations", "Weekly rotation templates by department. Each column maps to a real weekday.", `
       <div class="top-actions">
         <select id="department-select">
-          ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
+          ${departmentOptions(ui.selectedDepartmentId)}
         </select>
         ${canEditDepartmentRotations ? `
           <button class="ghost" data-open-drawer="rotation">${icons.plus} New Rotation</button>
@@ -1445,7 +1485,7 @@ function renderHierarchy() {
       <button class="segment" data-hierarchy-select="none">Clear</button>
       ${state.departments.map((department) => `
         <button class="segment ${ui.hierarchyDepartmentIds.includes(department.id) ? "active" : ""}" data-hierarchy-department-filter="${department.id}">
-          ${department.name}
+          ${departmentLabel(department)}
         </button>
       `).join("")}
     </div>
@@ -1995,7 +2035,7 @@ function profileDrawer() {
           return `
             <label>
               <input type="checkbox" name="departmentMembership" value="${department.id}" ${isMember ? "checked" : ""}>
-              <span>${department.name}</span>
+              <span>${departmentLabel(department)}</span>
             </label>
           `;
         }).join("")}
@@ -2025,6 +2065,9 @@ function departmentDrawer() {
   return `
     <form id="department-form" class="drawer-form">
       <label>Department name<input name="name" required placeholder="Department name" value="${department?.name || ""}" ${canEdit ? "" : "disabled"}></label>
+      <label>Parent department<select name="parentDepartmentId" ${canEdit ? "" : "disabled"}>
+        ${departmentOptions(department?.parentDepartmentId || "", { excludeId: department?.id || "", includeNone: true })}
+      </select></label>
       <label>Minimum available people<input name="coverageTarget" type="number" min="0" value="${coverageTarget}" ${canEdit ? "" : "disabled"}></label>
       ${department ? `
         <div class="department-drawer-summary">
@@ -2717,6 +2760,11 @@ function bindEvents() {
     render();
   });
 
+  document.querySelector("#month-start-range")?.addEventListener("click", () => {
+    ui.startDate = monthStart(ui.startDate);
+    render();
+  });
+
   document.querySelectorAll("[data-calendar-prev]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.calendarMonth = addMonths(ui.calendarMonth, -1);
@@ -3247,6 +3295,7 @@ async function saveDepartment(event) {
   const department = {
     id: existing?.id || makeId("dep"),
     name: form.get("name").trim(),
+    parentDepartmentId: form.get("parentDepartmentId") || null,
     coverageTarget: Number(form.get("coverageTarget") || 0)
   };
   await runMutation("department-save", {
