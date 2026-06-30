@@ -36,7 +36,10 @@ test("creation opens centered while editing stays in the right sidebar", async (
   await page.getByRole("textbox", { name: "Department name", exact: true }).fill("Motion Graphics");
   await page.getByRole("combobox", { name: "Parent department", exact: true }).selectOption("ops");
   await page.getByRole("button", { name: "Create Department", exact: true }).click();
-  await expect(page.getByText("Sub-department of Operations", { exact: true })).toBeVisible();
+  await expect(page.locator(".sub-department-card").filter({ hasText: "Motion Graphics" })).toContainText("Sub-department");
+  await expect(page.locator(".sub-department-card").filter({ hasText: "Motion Graphics" })).toContainText("Operations");
+  await page.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(page.locator(".department-detail-row").filter({ hasText: "Motion Graphics" })).toContainText("Operations /");
 
   await page.locator("#close-drawer").click();
   await page.locator('[data-open-drawer="department-detail"]').first().click();
@@ -79,6 +82,9 @@ test("personal profile shift details stay read-only and route edits to Scheduler
 
 test("admins can assign seniority and weekly or daily department leads", async ({ page }) => {
   const today = localIso();
+  const weekend = [0, 6].includes(new Date().getDay());
+  const expectedLead = weekend ? "Karim" : "Mona";
+  const expectedLeadProfileId = weekend ? "emp-003" : "emp-002";
 
   await page.goto("/");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
@@ -96,9 +102,9 @@ test("admins can assign seniority and weekly or daily department leads", async (
   await expect(page.getByRole("combobox", { name: "Sat", exact: true })).toHaveValue("emp-003");
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
-  await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText("Lead: Karim");
+  await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText(`Lead: ${expectedLead}`);
   await expect(page.locator(".date-head.today")).toContainText("Today");
-  await expect(page.locator(`.shift-cell[data-profile-id="emp-003"][data-date="${today}"] .lead-marker`)).toBeVisible();
+  await expect(page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"] .lead-marker`)).toBeVisible();
   await page.locator(".date-head.today").click();
   await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
 });

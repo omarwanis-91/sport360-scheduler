@@ -75,6 +75,7 @@ const ui = {
   selectedDepartmentId: state.departments[0]?.id,
   peopleDepartmentId: "all",
   peopleView: "default",
+  departmentView: "tiles",
   rangeDays: appConfig.defaultScheduleDays,
   startDate: todayIso,
   calendarMonth: todayIso.slice(0, 7),
@@ -1036,6 +1037,10 @@ function peopleViewButton(id, label) {
   return `<button class="segment ${ui.peopleView === id ? "active" : ""}" data-people-view="${id}">${label}</button>`;
 }
 
+function departmentViewButton(id, label) {
+  return `<button class="segment ${ui.departmentView === id ? "active" : ""}" data-department-view="${id}">${label}</button>`;
+}
+
 function coverageTargetForDepartment(department) {
   return Number(department?.coverageTarget ?? coverageTargets[department?.id] ?? 1);
 }
@@ -1294,10 +1299,17 @@ function renderPersonTile(profile) {
 
 function renderDepartments() {
   const dates = datesInRange();
+  const ordered = orderedDepartments();
   return `
     ${renderTopbar("Departments", "Create departments, review team size, and jump into each schedule.", canManageDepartments() ? `<button class="primary" data-open-drawer="department">${icons.plus} New Department</button>` : "")}
-    <section class="department-grid">
-      ${orderedDepartments().map(({ department, depth }) => renderDepartmentCard(department, dates, depth)).join("")}
+    <section class="control-row people-view-switch">
+      ${departmentViewButton("tiles", "Tiles")}
+      ${departmentViewButton("details", "Details")}
+    </section>
+    <section class="${ui.departmentView === "details" ? "department-details-list" : "department-grid"}">
+      ${ui.departmentView === "details"
+        ? ordered.map(({ department, depth }) => renderDepartmentDetailRow(department, dates, depth)).join("")
+        : ordered.map(({ department, depth }) => renderDepartmentCard(department, dates, depth)).join("")}
       <template>
       ${state.departments.map((department) => {
         const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
@@ -1335,8 +1347,9 @@ function renderDepartmentCard(department, dates, depth = 0) {
     <article class="department-card ${depth ? "sub-department-card" : ""}" style="--department-depth: ${depth}">
       <button class="department-card-main" data-open-drawer="department-detail" data-department-id="${department.id}">
         <div class="department-card-head">
-          <span class="eyebrow">${parent ? `Sub-department of ${parent.name}` : "Department"}</span>
+          <span class="department-kind">${parent ? "Sub-department" : "Department"}</span>
           <strong>${department.name}</strong>
+          ${parent ? `<em>${parent.name}</em>` : children.length ? `<em>${children.length} child ${children.length === 1 ? "department" : "departments"}</em>` : ""}
         </div>
         <div class="department-card-stats">
           <span><strong>${stats.members.length}</strong> members</span>
@@ -1350,6 +1363,28 @@ function renderDepartmentCard(department, dates, depth = 0) {
         ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
       </div>
     </article>
+  `;
+}
+
+function renderDepartmentDetailRow(department, dates, depth = 0) {
+  const stats = departmentStats(department, dates);
+  const children = state.departments.filter((item) => item.parentDepartmentId === department.id);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  return `
+    <button class="department-detail-row ${depth ? "is-child" : ""}" style="--department-depth: ${depth}" data-open-drawer="department-detail" data-department-id="${department.id}">
+      <div class="department-tree-name">
+        <span class="tree-rail"></span>
+        <div>
+          <em>${parent ? `${parent.name} /` : "Top level"}</em>
+          <strong>${department.name}</strong>
+        </div>
+      </div>
+      <span><strong>${stats.members.length}</strong> members</span>
+      <span><strong>${stats.target}</strong> target</span>
+      <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
+      <span><strong>${children.length}</strong> sub-depts</span>
+      <small>${stats.unclaimed} unclaimed - ${stats.rotations} rotation versions</small>
+    </button>
   `;
 }
 
@@ -2702,6 +2737,13 @@ function bindEvents() {
   document.querySelectorAll("[data-people-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.peopleView = button.dataset.peopleView;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-department-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.departmentView = button.dataset.departmentView;
       render();
     });
   });
