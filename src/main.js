@@ -272,6 +272,13 @@ function leadForWeekday(departmentId, weekday) {
   return byId(state.profiles, rotation?.pattern?.[weekday]);
 }
 
+function leadForProfileWeekday(profile, departmentId, weekday) {
+  return departmentScopeIds(departmentId)
+    .filter((id) => profileBelongsToDepartment(profile, id))
+    .map((id) => leadForWeekday(id, weekday))
+    .find((lead) => lead?.id === profile.id);
+}
+
 function departmentLabel(department) {
   const parent = byId(state.departments, department?.parentDepartmentId);
   return parent ? `${parent.name} / ${department.name}` : department?.name || "";
@@ -304,6 +311,26 @@ function orderedDepartments() {
   return output;
 }
 
+function childDepartmentsOf(departmentId) {
+  return state.departments.filter((department) => department.parentDepartmentId === departmentId);
+}
+
+function descendantDepartmentIds(departmentId) {
+  const descendants = [];
+  const visit = (parentId) => {
+    childDepartmentsOf(parentId).forEach((child) => {
+      descendants.push(child.id);
+      visit(child.id);
+    });
+  };
+  visit(departmentId);
+  return descendants;
+}
+
+function departmentScopeIds(departmentId) {
+  return [departmentId, ...descendantDepartmentIds(departmentId)].filter(Boolean);
+}
+
 function datesBetween(startIso, endIso) {
   return datesBetweenLogic(startIso, endIso);
 }
@@ -330,7 +357,8 @@ function profileDepartmentNames(profile) {
 }
 
 function profileBelongsToDepartment(profile, departmentId) {
-  return profileDepartmentIds(profile).includes(departmentId);
+  const scope = new Set(departmentScopeIds(departmentId));
+  return profileDepartmentIds(profile).some((id) => scope.has(id));
 }
 
 function selectedHierarchyDepartments() {
@@ -449,6 +477,19 @@ function latestLeadRotation(departmentId) {
 
 function departmentLeadForDate(departmentId, dateIso) {
   return departmentLeadForDateLogic(state, departmentId, dateIso);
+}
+
+function departmentLeadsForDate(departmentId, dateIso) {
+  return departmentScopeIds(departmentId)
+    .map((id) => ({ department: byId(state.departments, id), ...departmentLeadForDate(id, dateIso) }))
+    .filter((lead) => lead.profile);
+}
+
+function leadForProfileDate(profile, departmentId, dateIso) {
+  return departmentScopeIds(departmentId)
+    .filter((id) => profileBelongsToDepartment(profile, id))
+    .map((id) => departmentLeadForDate(id, dateIso))
+    .find((lead) => lead?.profile?.id === profile.id);
 }
 
 function scheduleFor(profileId, dateIso) {
@@ -1046,13 +1087,16 @@ function coverageTargetForDepartment(department) {
 }
 
 function renderDateHead(date) {
-  const lead = departmentLeadForDate(ui.selectedDepartmentId, date);
+  const leads = departmentLeadsForDate(ui.selectedDepartmentId, date);
   const isToday = date === todayIso;
+  const leadLabel = leads.length > 1
+    ? `${leads.length} leads`
+    : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : "No lead";
   return `
     <button class="date-head ${isToday ? "today" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="lead" data-date="${date}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
-      <em>${lead.profile ? `Lead: ${lead.profile.name.split(" ")[0]}` : "No lead"}</em>
+      <em>${leadLabel}</em>
     </button>
   `;
 }
@@ -1073,8 +1117,8 @@ function renderProfileRow(profile, dates) {
 function renderShiftCell(profile, date) {
   const status = scheduleFor(profile.id, date);
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
-  const lead = departmentLeadForDate(ui.selectedDepartmentId, date);
-  const isDayLead = lead.profile?.id === profile.id;
+  const lead = leadForProfileDate(profile, ui.selectedDepartmentId, date);
+  const isDayLead = lead?.profile?.id === profile.id;
   const icon = statusIcons[status.id] || icons.scheduler;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
@@ -1329,10 +1373,10 @@ function renderDepartments() {
 
 function departmentStats(department, dates = datesInRange()) {
   const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
-  const leadCount = dates.filter((date) => departmentLeadForDate(department.id, date).profile).length;
+  const leadCount = dates.reduce((count, date) => count + departmentLeadsForDate(department.id, date).length, 0);
   const pendingRequests = state.vacationRequests.filter((request) => {
     const profile = byId(state.profiles, request.profileId);
-    return profile?.departmentId === department.id && request.status === "pending";
+    return profile && profileBelongsToDepartment(profile, department.id) && request.status === "pending";
   }).length;
   const rotations = state.rotationVersions.filter((rotation) => members.some((profile) => profile.id === rotation.profileId)).length;
   const unclaimed = members.filter((profile) => !profile.userId).length;
@@ -1341,10 +1385,10 @@ function departmentStats(department, dates = datesInRange()) {
 
 function renderDepartmentCard(department, dates, depth = 0) {
   const stats = departmentStats(department, dates);
-  const children = state.departments.filter((item) => item.parentDepartmentId === department.id);
+  const children = childDepartmentsOf(department.id);
   const parent = byId(state.departments, department.parentDepartmentId);
   return `
-    <article class="department-card ${depth ? "sub-department-card" : ""}" style="--department-depth: ${depth}">
+    <article class="department-card ${depth ? "sub-department-card" : children.length ? "parent-department-card" : ""}" style="--department-depth: ${depth}">
       <button class="department-card-main" data-open-drawer="department-detail" data-department-id="${department.id}">
         <div class="department-card-head">
           <span class="department-kind">${parent ? "Sub-department" : "Department"}</span>
@@ -1358,6 +1402,14 @@ function renderDepartmentCard(department, dates, depth = 0) {
           <span><strong>${stats.pendingRequests}</strong> pending</span>
         </div>
         <p>${children.length ? `${children.length} sub-${children.length === 1 ? "department" : "departments"} - ` : ""}${stats.unclaimed} unclaimed profiles - ${stats.rotations} rotation versions</p>
+        ${children.length ? `
+          <div class="department-child-strip">
+            ${children.map((child) => {
+              const childStats = departmentStats(child, dates);
+              return `<span><strong>${child.name}</strong><small>${childStats.members.length} members</small></span>`;
+            }).join("")}
+          </div>
+        ` : ""}
       </button>
       <div class="department-card-actions">
         ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
@@ -1368,7 +1420,7 @@ function renderDepartmentCard(department, dates, depth = 0) {
 
 function renderDepartmentDetailRow(department, dates, depth = 0) {
   const stats = departmentStats(department, dates);
-  const children = state.departments.filter((item) => item.parentDepartmentId === department.id);
+  const children = childDepartmentsOf(department.id);
   const parent = byId(state.departments, department.parentDepartmentId);
   return `
     <button class="department-detail-row ${depth ? "is-child" : ""}" style="--department-depth: ${depth}" data-open-drawer="department-detail" data-department-id="${department.id}">
@@ -1623,7 +1675,7 @@ function renderLeadRotationPanel(department) {
 }
 
 function renderRotationCell(profile, rotation, statusId, weekday = 0) {
-  const isLeadSlot = leadForWeekday(ui.selectedDepartmentId, weekday)?.id === profile.id;
+  const isLeadSlot = leadForProfileWeekday(profile, ui.selectedDepartmentId, weekday)?.id === profile.id;
   if (!rotation) {
     return `
       <button class="rotation-cell shift-cell state-off missing" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="">

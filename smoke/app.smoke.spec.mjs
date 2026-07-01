@@ -72,7 +72,7 @@ test("personal profile shift details stay read-only and route edits to Scheduler
 
   await expect(page.getByRole("heading", { name: "Day Details", exact: true })).toBeVisible();
   await expect(page.locator(".person-summary-copy > span")).toHaveText("Workforce Admin");
-  await expect(page.locator(".detail-line").filter({ hasText: "Date" })).toContainText(/[A-Z][a-z]{2} Jun \d{1,2}/);
+  await expect(page.locator(".detail-line").filter({ hasText: "Date" })).toContainText(/[A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2}/);
   await expect(page.locator("#shift-form")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open in Scheduler", exact: true })).toBeVisible();
 

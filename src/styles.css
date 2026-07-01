@@ -2712,6 +2712,13 @@ label {
   border-left: 3px solid rgba(148, 163, 184, 0.34);
 }
 
+.parent-department-card {
+  border-color: rgba(148, 163, 184, 0.28);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.01)),
+    rgba(17, 17, 17, 0.9);
+}
+
 .sub-department-card .department-card-main {
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.035), transparent 42%),
@@ -2885,6 +2892,38 @@ label {
   margin: 0;
   color: var(--muted);
   font-size: 11px;
+}
+
+.department-child-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 7px;
+}
+
+.department-child-strip span {
+  display: grid;
+  gap: 2px;
+  min-height: 42px;
+  align-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  padding: 7px 8px;
+  background:
+    linear-gradient(90deg, rgba(34, 197, 94, 0.045), transparent 60%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.department-child-strip strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-child-strip small {
+  color: var(--muted);
+  font-size: 10px;
 }
 
 .department-card-actions,
