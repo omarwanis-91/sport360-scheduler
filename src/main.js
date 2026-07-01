@@ -76,6 +76,7 @@ const ui = {
   peopleDepartmentId: "all",
   peopleView: "default",
   departmentView: "tiles",
+  expandedDepartmentIds: [],
   rangeDays: appConfig.defaultScheduleDays,
   startDate: todayIso,
   calendarMonth: todayIso.slice(0, 7),
@@ -1387,14 +1388,18 @@ function renderDepartmentCard(department, dates, depth = 0) {
   const stats = departmentStats(department, dates);
   const children = childDepartmentsOf(department.id);
   const parent = byId(state.departments, department.parentDepartmentId);
+  const isSubDepartment = Boolean(parent);
+  const isExpanded = ui.expandedDepartmentIds.includes(department.id);
+  const compactClass = isSubDepartment && !isExpanded ? "is-compact" : "";
   return `
-    <article class="department-card ${depth ? "sub-department-card" : children.length ? "parent-department-card" : ""}" style="--department-depth: ${depth}">
+    <article class="department-card ${depth ? "sub-department-card" : children.length ? "parent-department-card" : ""} ${compactClass}" style="--department-depth: ${depth}">
       <button class="department-card-main" data-open-drawer="department-detail" data-department-id="${department.id}">
         <div class="department-card-head">
           <span class="department-kind">${parent ? "Sub-department" : "Department"}</span>
           <strong>${department.name}</strong>
           ${parent ? `<em>${parent.name}</em>` : children.length ? `<em>${children.length} child ${children.length === 1 ? "department" : "departments"}</em>` : ""}
         </div>
+        ${isSubDepartment ? `<div class="department-compact-line"><span>${stats.members.length} members</span><span>${stats.leadCount}/${dates.length} leads</span></div>` : ""}
         <div class="department-card-stats">
           <span><strong>${stats.members.length}</strong> members</span>
           <span><strong>${stats.target}</strong> target</span>
@@ -1412,6 +1417,7 @@ function renderDepartmentCard(department, dates, depth = 0) {
         ` : ""}
       </button>
       <div class="department-card-actions">
+        ${isSubDepartment ? `<button type="button" class="ghost compact-toggle" data-toggle-department-card="${department.id}">${isExpanded ? "Collapse" : "Expand"}</button>` : ""}
         ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
       </div>
     </article>
@@ -2796,6 +2802,17 @@ function bindEvents() {
   document.querySelectorAll("[data-department-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.departmentView = button.dataset.departmentView;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-toggle-department-card]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const departmentId = button.dataset.toggleDepartmentCard;
+      const expanded = new Set(ui.expandedDepartmentIds);
+      if (expanded.has(departmentId)) expanded.delete(departmentId);
+      else expanded.add(departmentId);
+      ui.expandedDepartmentIds = [...expanded];
       render();
     });
   });

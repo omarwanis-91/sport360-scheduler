@@ -36,8 +36,14 @@ test("creation opens centered while editing stays in the right sidebar", async (
   await page.getByRole("textbox", { name: "Department name", exact: true }).fill("Motion Graphics");
   await page.getByRole("combobox", { name: "Parent department", exact: true }).selectOption("ops");
   await page.getByRole("button", { name: "Create Department", exact: true }).click();
-  await expect(page.locator(".sub-department-card").filter({ hasText: "Motion Graphics" })).toContainText("Sub-department");
-  await expect(page.locator(".sub-department-card").filter({ hasText: "Motion Graphics" })).toContainText("Operations");
+  const subDepartmentCard = page.locator(".sub-department-card").filter({ hasText: "Motion Graphics" });
+  await expect(subDepartmentCard).toContainText("Sub-department");
+  await expect(subDepartmentCard).toContainText("Operations");
+  await expect(subDepartmentCard).toHaveClass(/is-compact/);
+  await subDepartmentCard.getByRole("button", { name: "Expand", exact: true }).click();
+  await expect(subDepartmentCard).not.toHaveClass(/is-compact/);
+  await subDepartmentCard.getByRole("button", { name: "Collapse", exact: true }).click();
+  await expect(subDepartmentCard).toHaveClass(/is-compact/);
   await page.getByRole("button", { name: "Details", exact: true }).click();
   await expect(page.locator(".department-detail-row").filter({ hasText: "Motion Graphics" })).toContainText("Operations /");
 

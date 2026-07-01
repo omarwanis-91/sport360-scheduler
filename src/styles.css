@@ -2685,7 +2685,7 @@ label {
 
 .department-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
 }
 
@@ -2710,6 +2710,10 @@ label {
 
 .sub-department-card {
   border-left: 3px solid rgba(148, 163, 184, 0.34);
+}
+
+.sub-department-card.is-compact {
+  align-self: start;
 }
 
 .parent-department-card {
@@ -2747,9 +2751,20 @@ label {
   text-align: left;
 }
 
+.sub-department-card.is-compact .department-card-main {
+  grid-template-columns: 1fr auto;
+  gap: 8px 10px;
+  min-height: 92px;
+  padding: 12px;
+}
+
 .department-card-head {
   display: grid;
   gap: 4px;
+}
+
+.sub-department-card.is-compact .department-card-head {
+  gap: 3px;
 }
 
 .department-kind {
@@ -2774,10 +2789,35 @@ label {
   font-size: 18px;
 }
 
+.sub-department-card.is-compact .department-card-head strong {
+  font-size: 14px;
+}
+
 .department-card-head em {
   color: var(--muted);
   font-size: 11px;
   font-style: normal;
+}
+
+.department-compact-line {
+  display: none;
+}
+
+.sub-department-card.is-compact .department-compact-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.sub-department-card.is-compact .department-compact-line span {
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .department-details-list {
@@ -2868,6 +2908,11 @@ label {
   gap: 7px;
 }
 
+.sub-department-card.is-compact .department-card-stats,
+.sub-department-card.is-compact .department-card-main p {
+  display: none;
+}
+
 .department-card-stats span,
 .department-drawer-summary span {
   display: grid;
@@ -2938,6 +2983,14 @@ label {
   padding: 10px;
   border-top: 1px solid var(--line-soft);
   background: rgba(255, 255, 255, 0.018);
+}
+
+.sub-department-card.is-compact .department-card-actions {
+  padding: 8px 10px;
+}
+
+.compact-toggle {
+  min-width: 82px;
 }
 
 .department-card-actions .ghost,
