@@ -1987,7 +1987,7 @@ function renderDrawer() {
     profile: ui.drawer.profileId ? "Edit Profile" : "New Profile",
     request: "New Vacation",
     "request-detail": "Vacation Request",
-    lead: "Day Editor",
+    lead: "Lead Assignment",
     "calendar-day": "Day Details",
     coverage: "Coverage",
     department: "New Department",
@@ -2016,7 +2016,7 @@ function renderDrawer() {
 function isCreationDrawer() {
   if (!ui.drawer) return false;
   if (ui.drawer.type === "profile") return !ui.drawer.profileId;
-  return ["request", "department", "department-member", "rotation", "status"].includes(ui.drawer.type);
+  return ["request", "department", "department-member", "rotation", "status", "lead"].includes(ui.drawer.type);
 }
 
 function drawerBody() {
@@ -2551,76 +2551,32 @@ function bulkRotationDay(statusId, index) {
 function leadDrawer() {
   const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
   const resolvedLead = departmentLeadForDate(ui.selectedDepartmentId, ui.drawer.date);
-  const profiles = state.profiles.filter((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId));
   const candidates = availableLeadCandidates(ui.selectedDepartmentId, ui.drawer.date, resolvedLead.profile?.id);
   const canEdit = canManageDepartment(ui.selectedDepartmentId) && editableDate(ui.drawer.date);
   const department = byId(state.departments, ui.selectedDepartmentId);
-  const coverage = coverageForDate(profiles, ui.drawer.date);
   const leadHealth = leadAvailabilityForDepartmentDate(ui.selectedDepartmentId, ui.drawer.date);
-  const target = department.coverageTarget || coverageTargets[department.id] || 0;
-  const lowCoverage = target > 0 && coverage.available < target;
-  const projected = coverageCountForStatusIds(profiles.map((profile) => scheduleFor(profile.id, ui.drawer.date).id));
-  const unassigned = profiles.filter((profile) => scheduleFor(profile.id, ui.drawer.date).id === "empty").length;
-  const manualCount = profiles.filter((profile) => scheduleFor(profile.id, ui.drawer.date).source === "Override").length;
-  const exceptionCount = profiles.filter((profile) => exceptionStatusIds.includes(scheduleFor(profile.id, ui.drawer.date).id)).length;
+  const activeLeadText = leadHealth.available
+    ? `${leadHealth.profile.name} is active for this day.`
+    : leadHealth.profile ? `${leadHealth.profile.name} is ${leadHealth.schedule?.label || "unavailable"} on this day.` : "No leader is assigned for this day.";
   return `
-    <div class="day-editor">
-      <div class="day-editor-summary ${lowCoverage ? "low" : ""}">
+    <div class="lead-only-editor">
+      <div class="lead-only-summary ${leadHealth.missing ? "missing" : ""}">
         <div>
           <span class="eyebrow">${department.name}</span>
           <strong>${formatDay(ui.drawer.date)} ${formatDate(ui.drawer.date)}</strong>
           <small>${ui.drawer.date}</small>
         </div>
-        <div class="day-editor-score">
-          <strong>${coverage.available}</strong>
-          <span>${target ? `of ${target} target` : "available"}</span>
-        </div>
+        <span class="lead-state">${leadHealth.missing ? "Needs lead" : "Covered"}</span>
       </div>
-
-      <div class="day-editor-metrics">
-        <span><strong>${coverage.unavailable}</strong> unavailable</span>
-        <span><strong>${coverage.away}</strong> on ground</span>
-        <span><strong>${exceptionCount}</strong> exceptions</span>
-        <span><strong>${manualCount}</strong> manual</span>
-      </div>
-
-      ${leadHealth.missing ? `
-        <div class="lead-alert">
-          <strong>Leader missing</strong>
-          <span>${leadHealth.profile ? `${leadHealth.profile.name} is ${leadHealth.schedule?.label || "unavailable"} on this day.` : "No leader is assigned for this day."}</span>
-        </div>
-      ` : ""}
-
-      <div class="day-editor-projection" data-day-projection data-target="${target}">
-        <div>
-          <span class="eyebrow">Coverage Preview</span>
-          <strong><b data-projected-available>${projected.available}</b>${target ? ` / ${target}` : ""} available after edits</strong>
-        </div>
-        <div class="day-editor-projection-metrics">
-          <span><b data-projected-unavailable>${projected.unavailable}</b> unavailable</span>
-          <span><b data-projected-away>${projected.away}</b> on ground</span>
-          <span><b data-projected-changes>0</b> changed</span>
-        </div>
-      </div>
+      <p class="lead-only-copy">${activeLeadText}</p>
 
       <form id="lead-form" class="day-lead-form">
         <label>Daily lead override<select name="profileId" ${canEdit ? "" : "disabled"}>
           <option value="">Use weekly rotation${resolvedLead.rotation && resolvedLead.profile ? ` (${resolvedLead.profile.name})` : ""}</option>
           ${candidates.map((profile) => `<option value="${profile.id}" ${lead?.profileId === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}
         </select></label>
-        <button class="ghost" ${canEdit ? "" : "disabled"}>Save</button>
-      </form>
-
-      <form id="day-bulk-form" class="drawer-form">
-        <div class="section-title">
-          <span class="eyebrow">Daily Exceptions</span>
-          <strong>${profiles.length} people - ${manualCount} saved manual changes</strong>
-        </div>
-        <div class="bulk-shift-list">
-          ${profiles.map((profile) => renderBulkShiftRow(profile, ui.drawer.date, canEdit)).join("")}
-        </div>
-        <p class="hint">${canEdit ? "Use rotation shifts for normal one-day swaps. Use Vacation, Sick, and On Ground for daily exceptions. Clear returns a row to its rotation." : "This day is locked for your role."}</p>
-        <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Daily Changes</button>
+        <p class="hint">${candidates.length ? "Only people available on this day are listed." : "No available replacement leaders for this department on this day."}</p>
+        <button class="primary wide" ${canEdit && candidates.length ? "" : "disabled"}>Save Lead</button>
       </form>
     </div>
   `;

@@ -351,11 +351,11 @@ textarea:focus {
 }
 
 .app-notice.warning {
-  border-color: rgba(245, 158, 11, 0.38);
+  border-color: rgba(244, 63, 94, 0.34);
   background:
-    radial-gradient(circle at 92% 14%, rgba(245, 158, 11, 0.14), transparent 36%),
-    #17130d;
-  color: #fde68a;
+    radial-gradient(circle at 92% 14%, rgba(244, 63, 94, 0.12), transparent 36%),
+    #151012;
+  color: #fecdd3;
 }
 
 .app-notice span {
@@ -813,20 +813,20 @@ h2 {
 }
 
 .coverage-cell.lead-missing {
-  border-color: rgba(245, 158, 11, 0.22);
+  border-color: rgba(244, 63, 94, 0.22);
   background:
-    linear-gradient(90deg, rgba(245, 158, 11, 0.08), rgba(17, 17, 17, 0.9)),
-    #13110c;
+    linear-gradient(90deg, rgba(244, 63, 94, 0.07), rgba(17, 17, 17, 0.9)),
+    #141012;
 }
 
 .coverage-cell.lead-missing .coverage-count {
-  background: rgba(245, 158, 11, 0.16);
-  color: #fde68a;
+  background: rgba(244, 63, 94, 0.14);
+  color: #fecdd3;
 }
 
 .coverage-cell.lead-missing .coverage-meta,
 .coverage-cell.lead-missing small {
-  color: #fbbf24;
+  color: #fda4af;
 }
 
 .scheduler-shell {
@@ -983,14 +983,14 @@ h2 {
 }
 
 .date-head.lead-missing {
-  border-color: rgba(245, 158, 11, 0.22);
+  border-color: rgba(244, 63, 94, 0.22);
   background:
-    linear-gradient(145deg, rgba(245, 158, 11, 0.09), rgba(17, 17, 17, 0.9)),
-    #12100c;
+    linear-gradient(145deg, rgba(244, 63, 94, 0.07), rgba(17, 17, 17, 0.9)),
+    #141012;
 }
 
 .date-head.lead-missing em {
-  color: #fbbf24;
+  color: #fda4af;
   font-weight: 800;
 }
 
@@ -1297,30 +1297,26 @@ h2 {
 
 .shift-cell.vacation {
   background:
-    radial-gradient(circle at 86% 18%, rgba(125, 211, 252, 0.16), transparent 30%),
-    repeating-radial-gradient(ellipse at 22% 110%, rgba(56, 189, 248, 0.16) 0 2px, transparent 2px 12px),
-    linear-gradient(145deg, rgba(14, 116, 144, 0.18), rgba(12, 18, 27, 0.92)),
-    #0b121b;
-  color: #bae6fd;
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.045) 8px 10px, transparent 10px 18px),
+    linear-gradient(145deg, rgba(56, 189, 248, 0.055), rgba(16, 18, 22, 0.96)),
+    #101112;
+  color: #cbd5e1;
 }
 
 .shift-cell.vacation::before {
-  background: linear-gradient(to bottom, #38bdf8, #0ea5e9);
+  background: linear-gradient(to bottom, #7dd3fc, #0ea5e9);
 }
 
 .shift-cell.vacation::after {
-  opacity: 0.34;
-  background:
-    radial-gradient(ellipse at 12% 88%, rgba(251, 191, 36, 0.16), transparent 21%),
-    repeating-linear-gradient(165deg, transparent 0 13px, rgba(186, 230, 253, 0.06) 13px 15px, transparent 15px 26px);
+  opacity: 0.18;
+  background: radial-gradient(ellipse at 15% 92%, rgba(56, 189, 248, 0.22), transparent 24%);
 }
 
 .shift-cell.sick {
   background:
-    radial-gradient(circle at 86% 18%, rgba(248, 113, 113, 0.18), transparent 30%),
-    repeating-linear-gradient(135deg, rgba(248, 113, 113, 0.085) 0 1px, transparent 1px 8px),
-    linear-gradient(145deg, rgba(153, 27, 27, 0.26), rgba(25, 10, 12, 0.94)),
-    #190b0d;
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.045) 8px 10px, transparent 10px 18px),
+    linear-gradient(145deg, rgba(220, 38, 38, 0.08), rgba(18, 14, 15, 0.96)),
+    #111010;
   color: #fecaca;
 }
 
@@ -1329,7 +1325,7 @@ h2 {
 }
 
 .shift-cell.sick::after {
-  opacity: 0.36;
+  opacity: 0.22;
   background:
     linear-gradient(45deg, transparent 0 42%, rgba(254, 202, 202, 0.12) 42% 48%, transparent 48%),
     linear-gradient(-45deg, transparent 0 42%, rgba(254, 202, 202, 0.1) 42% 48%, transparent 48%);
@@ -1337,12 +1333,9 @@ h2 {
 
 .shift-cell.ground {
   background:
-    radial-gradient(circle at 84% 18%, rgba(45, 212, 191, 0.18), transparent 30%),
-    radial-gradient(circle at 74% 76%, rgba(20, 184, 166, 0.12) 0 8px, transparent 9px),
-    repeating-linear-gradient(135deg, rgba(45, 212, 191, 0.12) 0 1px, transparent 1px 6px),
-    linear-gradient(145deg, rgba(15, 118, 110, 0.24), rgba(8, 18, 18, 0.95)),
-    #071312;
-  color: #ccfbf1;
+    linear-gradient(90deg, rgba(45, 212, 191, 0.045), rgba(255, 255, 255, 0.012)),
+    #161616;
+  color: #d4d4d8;
 }
 
 .shift-cell.ground::before {
@@ -1350,10 +1343,10 @@ h2 {
 }
 
 .shift-cell.ground::after {
-  opacity: 0.54;
+  opacity: 0.24;
   background:
-    radial-gradient(circle at 18px 18px, transparent 0 6px, rgba(153, 246, 228, 0.08) 7px, transparent 8px),
-    repeating-linear-gradient(45deg, transparent 0 8px, rgba(204, 251, 241, 0.07) 8px 10px, transparent 10px 18px);
+    radial-gradient(circle at 18px 18px, transparent 0 5px, rgba(45, 212, 191, 0.12) 6px, transparent 7px),
+    repeating-linear-gradient(45deg, transparent 0 12px, rgba(45, 212, 191, 0.055) 12px 14px, transparent 14px 24px);
 }
 
 .state-off .shift-icon {
@@ -1966,13 +1959,12 @@ label {
 
 .month-day.vacation,
 .month-day.approved-vacation {
-  border-color: rgba(56, 189, 248, 0.38);
+  border-color: rgba(56, 189, 248, 0.28);
   background:
-    radial-gradient(ellipse at 12% 92%, rgba(251, 191, 36, 0.12), transparent 25%),
-    repeating-radial-gradient(ellipse at 18% 110%, rgba(56, 189, 248, 0.15) 0 2px, transparent 2px 13px),
-    linear-gradient(145deg, rgba(14, 116, 144, 0.18), rgba(12, 18, 27, 0.92)),
-    #0b121b;
-  color: #bae6fd;
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.045) 8px 10px, transparent 10px 18px),
+    linear-gradient(145deg, rgba(56, 189, 248, 0.06), rgba(16, 18, 22, 0.96)),
+    #101112;
+  color: #cbd5e1;
 }
 
 .month-day.vacation em,
@@ -1982,29 +1974,25 @@ label {
 }
 
 .month-day.ground {
-  border-color: rgba(45, 212, 191, 0.46);
+  border-color: rgba(45, 212, 191, 0.3);
   background:
-    radial-gradient(circle at 84% 18%, rgba(45, 212, 191, 0.18), transparent 30%),
-    radial-gradient(circle at 72% 76%, rgba(20, 184, 166, 0.14) 0 7px, transparent 8px),
-    repeating-linear-gradient(135deg, rgba(45, 212, 191, 0.12) 0 1px, transparent 1px 6px),
-    linear-gradient(145deg, rgba(15, 118, 110, 0.22), rgba(8, 18, 18, 0.95)),
-    #071312;
-  color: #ccfbf1;
+    linear-gradient(145deg, rgba(45, 212, 191, 0.06), rgba(17, 17, 17, 0.94)),
+    #121414;
+  color: #d4d4d8;
 }
 
 .month-day.ground em {
   border-radius: 8px;
-  background: rgba(15, 118, 110, 0.3);
+  background: rgba(15, 118, 110, 0.18);
   color: #99f6e4;
 }
 
 .month-day.sick {
-  border-color: rgba(248, 113, 113, 0.44);
+  border-color: rgba(248, 113, 113, 0.34);
   background:
-    radial-gradient(circle at 84% 18%, rgba(248, 113, 113, 0.18), transparent 30%),
-    repeating-linear-gradient(135deg, rgba(248, 113, 113, 0.08) 0 1px, transparent 1px 8px),
-    linear-gradient(145deg, rgba(153, 27, 27, 0.22), rgba(25, 10, 12, 0.94)),
-    #190b0d;
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.045) 8px 10px, transparent 10px 18px),
+    linear-gradient(145deg, rgba(220, 38, 38, 0.08), rgba(18, 14, 15, 0.96)),
+    #111010;
   color: #fecaca;
 }
 
@@ -2368,6 +2356,62 @@ label {
 .lead-alert span {
   color: #fbbf24;
   font-size: 11px;
+}
+
+.lead-only-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.lead-only-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.lead-only-summary.missing {
+  border-color: rgba(244, 63, 94, 0.24);
+  background:
+    linear-gradient(90deg, rgba(244, 63, 94, 0.065), rgba(255, 255, 255, 0.014)),
+    #131011;
+}
+
+.lead-only-summary strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.lead-only-summary small,
+.lead-only-copy {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lead-state {
+  flex: 0 0 auto;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lead-only-summary.missing .lead-state {
+  border-color: rgba(244, 63, 94, 0.26);
+  background: rgba(244, 63, 94, 0.1);
+  color: #fda4af;
+}
+
+.lead-only-copy {
+  margin: 0;
 }
 
 .day-editor-projection {

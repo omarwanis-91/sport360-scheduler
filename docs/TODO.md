@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Simplified schedule visuals around working/non-working base states and made missing-lead assignment a focused centered modal.
 - [x] Made Sick red, strengthened On Ground, removed manual Vacation overrides, and added missing-lead alerts/replacement prompts.
 - [x] Made Vacation blue with a subtle beach/water treatment and gave On Ground a distinct teal terrain treatment across profiles and Scheduler.
 - [x] Made sub-department tiles compact by default with expand/collapse for full details.
