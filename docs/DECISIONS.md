@@ -195,3 +195,12 @@ The Hierarchy workspace lets the user select one or more departments, then group
 During setup, profiles are pseudo profiles created and controlled by Admins. Admins can create, edit, unlink, and delete these profiles while the team structure is still being shaped.
 
 Longer term, employees should be able to create or claim their own profile and edit basic personal information, while Admins retain control over operational fields such as roles, departments, rotations, and scheduling rules.
+
+## D-030 - Vacation Requests And Lead Replacement
+
+**Date:** 2026-07-04
+**Status:** Accepted
+
+Vacation is not manually assigned from the shift override editor. Vacation must come through the vacation request and approval workflow so balance deduction, schedule impact, and audit history stay connected.
+
+If a scheduled department lead becomes unavailable through Vacation, Sick, On Ground, or another non-working state, the Scheduler should stop showing that person as the active lead for that day and surface a missing-lead alert. Approving vacation for an affected lead should guide the manager to assign a replacement daily lead.

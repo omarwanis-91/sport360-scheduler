@@ -108,9 +108,14 @@ test("admins can assign seniority and weekly or daily department leads", async (
   await expect(page.getByRole("combobox", { name: "Sat", exact: true })).toHaveValue("emp-003");
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
-  await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText(`Lead: ${expectedLead}`);
+  if (weekend) {
+    await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText("Lead missing");
+    await expect(page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"] .lead-marker`)).toHaveCount(0);
+  } else {
+    await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText(`Lead: ${expectedLead}`);
+    await expect(page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"] .lead-marker`)).toBeVisible();
+  }
   await expect(page.locator(".date-head.today")).toContainText("Today");
-  await expect(page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"] .lead-marker`)).toBeVisible();
   await page.locator(".date-head.today").click();
   await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
 });

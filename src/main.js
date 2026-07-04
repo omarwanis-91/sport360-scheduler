@@ -58,6 +58,7 @@ const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const defaultWeekPattern = ["morning", "morning", "morning", "morning", "morning", "weekend", "weekend"];
 const rotationStatusIds = ["morning", "midday", "night", "weekend"];
 const exceptionStatusIds = ["vacation", "sick", "ground"];
+const manualExceptionStatusIds = ["sick", "ground"];
 const seniorityLevels = [
   ["junior", "Junior"],
   ["mid", "Mid-level"],
@@ -165,10 +166,14 @@ function exceptionStatuses() {
   return exceptionStatusIds.map((id) => byId(state.statuses, id)).filter(Boolean);
 }
 
+function manualExceptionStatuses() {
+  return manualExceptionStatusIds.map((id) => byId(state.statuses, id)).filter(Boolean);
+}
+
 function dailyStatusGroups() {
   return [
     { label: "Rotation shifts", statuses: rotationStatuses() },
-    { label: "Daily exceptions", statuses: exceptionStatuses() }
+    { label: "Daily exceptions", statuses: manualExceptionStatuses() }
   ];
 }
 
@@ -480,17 +485,84 @@ function departmentLeadForDate(departmentId, dateIso) {
   return departmentLeadForDateLogic(state, departmentId, dateIso);
 }
 
-function departmentLeadsForDate(departmentId, dateIso) {
+function isScheduleLeadAvailable(schedule) {
+  return schedule?.kind === "working" && schedule.id !== "ground";
+}
+
+function leadAvailabilityForDepartmentDate(departmentId, dateIso) {
+  const lead = departmentLeadForDate(departmentId, dateIso);
+  const schedule = lead.profile ? scheduleFor(lead.profile.id, dateIso) : null;
+  const available = Boolean(lead.profile && isScheduleLeadAvailable(schedule));
+  return {
+    ...lead,
+    department: byId(state.departments, departmentId),
+    schedule,
+    available,
+    missing: !available
+  };
+}
+
+function leadAvailabilityForScopeDate(departmentId, dateIso) {
   return departmentScopeIds(departmentId)
-    .map((id) => ({ department: byId(state.departments, id), ...departmentLeadForDate(id, dateIso) }))
-    .filter((lead) => lead.profile);
+    .filter((id) => childDepartmentsOf(id).length === 0 || state.profiles.some((profile) => profileDepartmentIds(profile).includes(id)))
+    .map((id) => leadAvailabilityForDepartmentDate(id, dateIso));
+}
+
+function unavailableLeadAssignmentsForProfile(profileId, dates) {
+  const departmentIds = profileDepartmentIds(byId(state.profiles, profileId));
+  return departmentIds.flatMap((departmentId) => dates.map((date) => {
+    const lead = departmentLeadForDate(departmentId, date);
+    if (lead.profile?.id !== profileId) return null;
+    const schedule = scheduleFor(profileId, date);
+    return isScheduleLeadAvailable(schedule) ? null : { departmentId, date, schedule };
+  }).filter(Boolean));
+}
+
+function assignedLeadDatesForProfile(profileId, dates) {
+  const departmentIds = profileDepartmentIds(byId(state.profiles, profileId));
+  return departmentIds.flatMap((departmentId) => dates.map((date) => {
+    const lead = departmentLeadForDate(departmentId, date);
+    return lead.profile?.id === profileId ? { departmentId, date } : null;
+  }).filter(Boolean));
+}
+
+function availableLeadCandidates(departmentId, dateIso, excludeProfileId = "") {
+  return leadCandidates(departmentId).filter((profile) =>
+    profile.id !== excludeProfileId && isScheduleLeadAvailable(scheduleFor(profile.id, dateIso))
+  );
+}
+
+function missingLeadInfo(departmentId, dateIso) {
+  const unavailable = leadAvailabilityForScopeDate(departmentId, dateIso).filter((lead) => lead.missing);
+  return {
+    missing: unavailable.length > 0,
+    items: unavailable,
+    label: unavailable.length === 1
+      ? "Lead missing"
+      : unavailable.length > 1 ? `${unavailable.length} leads missing` : ""
+  };
+}
+
+function openLeadPromptForAssignment(assignment, message) {
+  if (!assignment) return false;
+  ui.selectedDepartmentId = assignment.departmentId;
+  ui.activeView = "scheduler";
+  ui.drawer = { type: "lead", date: assignment.date, departmentId: assignment.departmentId };
+  if (message) {
+    ui.notice = message;
+    ui.noticeKind = "warning";
+  }
+  return true;
+}
+
+function departmentLeadsForDate(departmentId, dateIso) {
+  return leadAvailabilityForScopeDate(departmentId, dateIso).filter((lead) => lead.profile && lead.available);
 }
 
 function leadForProfileDate(profile, departmentId, dateIso) {
-  return departmentScopeIds(departmentId)
-    .filter((id) => profileBelongsToDepartment(profile, id))
-    .map((id) => departmentLeadForDate(id, dateIso))
-    .find((lead) => lead?.profile?.id === profile.id);
+  return leadAvailabilityForScopeDate(departmentId, dateIso)
+    .filter((lead) => profileBelongsToDepartment(profile, lead.department?.id))
+    .find((lead) => lead?.profile?.id === profile.id && lead.available);
 }
 
 function scheduleFor(profileId, dateIso) {
@@ -1056,17 +1128,18 @@ function renderCoverageRow(profiles, dates, department) {
     ${dates.map((date) => {
       const coverage = coverageForDate(profiles, date);
       const isLow = coverage.available < target;
+      const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
+      const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
       return `
-        <button class="coverage-cell ${isLow ? "low" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="coverage" data-date="${date}">
+        <button class="coverage-cell ${isLow ? "low" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${leadInfo.missing ? "lead" : "coverage"}" data-date="${date}" data-department-id="${leadDepartmentId}">
           <span class="coverage-count">${coverage.available}</span>
           <span class="coverage-meta">avail</span>
-          <small>${coverage.unavailable} off · ${coverage.away} ground</small>
+          <small>${leadInfo.missing ? leadInfo.label : `${coverage.unavailable} off - ${coverage.away} ground`}</small>
         </button>
       `;
     }).join("")}
   `;
 }
-
 function filterButton(id, label) {
   return `<button class="segment ${ui.selectedFilter === id ? "active" : ""}" data-filter="${id}">${label}</button>`;
 }
@@ -1090,11 +1163,13 @@ function coverageTargetForDepartment(department) {
 function renderDateHead(date) {
   const leads = departmentLeadsForDate(ui.selectedDepartmentId, date);
   const isToday = date === todayIso;
+  const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
+  const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
   const leadLabel = leads.length > 1
     ? `${leads.length} leads`
-    : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : "No lead";
+    : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
   return `
-    <button class="date-head ${isToday ? "today" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="lead" data-date="${date}">
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="lead" data-date="${date}" data-department-id="${leadDepartmentId}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
       <em>${leadLabel}</em>
@@ -2032,7 +2107,7 @@ function shiftDrawer() {
         <label>Apply to<input name="endDate" type="date" value="${ui.drawer.date}" ${canEdit ? "" : "disabled"}></label>
       </div>
       <label>Note<textarea name="note" ${canEdit ? "" : "disabled"}>${schedule.note || ""}</textarea></label>
-      <p class="hint">${canEdit ? "Saving creates a manual daily change. Vacation, Sick, and On Ground live here, not in rotations." : "This date or department is locked for your role."}</p>
+      <p class="hint">${canEdit ? "Saving creates a manual daily change. Sick and On Ground live here; vacations are approved through requests." : "This date or department is locked for your role."}</p>
       <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Daily Change</button>
       ${canManageDepartment(profile.departmentId) ? `<button type="button" class="ghost wide" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">${rotation ? "Edit Weekly Rotation" : "Create Weekly Rotation"}</button>` : ""}
       <button type="button" class="danger wide" id="clear-override" ${canEdit && existingOverride ? "" : "disabled"}>Clear Override</button>
@@ -2477,10 +2552,11 @@ function leadDrawer() {
   const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
   const resolvedLead = departmentLeadForDate(ui.selectedDepartmentId, ui.drawer.date);
   const profiles = state.profiles.filter((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId));
-  const candidates = leadCandidates(ui.selectedDepartmentId);
+  const candidates = availableLeadCandidates(ui.selectedDepartmentId, ui.drawer.date, resolvedLead.profile?.id);
   const canEdit = canManageDepartment(ui.selectedDepartmentId) && editableDate(ui.drawer.date);
   const department = byId(state.departments, ui.selectedDepartmentId);
   const coverage = coverageForDate(profiles, ui.drawer.date);
+  const leadHealth = leadAvailabilityForDepartmentDate(ui.selectedDepartmentId, ui.drawer.date);
   const target = department.coverageTarget || coverageTargets[department.id] || 0;
   const lowCoverage = target > 0 && coverage.available < target;
   const projected = coverageCountForStatusIds(profiles.map((profile) => scheduleFor(profile.id, ui.drawer.date).id));
@@ -2507,6 +2583,13 @@ function leadDrawer() {
         <span><strong>${exceptionCount}</strong> exceptions</span>
         <span><strong>${manualCount}</strong> manual</span>
       </div>
+
+      ${leadHealth.missing ? `
+        <div class="lead-alert">
+          <strong>Leader missing</strong>
+          <span>${leadHealth.profile ? `${leadHealth.profile.name} is ${leadHealth.schedule?.label || "unavailable"} on this day.` : "No leader is assigned for this day."}</span>
+        </div>
+      ` : ""}
 
       <div class="day-editor-projection" data-day-projection data-target="${target}">
         <div>
@@ -2701,6 +2784,9 @@ function bindEvents() {
       if (button.dataset.openDrawer === "profile") {
         ui.pendingPhotoFile = null;
         ui.pendingPhotoDataUrl = "";
+      }
+      if (button.dataset.openDrawer === "lead" && button.dataset.departmentId) {
+        ui.selectedDepartmentId = button.dataset.departmentId;
       }
       ui.drawer = { type: button.dataset.openDrawer, ...button.dataset };
       render();
@@ -3182,6 +3268,11 @@ async function saveShiftOverride(event) {
   const rangeStart = startDate <= endDate ? startDate : endDate;
   const rangeEnd = startDate <= endDate ? endDate : startDate;
   const targetDates = datesBetween(rangeStart, rangeEnd).filter(editableDate);
+  const selectedStatusId = form.get("statusId");
+  const selectedStatus = byId(state.statuses, selectedStatusId);
+  const leadAssignmentsToReplace = selectedStatus && !isScheduleLeadAvailable(selectedStatus)
+    ? assignedLeadDatesForProfile(profile.id, targetDates)
+    : [];
   const payloads = targetDates.map((date) => {
     const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === date);
     return {
@@ -3190,7 +3281,7 @@ async function saveShiftOverride(event) {
         id: existing?.id || makeId("ovr"),
         profileId: ui.drawer.profileId,
         date,
-        statusId: form.get("statusId"),
+        statusId: selectedStatusId,
         note: form.get("note").trim()
       }
     };
@@ -3208,6 +3299,10 @@ async function saveShiftOverride(event) {
     }
     await saveState();
     ui.drawer = null;
+    if (leadAssignmentsToReplace.length) {
+      ui.notice = "Leader is unavailable on one or more edited days. Use the Lead missing alert to assign a replacement.";
+      ui.noticeKind = "warning";
+    }
     render();
   });
 }
@@ -3532,6 +3627,10 @@ async function decideRequest(requestId, decision) {
   const profile = byId(state.profiles, request.profileId);
   if (!request || !profile || request.status !== "pending" || !canManageDepartment(profile.departmentId)) return;
   const days = workdayCount(profile.id, request.startDate, request.endDate);
+  const requestDates = datesBetween(request.startDate, request.endDate);
+  const leadAssignmentsToReplace = decision === "approved"
+    ? assignedLeadDatesForProfile(profile.id, requestDates).filter((assignment) => isScheduleLeadAvailable(scheduleFor(profile.id, assignment.date)))
+    : [];
   await runMutation("vacation-decision", {
     pending: decision === "approved" ? "Approving request..." : "Rejecting request...",
     success: decision === "approved" ? "Request approved." : "Request rejected.",
@@ -3540,8 +3639,11 @@ async function decideRequest(requestId, decision) {
     if (dataStore?.mode === "supabase") {
       await dataStore.updateVacationDecision({ ...request, status: decision }, profile, []);
       audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
-      ui.drawer = null;
       await reloadState();
+      if (!openLeadPromptForAssignment(leadAssignmentsToReplace[0], "Vacation approved. Choose another leader for the affected day.")) {
+        ui.drawer = null;
+      }
+      render();
       return;
     }
 
@@ -3567,7 +3669,9 @@ async function decideRequest(requestId, decision) {
     audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
     await dataStore.updateVacationDecision(request, profile, changedOverrides);
     await saveState();
-    ui.drawer = null;
+    if (!openLeadPromptForAssignment(leadAssignmentsToReplace[0], "Vacation approved. Choose another leader for the affected day.")) {
+      ui.drawer = null;
+    }
     render();
   });
 }
@@ -3578,6 +3682,11 @@ async function saveLead(event) {
   const form = new FormData(event.currentTarget);
   const existing = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
   const profileId = form.get("profileId");
+  const selectedProfile = byId(state.profiles, profileId);
+  if (profileId && (!selectedProfile || !isScheduleLeadAvailable(scheduleFor(profileId, ui.drawer.date)))) {
+    notify("Choose a leader who is available on this day.", "error");
+    return;
+  }
   const payload = { id: existing?.id || makeId("lead"), departmentId: ui.selectedDepartmentId, date: ui.drawer.date, profileId };
   await runMutation("daily-lead", {
     pending: "Saving daily lead...",
