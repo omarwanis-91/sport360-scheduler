@@ -1046,6 +1046,13 @@ h2 {
   border-radius: 0;
   color: #e4e4e7;
   overflow: hidden;
+  transition:
+    background 0.36s ease,
+    border-color 0.36s ease,
+    box-shadow 0.36s ease,
+    color 0.36s ease,
+    filter 0.36s ease,
+    opacity 0.36s ease;
 }
 
 .schedule-grid.range-month .employee-head,
@@ -1086,6 +1093,7 @@ h2 {
   inset: 0 auto 0 0;
   width: 3px;
   opacity: 0.9;
+  transition: background 0.36s ease, opacity 0.36s ease;
 }
 
 .shift-cell::after {
@@ -1094,6 +1102,7 @@ h2 {
   inset: 0;
   pointer-events: none;
   opacity: 0;
+  transition: opacity 0.36s ease, background 0.36s ease;
 }
 
 .shift-cell.source-override {
@@ -1400,6 +1409,83 @@ h2 {
 .shift-cell.state-off:hover::after,
 .shift-cell.state-off:focus-visible::after {
   opacity: 0.5;
+}
+
+.shift-cell.morning:hover,
+.shift-cell.morning:focus-visible {
+  border-color: rgba(234, 179, 8, 0.28);
+  background:
+    radial-gradient(circle at 88% 16%, rgba(253, 224, 71, 0.16), transparent 34%),
+    linear-gradient(145deg, rgba(202, 138, 4, 0.13), rgba(24, 23, 19, 0.9)),
+    #19160d;
+  color: #fff3c4;
+  box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.08);
+}
+
+.shift-cell.midday:hover,
+.shift-cell.midday:focus-visible {
+  border-color: rgba(251, 146, 60, 0.28);
+  background:
+    radial-gradient(circle at 88% 16%, rgba(251, 146, 60, 0.16), transparent 36%),
+    linear-gradient(145deg, rgba(194, 120, 58, 0.13), rgba(28, 23, 19, 0.9)),
+    #1a120d;
+  color: #ffe5cf;
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.08);
+}
+
+.shift-cell.night:hover,
+.shift-cell.night:focus-visible {
+  border-color: rgba(129, 140, 248, 0.32);
+  background:
+    radial-gradient(circle at 88% 16%, rgba(129, 140, 248, 0.18), transparent 34%),
+    linear-gradient(145deg, rgba(79, 70, 229, 0.15), rgba(16, 17, 25, 0.9)),
+    #111326;
+  color: #eef0ff;
+  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.08);
+}
+
+.shift-cell.weekend:hover,
+.shift-cell.weekend:focus-visible {
+  border-color: rgba(161, 161, 170, 0.26);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.07) 8px 10px, transparent 10px 18px),
+    linear-gradient(90deg, rgba(161, 161, 170, 0.12), rgba(18, 18, 19, 0.86)),
+    #161617;
+  color: #e4e4e7;
+}
+
+.shift-cell.vacation:hover,
+.shift-cell.vacation:focus-visible {
+  border-color: rgba(34, 197, 94, 0.34);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.06) 8px 10px, transparent 10px 18px),
+    radial-gradient(ellipse at 18% 92%, rgba(34, 197, 94, 0.2), transparent 28%),
+    linear-gradient(145deg, rgba(34, 197, 94, 0.1), rgba(16, 18, 22, 0.9)),
+    #101812;
+  color: #dcfce7;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.08);
+}
+
+.shift-cell.sick:hover,
+.shift-cell.sick:focus-visible {
+  border-color: rgba(248, 113, 113, 0.34);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.055) 8px 10px, transparent 10px 18px),
+    linear-gradient(145deg, rgba(220, 38, 38, 0.12), rgba(18, 14, 15, 0.9)),
+    #1a0f10;
+  color: #fee2e2;
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.08);
+}
+
+.shift-cell.ground:hover,
+.shift-cell.ground:focus-visible {
+  border-color: rgba(245, 158, 11, 0.34);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.055) 8px 10px, transparent 10px 18px),
+    linear-gradient(90deg, rgba(245, 158, 11, 0.13), rgba(255, 255, 255, 0.018)),
+    #1a140d;
+  color: #ffedd5;
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.08);
 }
 
 .drawer {
