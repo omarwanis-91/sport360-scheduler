@@ -117,13 +117,22 @@ test("admins can assign seniority and weekly or daily department leads", async (
   }
   await expect(page.locator(".date-head.today")).toContainText("Today");
   await page.locator(".date-head.today").click();
-  await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
+  if (weekend) {
+    await expect(page.getByRole("combobox", { name: "Daily lead override", exact: true })).toBeVisible();
+  } else {
+    await expect(page.getByRole("heading", { name: "Coverage", exact: true })).toBeVisible();
+  }
 });
 
 test("scheduler zoom switches week, two-week, and month density", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.locator(".scheduler-month-bar")).toContainText(/June|July/);
+  await page.locator("#schedule-status-filter").selectOption("night");
+  await expect(page.locator("#schedule-status-filter")).toHaveValue("night");
+  await expect(page.locator(".shift-cell.night").first()).toBeVisible();
+  await expect(page.locator(".shift-cell.filtered-out").first()).toBeVisible();
+  await page.locator("#schedule-status-filter").selectOption("all");
   await expect(page.getByRole("button", { name: /New Profile/, exact: false })).toHaveCount(0);
   await expect(page.locator(".schedule-grid.range-two-weeks")).toBeVisible();
   await page.getByTitle("Zoom in").click();

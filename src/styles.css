@@ -836,20 +836,20 @@ h2 {
 
 .schedule-grid {
   display: grid;
-  grid-template-columns: 204px repeat(var(--days), minmax(108px, 1fr));
+  grid-template-columns: 236px repeat(var(--days), minmax(108px, 1fr));
   min-width: max-content;
 }
 
 .schedule-grid.range-week {
-  grid-template-columns: 204px repeat(var(--days), minmax(156px, 1fr));
+  grid-template-columns: 236px repeat(var(--days), minmax(156px, 1fr));
 }
 
 .schedule-grid.range-two-weeks {
-  grid-template-columns: 204px repeat(var(--days), minmax(118px, 1fr));
+  grid-template-columns: 236px repeat(var(--days), minmax(118px, 1fr));
 }
 
 .schedule-grid.range-month {
-  grid-template-columns: 180px repeat(var(--days), minmax(62px, 76px));
+  grid-template-columns: 220px repeat(var(--days), minmax(62px, 76px));
 }
 
 .month-corner,
@@ -913,6 +913,9 @@ h2 {
 
 .month-corner select {
   width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bar-date-control {
@@ -1137,8 +1140,8 @@ h2 {
 }
 
 .shift-cell.state-off {
-  background: #101010;
-  color: #8b8b93;
+  background: #121214;
+  color: #a1a1aa;
 }
 
 .shift-cell.state-off::before {
@@ -1146,7 +1149,7 @@ h2 {
 }
 
 .shift-cell.state-off::after {
-  opacity: 0.42;
+  opacity: 0.28;
   background:
     repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.045) 8px 10px, transparent 10px 18px),
     linear-gradient(135deg, transparent 0 48%, rgba(255, 255, 255, 0.045) 48% 52%, transparent 52%);
@@ -1308,7 +1311,7 @@ h2 {
 }
 
 .shift-cell.vacation::after {
-  opacity: 0.1;
+  opacity: 0.08;
   background: radial-gradient(ellipse at 15% 92%, rgba(56, 189, 248, 0.18), transparent 24%);
 }
 
@@ -1325,7 +1328,7 @@ h2 {
 }
 
 .shift-cell.sick::after {
-  opacity: 0.16;
+  opacity: 0.12;
   background:
     linear-gradient(45deg, transparent 0 42%, rgba(254, 202, 202, 0.12) 42% 48%, transparent 48%),
     linear-gradient(-45deg, transparent 0 42%, rgba(254, 202, 202, 0.1) 42% 48%, transparent 48%);
@@ -1343,14 +1346,14 @@ h2 {
 }
 
 .shift-cell.ground::after {
-  opacity: 0.16;
+  opacity: 0.12;
   background:
     radial-gradient(circle at 18px 18px, transparent 0 5px, rgba(45, 212, 191, 0.12) 6px, transparent 7px),
     repeating-linear-gradient(45deg, transparent 0 12px, rgba(45, 212, 191, 0.055) 12px 14px, transparent 14px 24px);
 }
 
 .state-off .shift-icon {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .state-working .shift-label,
@@ -1361,6 +1364,35 @@ h2 {
 .state-off .shift-label {
   color: inherit;
   font-weight: 650;
+}
+
+.shift-cell.filtered-out {
+  opacity: 0.34;
+  filter: grayscale(0.45);
+}
+
+.shift-cell:hover,
+.shift-cell:focus-visible {
+  border-color: rgba(244, 244, 245, 0.24);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.026)),
+    #181818;
+  opacity: 1;
+  filter: none;
+}
+
+.shift-cell.state-off:hover,
+.shift-cell.state-off:focus-visible {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.07) 8px 10px, transparent 10px 18px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.024)),
+    #18181b;
+  color: #e4e4e7;
+}
+
+.shift-cell.state-off:hover::after,
+.shift-cell.state-off:focus-visible::after {
+  opacity: 0.5;
 }
 
 .drawer {

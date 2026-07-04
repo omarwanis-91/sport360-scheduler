@@ -108,6 +108,7 @@ Employee profiles also carry `seniority_level`. Department lead scheduling uses 
 - Shift-specific colors communicate schedule state.
 - Unavailable states remain quieter than working states.
 - Scheduler cells use the vertical bar as the primary working/non-working signal; individual status type is secondary through icon, label, and subtle texture.
+- Scheduler filtering can narrow the current range by availability, rotational shift, daily exception, or manual change while keeping the date timeline visible.
 - Cards are used for repeated entities and focused tools, not every page section.
 - Icons and concise status tags carry repeated information.
 

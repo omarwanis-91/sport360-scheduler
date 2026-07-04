@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Cleaned up Scheduler department labels, restored full day details for covered dates, improved non-working hover visibility, and added shift/status filtering.
 - [x] Made Scheduler vertical bars calmer and allowed any department member to be assigned as day lead.
 - [x] Fixed focused lead assignment saving for the opened department/date and kept approved vacation days from being labeled as manual overrides.
 - [x] Simplified schedule visuals around working/non-working base states and made missing-lead assignment a focused centered modal.

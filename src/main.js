@@ -83,6 +83,7 @@ const ui = {
   calendarMonth: todayIso.slice(0, 7),
   profileViewId: null,
   selectedFilter: "all",
+  scheduleStatusFilter: "all",
   requestFilter: "pending",
   activityType: "all",
   activitySearch: "",
@@ -376,7 +377,7 @@ function hierarchyProfilesForDepartment(departmentId) {
   return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId));
 }
 
-function departmentProfiles() {
+function departmentProfiles({ applyScheduleFilter = true } = {}) {
   let profiles = state.profiles.filter((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId));
   if (ui.selectedFilter === "leads") {
     const leadIds = new Set(state.departmentLeads.filter((lead) => lead.departmentId === ui.selectedDepartmentId).map((lead) => lead.profileId));
@@ -386,7 +387,19 @@ function departmentProfiles() {
   if (ui.selectedFilter === "vacation") {
     profiles = profiles.filter((profile) => datesInRange().some((date) => scheduleFor(profile.id, date).id === "vacation"));
   }
+  if (applyScheduleFilter && ui.scheduleStatusFilter !== "all") {
+    const dates = datesInRange();
+    profiles = profiles.filter((profile) => dates.some((date) => scheduleMatchesFilter(scheduleFor(profile.id, date))));
+  }
   return profiles;
+}
+
+function scheduleMatchesFilter(schedule) {
+  if (ui.scheduleStatusFilter === "all") return true;
+  if (ui.scheduleStatusFilter === "available") return schedule.kind === "working" && schedule.id !== "ground";
+  if (ui.scheduleStatusFilter === "unavailable") return schedule.kind !== "working";
+  if (ui.scheduleStatusFilter === "manual") return isManualOverrideSchedule(schedule);
+  return schedule.id === ui.scheduleStatusFilter;
 }
 
 function canEditPast() {
@@ -1081,6 +1094,7 @@ function renderTopbar(title, subtitle, action = "") {
 function renderScheduler() {
   const dates = datesInRange();
   const profiles = departmentProfiles();
+  const coverageProfiles = departmentProfiles({ applyScheduleFilter: false });
   const department = byId(state.departments, ui.selectedDepartmentId);
   if (!department) {
     return renderTopbar("No Departments", "Create at least one department in Supabase before building schedules.", "");
@@ -1115,6 +1129,9 @@ function renderScheduler() {
             <option value="14" ${ui.rangeDays === 14 ? "selected" : ""}>2 Weeks</option>
             <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>1 Month</option>
           </select>
+          <select id="schedule-status-filter" title="Schedule filter">
+            ${scheduleFilterOptions()}
+          </select>
           <button class="ghost icon-button" id="zoom-out-range" title="Zoom out">${icons.minus}</button>
           <button class="ghost" id="today-range">Today</button>
         </div>
@@ -1123,7 +1140,7 @@ function renderScheduler() {
           <strong>${profiles.length} profiles</strong>
         </div>
         ${dates.map((date) => renderDateHead(date)).join("")}
-        ${renderCoverageRow(profiles, dates, department)}
+        ${renderCoverageRow(coverageProfiles, dates, department)}
         ${profiles.map((profile) => renderProfileRow(profile, dates)).join("")}
       </div>
     </section>
@@ -1156,6 +1173,23 @@ function filterButton(id, label) {
   return `<button class="segment ${ui.selectedFilter === id ? "active" : ""}" data-filter="${id}">${label}</button>`;
 }
 
+function scheduleFilterOptions() {
+  const options = [
+    ["all", "All shifts"],
+    ["available", "Available"],
+    ["unavailable", "Unavailable"],
+    ["morning", "Morning"],
+    ["midday", "Mid-day"],
+    ["night", "Night"],
+    ["weekend", "Weekend"],
+    ["vacation", "Vacation"],
+    ["sick", "Sick"],
+    ["ground", "On Ground"],
+    ["manual", "Manual changes"]
+  ];
+  return options.map(([id, label]) => `<option value="${id}" ${ui.scheduleStatusFilter === id ? "selected" : ""}>${label}</option>`).join("");
+}
+
 function requestFilterButton(id, label, count) {
   return `<button class="segment ${ui.requestFilter === id ? "active" : ""}" data-request-filter="${id}">${label}<span>${count}</span></button>`;
 }
@@ -1177,11 +1211,12 @@ function renderDateHead(date) {
   const isToday = date === todayIso;
   const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
   const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
+  const drawerType = leadInfo.missing ? "lead" : "coverage";
   const leadLabel = leads.length > 1
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
   return `
-    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="lead" data-date="${date}" data-department-id="${leadDepartmentId}">
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
       <em>${leadLabel}</em>
@@ -1210,8 +1245,9 @@ function renderShiftCell(profile, date) {
   const icon = statusIcons[status.id] || icons.scheduler;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
+  const filterClass = scheduleMatchesFilter(status) ? "" : "filtered-out";
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
       <span class="shift-icon">${icon}</span>
       ${isDayLead ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status.label}</span>
@@ -2892,6 +2928,11 @@ function bindEvents() {
 
   document.querySelector("#range-select")?.addEventListener("change", (event) => {
     ui.rangeDays = Number(event.target.value);
+    render();
+  });
+
+  document.querySelector("#schedule-status-filter")?.addEventListener("change", (event) => {
+    ui.scheduleStatusFilter = event.target.value;
     render();
   });
 
