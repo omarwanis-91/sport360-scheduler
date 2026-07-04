@@ -68,10 +68,16 @@ export function activeLeadRotation(leadRotations, departmentId, dateIso) {
     .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
 }
 
+function profileDepartmentIds(profile) {
+  return Array.isArray(profile?.departmentIds) && profile.departmentIds.length
+    ? profile.departmentIds
+    : [profile?.departmentId].filter(Boolean);
+}
+
 export function departmentLeadForDate(state, departmentId, dateIso) {
   const validProfile = (profileId) => {
     const profile = byId(state.profiles, profileId);
-    return profile?.departmentId === departmentId && profile.leadEligible ? profile : null;
+    return profileDepartmentIds(profile).includes(departmentId) ? profile : null;
   };
   const override = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === dateIso);
   const overrideProfile = validProfile(override?.profileId);

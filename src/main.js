@@ -3691,7 +3691,7 @@ async function saveLeadRotation(event) {
   if (!effectiveStart || (!editableDate(effectiveStart) && !isAdmin())) return;
   const pattern = weekDays.map((_, index) => form.get(`lead-${index}`));
   if (pattern.some((profileId) => !leadCandidates(departmentId).some((profile) => profile.id === profileId))) {
-    notify("Every weekday needs an eligible lead from this department.", "error");
+    notify("Every weekday needs a person from this department.", "error");
     return;
   }
   const existing = (state.departmentLeadRotations || []).find((rotation) => rotation.departmentId === departmentId && rotation.effectiveStart === effectiveStart);

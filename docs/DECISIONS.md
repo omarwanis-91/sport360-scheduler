@@ -211,3 +211,12 @@ If a scheduled department lead becomes unavailable through Vacation, Sick, On Gr
 **Status:** Accepted
 
 Approved vacation days should not be shown as overrides in the interface. Even if the persistence layer stores request-approved vacation as schedule replacement rows, the user-facing source is "Vacation request". The "Override" label and manual counts are reserved for manager-entered daily changes.
+
+## D-032 - Any Department Member Can Cover Day Lead
+
+**Date:** 2026-07-04
+**Status:** Accepted
+
+Daily and weekly department lead assignment is an operational scheduling choice, not a permanent seniority or title gate. Any current member of the department can be selected as day lead when coverage requires it. Seniority and application roles remain useful for hierarchy and permissions, but they must not prevent a temporary day-lead assignment.
+
+Scheduler cells should use the vertical bar as the primary working versus non-working signal. Shift and exception types should be secondary through icon, label, and subtle texture so the grid stays readable.

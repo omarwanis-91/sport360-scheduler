@@ -89,7 +89,7 @@ For a person and date:
 - `department_lead_rotation_versions`: effective-dated Mon-Sun default lead patterns by department.
 - `user_roles`: application access roles.
 
-Employee profiles also carry `seniority_level`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; `user_roles.lead` remains the separate authorization role for application permissions.
+Employee profiles also carry `seniority_level`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; any current department member can be selected as a day lead. `user_roles.lead` remains the separate authorization role for application permissions.
 - `audit_log`: important operational changes.
 
 ## Authorization Model
@@ -107,6 +107,7 @@ Employee profiles also carry `seniority_level`. Department lead scheduling uses 
 - Red reserved for brand actions, selection, warnings, and destructive states.
 - Shift-specific colors communicate schedule state.
 - Unavailable states remain quieter than working states.
+- Scheduler cells use the vertical bar as the primary working/non-working signal; individual status type is secondary through icon, label, and subtle texture.
 - Cards are used for repeated entities and focused tools, not every page section.
 - Icons and concise status tags carry repeated information.
 

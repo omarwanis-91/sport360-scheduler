@@ -43,7 +43,8 @@ function testState() {
     profiles: [
       { id: "lead-weekday", departmentId: "ops", leadEligible: true },
       { id: "lead-weekend", departmentId: "ops", leadEligible: true },
-      { id: "not-eligible", departmentId: "ops", leadEligible: false }
+      { id: "not-eligible", departmentId: "ops", leadEligible: false },
+      { id: "hybrid-member", departmentId: "support", departmentIds: ["support", "ops"], leadEligible: false }
     ],
     departmentLeads: [
       { id: "daily", departmentId: "ops", date: "2026-05-23", profileId: "lead-weekday" }
@@ -99,4 +100,13 @@ test("department lead uses daily override before the effective weekly rotation",
   assert.equal(departmentLeadForDate(state, "ops", "2026-05-22").profile.id, "lead-weekday");
   assert.equal(departmentLeadForDate(state, "ops", "2026-05-23").source, "Daily override");
   assert.equal(departmentLeadForDate(state, "ops", "2026-05-24").profile.id, "lead-weekend");
+});
+
+test("any department member can be assigned as day lead", () => {
+  const state = testState();
+  state.departmentLeads.push({ id: "any-member", departmentId: "ops", date: "2026-05-25", profileId: "not-eligible" });
+  state.departmentLeads.push({ id: "hybrid", departmentId: "ops", date: "2026-05-26", profileId: "hybrid-member" });
+
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-25").profile.id, "not-eligible");
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-26").profile.id, "hybrid-member");
 });
