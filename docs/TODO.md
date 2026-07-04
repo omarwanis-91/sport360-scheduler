@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Removed heavy coverage drawer row lines and made Scheduler/Rotation non-working cells quiet by default with stronger hover and filter focus.
 - [x] Cleaned up Scheduler department labels, restored full day details for covered dates, improved non-working hover visibility, and added shift/status filtering.
 - [x] Made Scheduler vertical bars calmer and allowed any department member to be assigned as day lead.
 - [x] Fixed focused lead assignment saving for the opened department/date and kept approved vacation days from being labeled as manual overrides.

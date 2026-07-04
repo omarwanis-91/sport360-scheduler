@@ -1245,7 +1245,9 @@ function renderShiftCell(profile, date) {
   const icon = statusIcons[status.id] || icons.scheduler;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
-  const filterClass = scheduleMatchesFilter(status) ? "" : "filtered-out";
+  const filterClass = scheduleMatchesFilter(status)
+    ? ui.scheduleStatusFilter === "all" ? "" : "filtered-match"
+    : "filtered-out";
   return `
     <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
       <span class="shift-icon">${icon}</span>
