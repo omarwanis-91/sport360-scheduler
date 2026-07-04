@@ -64,6 +64,7 @@ Right-side drawers handle focused tasks such as shift edits, daily bulk editing,
 - An override replaces the rotation-derived state for that date.
 - Vacation, Sick, and On Ground are daily exceptions.
 - Clearing an override returns the date to its rotation-derived state.
+- Approved vacation requests may materialize vacation days into schedule rows for resolution, but the UI treats them as request-sourced vacation rather than manual overrides.
 
 ### Schedule Resolution
 
@@ -82,7 +83,7 @@ For a person and date:
 - `departments`: organizational grouping and minimum coverage target.
 - `statuses`: schedule labels, kinds, and visual metadata.
 - `rotation_versions`: versioned weekly schedule patterns.
-- `schedule_overrides`: manual per-person, per-date changes.
+- `schedule_overrides`: per-person, per-date schedule replacements, including manual daily changes and approved vacation request materializations.
 - `vacation_requests`: request dates, status, decision data, and deducted days.
 - `department_leads`: daily lead assignments.
 - `department_lead_rotation_versions`: effective-dated Mon-Sun default lead patterns by department.

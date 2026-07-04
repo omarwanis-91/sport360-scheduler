@@ -566,7 +566,19 @@ function leadForProfileDate(profile, departmentId, dateIso) {
 }
 
 function scheduleFor(profileId, dateIso) {
-  return scheduleForLogic(state, profileId, dateIso);
+  const schedule = scheduleForLogic(state, profileId, dateIso);
+  if (schedule.override?.statusId === "vacation" && /^Vacation request\b/i.test(schedule.override.note || "")) {
+    return { ...schedule, source: "Vacation request" };
+  }
+  return schedule;
+}
+
+function isManualOverrideSchedule(schedule) {
+  return schedule?.source === "Override";
+}
+
+function activeDrawerDepartmentId() {
+  return ui.drawer?.departmentId || ui.selectedDepartmentId;
 }
 
 function workdayCount(profileId, startIso, endIso) {
@@ -938,7 +950,7 @@ function renderProfileQuickStats(profile) {
   const monthSchedules = monthDates.map((date) => scheduleFor(profile.id, date));
   const workDays = monthSchedules.filter((schedule) => schedule.kind === "working" && schedule.id !== "ground").length;
   const leaveDays = monthSchedules.filter((schedule) => schedule.kind === "leave").length;
-  const manualDays = monthDates.filter((date) => scheduleFor(profile.id, date).source === "Override").length;
+  const manualDays = monthDates.filter((date) => isManualOverrideSchedule(scheduleFor(profile.id, date))).length;
   return `
     <div class="profile-stat-grid">
       <article><span>Vacation</span><strong>${profile.remainingVacationDays}</strong><em>of ${profile.yearlyVacationDays}</em></article>
@@ -998,7 +1010,7 @@ function renderPersonMonthCalendar(profile, placement = "drawer") {
   const monthSchedules = cells.filter(Boolean).map((date) => scheduleFor(profile.id, date));
   const workingDays = monthSchedules.filter((schedule) => schedule.kind === "working" && schedule.id !== "ground").length;
   const leaveDays = monthSchedules.filter((schedule) => schedule.kind === "leave").length;
-  const manualDays = cells.filter(Boolean).filter((date) => scheduleFor(profile.id, date).source === "Override").length;
+  const manualDays = cells.filter(Boolean).filter((date) => isManualOverrideSchedule(scheduleFor(profile.id, date))).length;
   return `
     <section class="person-calendar ${placement}">
       <div class="calendar-head">
@@ -2549,12 +2561,13 @@ function bulkRotationDay(statusId, index) {
 }
 
 function leadDrawer() {
-  const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
-  const resolvedLead = departmentLeadForDate(ui.selectedDepartmentId, ui.drawer.date);
-  const candidates = availableLeadCandidates(ui.selectedDepartmentId, ui.drawer.date, resolvedLead.profile?.id);
-  const canEdit = canManageDepartment(ui.selectedDepartmentId) && editableDate(ui.drawer.date);
-  const department = byId(state.departments, ui.selectedDepartmentId);
-  const leadHealth = leadAvailabilityForDepartmentDate(ui.selectedDepartmentId, ui.drawer.date);
+  const departmentId = activeDrawerDepartmentId();
+  const lead = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === ui.drawer.date);
+  const resolvedLead = departmentLeadForDate(departmentId, ui.drawer.date);
+  const candidates = availableLeadCandidates(departmentId, ui.drawer.date, resolvedLead.profile?.id);
+  const canEdit = canManageDepartment(departmentId) && editableDate(ui.drawer.date);
+  const department = byId(state.departments, departmentId);
+  const leadHealth = leadAvailabilityForDepartmentDate(departmentId, ui.drawer.date);
   const activeLeadText = leadHealth.available
     ? `${leadHealth.profile.name} is active for this day.`
     : leadHealth.profile ? `${leadHealth.profile.name} is ${leadHealth.schedule?.label || "unavailable"} on this day.` : "No leader is assigned for this day.";
@@ -2576,7 +2589,7 @@ function leadDrawer() {
           ${candidates.map((profile) => `<option value="${profile.id}" ${lead?.profileId === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}
         </select></label>
         <p class="hint">${candidates.length ? "Only people available on this day are listed." : "No available replacement leaders for this department on this day."}</p>
-        <button class="primary wide" ${canEdit && candidates.length ? "" : "disabled"}>Save Lead</button>
+        <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Lead</button>
       </form>
     </div>
   `;
@@ -3634,16 +3647,17 @@ async function decideRequest(requestId, decision) {
 
 async function saveLead(event) {
   event.preventDefault();
-  if (!canManageDepartment(ui.selectedDepartmentId) || !editableDate(ui.drawer.date)) return;
+  const departmentId = activeDrawerDepartmentId();
+  if (!canManageDepartment(departmentId) || !editableDate(ui.drawer.date)) return;
   const form = new FormData(event.currentTarget);
-  const existing = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
+  const existing = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === ui.drawer.date);
   const profileId = form.get("profileId");
   const selectedProfile = byId(state.profiles, profileId);
   if (profileId && (!selectedProfile || !isScheduleLeadAvailable(scheduleFor(profileId, ui.drawer.date)))) {
     notify("Choose a leader who is available on this day.", "error");
     return;
   }
-  const payload = { id: existing?.id || makeId("lead"), departmentId: ui.selectedDepartmentId, date: ui.drawer.date, profileId };
+  const payload = { id: existing?.id || makeId("lead"), departmentId, date: ui.drawer.date, profileId };
   await runMutation("daily-lead", {
     pending: "Saving daily lead...",
     success: profileId ? "Daily lead override saved." : "Daily lead returned to weekly rotation.",
@@ -3662,6 +3676,7 @@ async function saveLead(event) {
       await dataStore.upsertDailyLead(payload);
     }
     await saveState();
+    ui.selectedDepartmentId = departmentId;
     ui.drawer = null;
     render();
   });
