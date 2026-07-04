@@ -5,9 +5,9 @@ export const seedState = {
     { id: "night", label: "Night", color: "#5b45d8", kind: "working" },
     { id: "midday", label: "Mid-day", color: "#d97706", kind: "working" },
     { id: "weekend", label: "Weekend", color: "#64748b", kind: "off" },
-    { id: "vacation", label: "Vacation", color: "#059669", kind: "leave" },
+    { id: "vacation", label: "Vacation", color: "#0ea5e9", kind: "leave" },
     { id: "sick", label: "Sick", color: "#dc2626", kind: "leave" },
-    { id: "ground", label: "On Ground", color: "#0f766e", kind: "working" }
+    { id: "ground", label: "On Ground", color: "#14b8a6", kind: "working" }
   ],
   departments: [
     { id: "ops", name: "Operations" },

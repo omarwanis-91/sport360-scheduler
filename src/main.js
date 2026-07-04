@@ -969,7 +969,7 @@ function renderCalendarDay(profile, date) {
   const sourceClass = schedule.source.toLowerCase().replace(/\s+/g, "-");
   const dayClass = schedule.id === "ground" ? "away" : schedule.kind;
   const weekendClass = weekdayIndex(date) >= 5 ? "weekend-day" : "";
-  const calendarClass = `month-day ${dayClass} ${schedule.id} ${sourceClass} ${weekendClass} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
+  const calendarClass = `month-day ${dayClass} ${schedule.id} ${sourceClass} ${weekendClass} ${approvedVacation ? "approved-vacation" : ""} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
   return `
     <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${schedule.label} - ${schedule.source}">
       <span>${parseDate(date).getDate()}</span>
@@ -2282,7 +2282,7 @@ function calendarDayDrawer() {
           <span>${profile.title}</span>
         </div>
       </div>
-      <div class="calendar-day-summary ${schedule.kind}">
+      <div class="calendar-day-summary ${schedule.kind} ${schedule.id}">
         <span class="shift-icon">${statusIcons[schedule.id] || icons.scheduler}</span>
         <div>
           <strong>${schedule.label}</strong>

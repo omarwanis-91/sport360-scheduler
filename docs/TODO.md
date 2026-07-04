@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Made Vacation blue with a subtle beach/water treatment and gave On Ground a distinct teal terrain treatment across profiles and Scheduler.
 - [x] Made sub-department tiles compact by default with expand/collapse for full details.
 - [x] Improved Departments hierarchy display and added a Details view beside the tile view.
 - [x] Added Scheduler month-title arrows, month-start snapping, removed New Profile from Scheduler, and introduced parent/sub-department structure.
