@@ -13,10 +13,11 @@ function stamp() {
 }
 
 function run(command, args, options = {}) {
+  const shell = process.platform === "win32" && /\.(cmd|bat)$/i.test(command);
   const result = spawnSync(command, args, {
     cwd: options.cwd || rootDir,
     env: process.env,
-    shell: false,
+    shell,
     stdio: options.stdio || "inherit"
   });
 
@@ -56,21 +57,18 @@ function findCommand(command) {
 }
 
 function resolveSupabaseCommand() {
-  const localSupabase = path.join(
-    rootDir,
-    "node_modules",
-    ".bin",
-    process.platform === "win32" ? "supabase.cmd" : "supabase"
-  );
+  if (process.platform !== "win32") {
+    const localSupabase = path.join(rootDir, "node_modules", ".bin", "supabase");
 
-  if (fs.existsSync(localSupabase)) {
-    return { command: localSupabase, prefixArgs: [], source: "local dev dependency" };
+    if (fs.existsSync(localSupabase)) {
+      return { command: localSupabase, prefixArgs: [], source: "local dev dependency" };
+    }
   }
 
   const globalSupabase = process.platform === "win32" ? "supabase.cmd" : "supabase";
   const globalSupabasePath = findCommand(globalSupabase);
   if (globalSupabasePath) {
-    return { command: globalSupabasePath, prefixArgs: [], source: "global CLI" };
+    return { command: globalSupabase, prefixArgs: [], source: "global CLI" };
   }
 
   const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
@@ -189,28 +187,34 @@ async function main() {
   const outputDir = path.join(backupRoot, stamp());
   fs.mkdirSync(outputDir, { recursive: true });
 
-  const files = [
-    dump(supabaseCli, dbUrl, outputDir, "roles.sql", ["--role-only"]),
-    dump(supabaseCli, dbUrl, outputDir, "schema.sql", []),
-    dump(supabaseCli, dbUrl, outputDir, "data.sql", [
-      "--use-copy",
-      "--data-only",
-      "-x",
-      "storage.buckets_vectors",
-      "-x",
-      "storage.vector_indexes"
-    ]),
-    dump(supabaseCli, dbUrl, outputDir, "migration_history_schema.sql", [
-      "--schema",
-      "supabase_migrations"
-    ]),
-    dump(supabaseCli, dbUrl, outputDir, "migration_history_data.sql", [
-      "--use-copy",
-      "--data-only",
-      "--schema",
-      "supabase_migrations"
-    ])
-  ];
+  let files;
+  try {
+    files = [
+      dump(supabaseCli, dbUrl, outputDir, "roles.sql", ["--role-only"]),
+      dump(supabaseCli, dbUrl, outputDir, "schema.sql", []),
+      dump(supabaseCli, dbUrl, outputDir, "data.sql", [
+        "--use-copy",
+        "--data-only",
+        "-x",
+        "storage.buckets_vectors",
+        "-x",
+        "storage.vector_indexes"
+      ]),
+      dump(supabaseCli, dbUrl, outputDir, "migration_history_schema.sql", [
+        "--schema",
+        "supabase_migrations"
+      ]),
+      dump(supabaseCli, dbUrl, outputDir, "migration_history_data.sql", [
+        "--use-copy",
+        "--data-only",
+        "--schema",
+        "supabase_migrations"
+      ])
+    ];
+  } catch (error) {
+    fs.rmSync(outputDir, { force: true, recursive: true });
+    throw error;
+  }
 
   const manifest = {
     createdAt: new Date().toISOString(),
