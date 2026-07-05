@@ -20,7 +20,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | --- | --- | --- |
 | `npm.cmd run phase4:local` passed | Pass | 2026-07-05 local run passed syntax, 7 unit tests, production build, and 13 demo smoke tests. |
 | GitHub checks passed | Pass | PR #7 is clean; `verify` passed; Netlify redirect/deploy-preview checks passed. |
-| Netlify deploy preview is healthy | Partial | GitHub/Netlify status reports deploy preview ready. Direct local shell HTTP checks timed out and still need browser confirmation. |
+| Netlify deploy preview is healthy | Partial | GitHub/Netlify status reports deploy preview ready. Direct local shell HTTP checks and in-app browser navigation timed out; still needs manual Chrome/Edge confirmation. |
 
 ## Launch Gate Matrix
 
@@ -29,7 +29,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Local release verification | Pass | `npm.cmd run phase4:local` passed on 2026-07-05. |
 | GitHub PR checks | Pass | PR #7 checks are passing and merge state is clean. |
 | Netlify deploy preview status | Pass | Netlify status context is passing for PR #7. |
-| Browser check of deploy preview | Pending | Local shell HTTP timed out; verify manually in Chrome/Edge or through Netlify browser session. |
+| Browser check of deploy preview | Pending | Local shell HTTP and in-app browser navigation timed out; verify manually in Chrome/Edge or through Netlify browser session. |
 | Free-plan manual export | Pending | Requires production Supabase database connection string. |
 | Backup folder verification | Pending | Run `npm.cmd run backup:verify` after export. |
 | Restore rehearsal | Pending | Requires non-production Supabase restore-test project. |
