@@ -58,8 +58,8 @@ Use this checklist before promoting an internal release.
 3. Confirm Netlify production deploy uses the expected commit.
 4. Confirm Netlify environment variables are present and production signup is disabled.
 5. Run the latest Supabase audit SQL files that match the migrations being released.
-6. Create a fresh Supabase backup or confirm the most recent automated backup is current.
-7. Export critical operational tables before the release.
+6. On Supabase Free, create a fresh manual export and store it off-site. On paid plans, confirm the most recent managed backup is current.
+7. Export critical operational tables before the release if a full logical dump is not available.
 8. Verify Admin, Lead, Employee, and unmatched-account sign-in behavior.
 9. Record the migration log entry for this release.
 10. Keep rollback instructions open while the first production checks are performed.
@@ -78,16 +78,39 @@ Supabase is the source of truth. Netlify can be redeployed, but production data 
 
 ### Database Backup
 
-Preferred method: use Supabase managed backups from the project dashboard.
+Supabase managed daily backups are not available on the Free plan. Supabase documents daily managed backups for Pro, Team, and Enterprise projects, and recommends that Free plan projects regularly export data with `supabase db dump`.
 
-1. Open Supabase.
-2. Select the production project.
-3. Open **Database -> Backups**.
-4. Confirm a recent backup exists.
-5. If the plan supports manual backups, create one before applying changes.
-6. Record the backup timestamp, release commit, and operator in the migration log section below.
+Current release rule:
 
-If a manual SQL export is needed, export these tables together so relationships stay understandable:
+- **Free plan:** manual logical export is required before production release, migrations, bulk edits, and pilot start.
+- **Paid plan:** managed backup is preferred, with manual export still useful before high-risk changes.
+
+### Free Plan Manual Export
+
+Use the Supabase CLI logical dump path when possible.
+
+1. Install and sign in to the Supabase CLI on a trusted machine.
+2. Get the production database connection string from Supabase **Project Settings -> Database -> Connection string**.
+3. Export roles, schema, and data to a private local folder outside the repository.
+4. Store the export in an approved off-site private location.
+5. Record the export timestamp, release commit, storage location label, and operator in the migration log.
+6. Do not commit exports, connection strings, database passwords, or generated dump files.
+
+Recommended folder naming:
+
+```text
+sport360-backups/YYYY-MM-DD_release-or-reason/
+```
+
+Recommended dump files:
+
+```text
+roles.sql
+schema.sql
+data.sql
+```
+
+If the CLI path is not available, use Supabase Table Editor exports for the critical tables below. This is weaker than a full logical dump, but still better than moving without a recovery point:
 
 - `departments`
 - `employee_profiles`
@@ -102,6 +125,17 @@ If a manual SQL export is needed, export these tables together so relationships 
 - `audit_log`
 
 Keep exports outside the repository. They may contain private employee data and must not be committed.
+
+### Paid Plan Managed Backup
+
+Use this path only if the production Supabase project has managed backups available.
+
+1. Open Supabase.
+2. Select the production project.
+3. Open **Database -> Backups**.
+4. Confirm a recent backup exists.
+5. If the plan supports manual backups, create one before applying changes.
+6. Record the backup timestamp, release commit, and operator in the migration log section below.
 
 ### Storage Backup
 
@@ -119,7 +153,7 @@ A backup is not production-ready until restore has been rehearsed.
 Perform the rehearsal in a non-production Supabase project, never in the production project.
 
 1. Create or choose a temporary restore-test Supabase project.
-2. Restore the selected backup or import the exported SQL into the restore-test project.
+2. Restore the selected managed backup or import the manual export into the restore-test project.
 3. Apply the same migrations that production is expected to run.
 4. Configure a local `.env.local` or Netlify deploy preview to point at the restore-test project.
 5. Sign in with test Admin, Lead, and Employee accounts.
@@ -128,7 +162,7 @@ Perform the rehearsal in a non-production Supabase project, never in the product
 8. Run the matching read-only audit SQL files from `supabase/audit/`.
 9. Record the rehearsal result, restore source, and any gaps in the migration log.
 
-The Phase 4 release gate is not complete until a restore rehearsal succeeds.
+The Phase 4 release gate is not complete until a restore rehearsal succeeds. On Supabase Free, that means restoring from the manual export, not from the unavailable managed-backup dashboard.
 
 ## Migration Log
 
@@ -136,7 +170,7 @@ Record each production database change here or in a linked issue/PR before relea
 
 | Date | Release / Commit | Migration or Action | Backup Timestamp | Audit / Verification | Operator | Result |
 | --- | --- | --- | --- | --- | --- | --- |
-| Pending | Pending | Pending production release rehearsal | Pending | Pending | Pending | Pending |
+| Pending | Pending | Free-plan manual export and restore rehearsal | Pending | Pending | Pending | Pending |
 
 For each applied migration, record:
 
@@ -144,6 +178,7 @@ For each applied migration, record:
 - Whether it was applied through Supabase SQL Editor, CLI, or another controlled process.
 - The exact audit SQL file run afterward.
 - Whether any manual recovery step was needed.
+- Whether recovery depends on a Free-plan manual export or a managed paid-plan backup.
 
 ## Health Check
 

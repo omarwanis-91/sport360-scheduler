@@ -4,7 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [~] Rehearse production backup, restore, health check, monitoring, and rollback using the production runbook.
+- [~] Rehearse Free-plan manual export, restore, health check, monitoring, and rollback using the production runbook.
 
 ## Next
 
