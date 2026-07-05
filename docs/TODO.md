@@ -4,7 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [~] Rehearse Free-plan manual export, restore, health check, monitoring, and rollback using the production runbook.
+- [~] Complete external launch gates in one pass: manual Supabase export, backup verification, restore rehearsal, browser health checks, role/auth checks, rollback ownership, and pilot signoff.
 
 ## Next
 
@@ -22,6 +22,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Recorded passing local verification, passing GitHub checks, and Netlify deploy-preview status in the production rehearsal report.
 - [x] Added a one-command Phase 4 local verification runner for syntax, unit, build, and smoke checks.
 - [x] Added a production rehearsal report template for recording export, restore, health-check, monitoring, and rollback results.
 - [x] Added a manual backup folder verifier for Free-plan export completeness checks.
