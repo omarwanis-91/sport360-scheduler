@@ -22,6 +22,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added a Supabase Free-plan manual export helper and backup ignore rules.
 - [x] Documented production backup/export, restore rehearsal, migration log, health check, monitoring, and rollback procedures.
 - [x] Replace committed environment details with generated runtime configuration.
 - [x] Generate production configuration from Netlify variables and ignored local configuration.

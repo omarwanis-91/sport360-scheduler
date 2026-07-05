@@ -91,10 +91,48 @@ Use the Supabase CLI logical dump path when possible.
 
 1. Install and sign in to the Supabase CLI on a trusted machine.
 2. Get the production database connection string from Supabase **Project Settings -> Database -> Connection string**.
-3. Export roles, schema, and data to a private local folder outside the repository.
-4. Store the export in an approved off-site private location.
-5. Record the export timestamp, release commit, storage location label, and operator in the migration log.
-6. Do not commit exports, connection strings, database passwords, or generated dump files.
+3. From the repository root, run `npm.cmd run backup:manual`.
+4. Paste the database connection string when prompted. The input is hidden and is not written to disk.
+5. Confirm the export folder was created outside the repository at `../sport360-backups/<timestamp>/`, unless `SPORT360_BACKUP_DIR` was set.
+6. Confirm the folder contains `roles.sql`, `schema.sql`, `data.sql`, `migration_history_schema.sql`, `migration_history_data.sql`, and `manifest.json`.
+7. Store the export in an approved off-site private location.
+8. Record the export timestamp, release commit, storage location label, and operator in the migration log.
+9. Do not commit exports, connection strings, database passwords, or generated dump files.
+
+The helper follows the Supabase CLI backup sequence:
+
+```powershell
+npm.cmd run backup:manual
+```
+
+To choose a different output location:
+
+```powershell
+$env:SPORT360_BACKUP_DIR="D:\Sport360 Backups"
+npm.cmd run backup:manual
+```
+
+For non-interactive use, set `SUPABASE_DB_URL` or `SPORT360_SUPABASE_DB_URL` only in a trusted local shell or secret manager:
+
+```powershell
+$env:SUPABASE_DB_URL="<production database connection string>"
+npm.cmd run backup:manual
+Remove-Item Env:\SUPABASE_DB_URL
+```
+
+Do not store the database connection string in `.env.local`, GitHub, Netlify, or the repository.
+
+Manual Supabase CLI commands, if the helper is not used:
+
+```powershell
+supabase db dump --db-url "<connection string>" -f roles.sql --role-only
+supabase db dump --db-url "<connection string>" -f schema.sql
+supabase db dump --db-url "<connection string>" -f data.sql --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+supabase db dump --db-url "<connection string>" -f migration_history_schema.sql --schema supabase_migrations
+supabase db dump --db-url "<connection string>" -f migration_history_data.sql --use-copy --data-only --schema supabase_migrations
+```
+
+Keep command history risk in mind if running manual commands. The helper is preferred because it avoids typing the connection string directly into the shell command.
 
 Recommended folder naming:
 

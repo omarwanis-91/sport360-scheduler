@@ -58,3 +58,13 @@ The current application is configured for Supabase in `src/config.js`.
 4. Create accounts using emails that match employee profiles. Sign-in links an account to the matching unclaimed profile.
 
 The browser uses the public Supabase anon key. Never place a service-role key or private credential in frontend code.
+
+## Free-Plan Manual Backup
+
+Supabase Free projects do not have managed dashboard backups. Before migrations, production release, or bulk edits, use the manual export helper:
+
+```powershell
+npm.cmd run backup:manual
+```
+
+The helper writes SQL dumps outside the repository by default. See [Production runbook](docs/PRODUCTION_RUNBOOK.md) for restore rehearsal and rollback steps.

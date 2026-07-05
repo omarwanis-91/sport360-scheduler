@@ -18,6 +18,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `src/config.js` | Supabase and application configuration. |
 | `server.js` | Local static file server. |
 | `scripts/build.js` | Creates the deployable `dist/` directory. |
+| `scripts/freePlanBackup.js` | Runs the Supabase Free-plan manual export helper without storing database credentials. |
 | `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
 | `vercel.json` | Vercel build, output, and SPA rewrite settings. |
 | `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
