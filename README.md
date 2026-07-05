@@ -65,6 +65,7 @@ Supabase Free projects do not have managed dashboard backups. Before migrations,
 
 ```powershell
 npm.cmd run backup:manual
+npm.cmd run backup:verify
 ```
 
 The helper writes SQL dumps outside the repository by default. See [Production runbook](docs/PRODUCTION_RUNBOOK.md) for restore rehearsal and rollback steps.

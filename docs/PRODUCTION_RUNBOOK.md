@@ -96,16 +96,24 @@ Use the Supabase CLI logical dump path when possible.
 5. Run `npm.cmd run backup:manual`.
 6. Paste the database connection string when prompted. The input is hidden and is not written to disk.
 7. Confirm the export folder was created outside the repository at `../sport360-backups/<timestamp>/`, unless `SPORT360_BACKUP_DIR` was set.
-8. Confirm the folder contains `roles.sql`, `schema.sql`, `data.sql`, `migration_history_schema.sql`, `migration_history_data.sql`, and `manifest.json`.
-9. Store the export in an approved off-site private location.
-10. Record the export timestamp, release commit, storage location label, and operator in the migration log.
-11. Do not commit exports, connection strings, database passwords, or generated dump files.
+8. Run `npm.cmd run backup:verify` to verify the latest export folder, or pass a specific folder path to verify an older export.
+9. Confirm the folder contains `roles.sql`, `schema.sql`, `data.sql`, `migration_history_schema.sql`, `migration_history_data.sql`, and `manifest.json`.
+10. Store the export in an approved off-site private location.
+11. Record the export timestamp, release commit, storage location label, and operator in the migration log.
+12. Do not commit exports, connection strings, database passwords, or generated dump files.
 
 The helper follows the Supabase CLI backup sequence:
 
 ```powershell
 npm.cmd run backup:check
 npm.cmd run backup:manual
+npm.cmd run backup:verify
+```
+
+To verify a specific export folder:
+
+```powershell
+npm.cmd run backup:verify -- "D:\Sport360 Backups\2026-07-05_release"
 ```
 
 To choose a different output location:
