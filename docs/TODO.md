@@ -8,7 +8,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Generate production configuration from Netlify variables and ignored local configuration.
 - [x] Disable public signup in production and verify Admin-created onboarding.
 - [x] Add GitHub Actions Chromium smoke tests for demo-mode browser coverage.
-- [~] Verify Chrome/Edge layouts at all supported desktop widths.
+- [x] Verify Chrome/Edge layouts at all supported desktop widths with automated viewport smoke coverage.
 
 ## Next
 
@@ -27,6 +27,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added and passed automated viewport smoke coverage for 1024px, 1280px, 1440px, and 1920px desktop widths.
 - [x] Fixed Scheduler/Rotation hover states so cells glow in their own status color with a smoother gradual transition.
 - [x] Removed heavy coverage drawer row lines and made Scheduler/Rotation non-working cells quiet by default with stronger hover and filter focus.
 - [x] Cleaned up Scheduler department labels, restored full day details for covered dates, improved non-working hover visibility, and added shift/status filtering.
