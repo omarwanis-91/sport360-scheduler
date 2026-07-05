@@ -89,19 +89,22 @@ Current release rule:
 
 Use the Supabase CLI logical dump path when possible.
 
-1. Install and sign in to the Supabase CLI on a trusted machine.
-2. Get the production database connection string from Supabase **Project Settings -> Database -> Connection string**.
-3. From the repository root, run `npm.cmd run backup:manual`.
-4. Paste the database connection string when prompted. The input is hidden and is not written to disk.
-5. Confirm the export folder was created outside the repository at `../sport360-backups/<timestamp>/`, unless `SPORT360_BACKUP_DIR` was set.
-6. Confirm the folder contains `roles.sql`, `schema.sql`, `data.sql`, `migration_history_schema.sql`, `migration_history_data.sql`, and `manifest.json`.
-7. Store the export in an approved off-site private location.
-8. Record the export timestamp, release commit, storage location label, and operator in the migration log.
-9. Do not commit exports, connection strings, database passwords, or generated dump files.
+1. From the repository root, run `npm.cmd run backup:check`.
+2. If the check says the CLI is available through `npx fallback`, that is acceptable. The helper will use official `npx supabase` execution.
+3. If the check fails, install the Supabase CLI using the official Windows paths: `npx supabase`, local `npm install --save-dev supabase`, Scoop, or the standalone binary. Do not use global `npm install -g supabase`.
+4. Get the production database connection string from Supabase **Project Settings -> Database -> Connection string**.
+5. Run `npm.cmd run backup:manual`.
+6. Paste the database connection string when prompted. The input is hidden and is not written to disk.
+7. Confirm the export folder was created outside the repository at `../sport360-backups/<timestamp>/`, unless `SPORT360_BACKUP_DIR` was set.
+8. Confirm the folder contains `roles.sql`, `schema.sql`, `data.sql`, `migration_history_schema.sql`, `migration_history_data.sql`, and `manifest.json`.
+9. Store the export in an approved off-site private location.
+10. Record the export timestamp, release commit, storage location label, and operator in the migration log.
+11. Do not commit exports, connection strings, database passwords, or generated dump files.
 
 The helper follows the Supabase CLI backup sequence:
 
 ```powershell
+npm.cmd run backup:check
 npm.cmd run backup:manual
 ```
 

@@ -31,13 +31,55 @@ function run(command, args, options = {}) {
   return result.stdout ? result.stdout.toString().trim() : "";
 }
 
-function commandExists(command) {
-  const result = spawnSync(command, ["--version"], {
+function findCommand(command) {
+  if (process.platform === "win32") {
+    const result = spawnSync("where.exe", [command], {
+      cwd: rootDir,
+      shell: false,
+      stdio: "pipe"
+    });
+    if (result.status === 0) {
+      return result.stdout.toString().split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    }
+    return null;
+  }
+
+  const result = spawnSync("command", ["-v", command], {
     cwd: rootDir,
-    shell: false,
-    stdio: "ignore"
+    shell: true,
+    stdio: "pipe"
   });
-  return result.status === 0;
+  if (result.status === 0) {
+    return result.stdout.toString().split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+  }
+  return null;
+}
+
+function resolveSupabaseCommand() {
+  const localSupabase = path.join(
+    rootDir,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "supabase.cmd" : "supabase"
+  );
+
+  if (fs.existsSync(localSupabase)) {
+    return { command: localSupabase, prefixArgs: [], source: "local dev dependency" };
+  }
+
+  const globalSupabase = process.platform === "win32" ? "supabase.cmd" : "supabase";
+  const globalSupabasePath = findCommand(globalSupabase);
+  if (globalSupabasePath) {
+    return { command: globalSupabasePath, prefixArgs: [], source: "global CLI" };
+  }
+
+  const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+  const npxPath = findCommand(npxCommand);
+  if (npxPath) {
+    return { command: npxPath, prefixArgs: ["-y", "supabase"], source: "npx fallback" };
+  }
+
+  return null;
 }
 
 function readHiddenLine(question) {
@@ -106,19 +148,37 @@ function getGitCommit() {
   }
 }
 
-function dump(supabaseCommand, dbUrl, outputDir, file, extraArgs) {
+function dump(supabaseCli, dbUrl, outputDir, file, extraArgs) {
   const target = path.join(outputDir, file);
-  run(supabaseCommand, ["db", "dump", "--db-url", dbUrl, "-f", target, ...extraArgs]);
+  run(supabaseCli.command, [
+    ...supabaseCli.prefixArgs,
+    "db",
+    "dump",
+    "--db-url",
+    dbUrl,
+    "-f",
+    target,
+    ...extraArgs
+  ]);
   return target;
 }
 
 async function main() {
-  const supabaseCommand = process.platform === "win32" ? "supabase.cmd" : "supabase";
+  const checkOnly = process.argv.includes("--check");
+  const supabaseCli = resolveSupabaseCommand();
 
-  if (!commandExists(supabaseCommand)) {
+  if (!supabaseCli) {
     throw new Error(
-      "Supabase CLI was not found. Install it first, then rerun `npm.cmd run backup:manual`."
+      "Supabase CLI was not found and npx is unavailable. Install the Supabase CLI or Node/npm first."
     );
+  }
+
+  console.log(`Supabase CLI available through ${supabaseCli.source}.`);
+  console.log(`Backup output root: ${backupRoot}`);
+
+  if (checkOnly) {
+    console.log("Manual backup prerequisites look ready. No database connection was requested.");
+    return;
   }
 
   const dbUrl = await getDbUrl();
@@ -130,9 +190,9 @@ async function main() {
   fs.mkdirSync(outputDir, { recursive: true });
 
   const files = [
-    dump(supabaseCommand, dbUrl, outputDir, "roles.sql", ["--role-only"]),
-    dump(supabaseCommand, dbUrl, outputDir, "schema.sql", []),
-    dump(supabaseCommand, dbUrl, outputDir, "data.sql", [
+    dump(supabaseCli, dbUrl, outputDir, "roles.sql", ["--role-only"]),
+    dump(supabaseCli, dbUrl, outputDir, "schema.sql", []),
+    dump(supabaseCli, dbUrl, outputDir, "data.sql", [
       "--use-copy",
       "--data-only",
       "-x",
@@ -140,11 +200,11 @@ async function main() {
       "-x",
       "storage.vector_indexes"
     ]),
-    dump(supabaseCommand, dbUrl, outputDir, "migration_history_schema.sql", [
+    dump(supabaseCli, dbUrl, outputDir, "migration_history_schema.sql", [
       "--schema",
       "supabase_migrations"
     ]),
-    dump(supabaseCommand, dbUrl, outputDir, "migration_history_data.sql", [
+    dump(supabaseCli, dbUrl, outputDir, "migration_history_data.sql", [
       "--use-copy",
       "--data-only",
       "--schema",

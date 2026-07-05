@@ -22,6 +22,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added and verified a backup prerequisite check that works through the Supabase CLI `npx` fallback.
 - [x] Added a Supabase Free-plan manual export helper and backup ignore rules.
 - [x] Documented production backup/export, restore rehearsal, migration log, health check, monitoring, and rollback procedures.
 - [x] Replace committed environment details with generated runtime configuration.
