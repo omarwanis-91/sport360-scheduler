@@ -22,6 +22,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added a production rehearsal report template for recording export, restore, health-check, monitoring, and rollback results.
 - [x] Added a manual backup folder verifier for Free-plan export completeness checks.
 - [x] Added and verified a backup prerequisite check that works through the Supabase CLI `npx` fallback.
 - [x] Added a Supabase Free-plan manual export helper and backup ignore rules.

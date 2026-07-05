@@ -2,6 +2,8 @@
 
 This runbook records the operational steps for the internal Sport360 release. It complements `docs/ROADMAP.md`; it does not replace the phase acceptance gates.
 
+Record rehearsal results in `docs/PRODUCTION_REHEARSAL_REPORT.md`. Keep this runbook as the repeatable procedure.
+
 ## Account Onboarding
 
 Production account creation is Admin-controlled. Public signup remains disabled through `SPORT360_ALLOW_SIGNUP=false`.
@@ -63,6 +65,7 @@ Use this checklist before promoting an internal release.
 8. Verify Admin, Lead, Employee, and unmatched-account sign-in behavior.
 9. Record the migration log entry for this release.
 10. Keep rollback instructions open while the first production checks are performed.
+11. Complete `docs/PRODUCTION_REHEARSAL_REPORT.md` before starting the pilot.
 
 ## Backup And Export
 

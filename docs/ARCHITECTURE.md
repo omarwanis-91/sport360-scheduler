@@ -25,6 +25,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
 | `supabase/audit/` | Read-only SQL reports for comparing the live database with repository expectations. |
 | `supabase/seed.sql` | Optional starter data. |
+| `docs/PRODUCTION_REHEARSAL_REPORT.md` | Records Phase 4 backup, restore, health-check, monitoring, and rollback rehearsal results. |
 
 ## Runtime Flow
 
