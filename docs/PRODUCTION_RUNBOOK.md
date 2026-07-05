@@ -49,3 +49,203 @@ Local development uses the same variable names in ignored `.env.local`.
 - Confirm an unmatched Auth account cannot read operational data.
 - Confirm `runtime-config.js` identifies the expected Supabase project and has signup disabled.
 
+## Production Release Checklist
+
+Use this checklist before promoting an internal release.
+
+1. Confirm the release branch is merged into `main`.
+2. Confirm GitHub checks pass: static check, unit tests, build, and Chromium smoke tests.
+3. Confirm Netlify production deploy uses the expected commit.
+4. Confirm Netlify environment variables are present and production signup is disabled.
+5. Run the latest Supabase audit SQL files that match the migrations being released.
+6. Create a fresh Supabase backup or confirm the most recent automated backup is current.
+7. Export critical operational tables before the release.
+8. Verify Admin, Lead, Employee, and unmatched-account sign-in behavior.
+9. Record the migration log entry for this release.
+10. Keep rollback instructions open while the first production checks are performed.
+
+## Backup And Export
+
+Supabase is the source of truth. Netlify can be redeployed, but production data must be protected before migrations or risky operational changes.
+
+### When To Back Up
+
+- Before applying any Supabase migration.
+- Before a production deploy that changes persistence or authorization behavior.
+- Before importing, deleting, or bulk editing profiles, departments, rotations, requests, or schedule overrides.
+- Before the one-department pilot starts.
+- At the end of each pilot business day while the release is being monitored.
+
+### Database Backup
+
+Preferred method: use Supabase managed backups from the project dashboard.
+
+1. Open Supabase.
+2. Select the production project.
+3. Open **Database -> Backups**.
+4. Confirm a recent backup exists.
+5. If the plan supports manual backups, create one before applying changes.
+6. Record the backup timestamp, release commit, and operator in the migration log section below.
+
+If a manual SQL export is needed, export these tables together so relationships stay understandable:
+
+- `departments`
+- `employee_profiles`
+- `employee_profile_departments`
+- `user_roles`
+- `shift_statuses`
+- `rotation_versions`
+- `department_lead_rotation_versions`
+- `department_daily_leads`
+- `schedule_overrides`
+- `vacation_requests`
+- `audit_log`
+
+Keep exports outside the repository. They may contain private employee data and must not be committed.
+
+### Storage Backup
+
+The `profile-photos` bucket is private and contains employee profile images.
+
+1. Open Supabase **Storage -> profile-photos**.
+2. Confirm the bucket remains private.
+3. Before a major profile-photo migration, download the affected folders or confirm the bucket is included in the project backup plan.
+4. Record the storage backup status in the migration log.
+
+## Restore Rehearsal
+
+A backup is not production-ready until restore has been rehearsed.
+
+Perform the rehearsal in a non-production Supabase project, never in the production project.
+
+1. Create or choose a temporary restore-test Supabase project.
+2. Restore the selected backup or import the exported SQL into the restore-test project.
+3. Apply the same migrations that production is expected to run.
+4. Configure a local `.env.local` or Netlify deploy preview to point at the restore-test project.
+5. Sign in with test Admin, Lead, and Employee accounts.
+6. Confirm the app can load Scheduler, People, Departments, Rotations, Requests, and My Profile.
+7. Confirm profile photos either load through signed URLs or fall back safely.
+8. Run the matching read-only audit SQL files from `supabase/audit/`.
+9. Record the rehearsal result, restore source, and any gaps in the migration log.
+
+The Phase 4 release gate is not complete until a restore rehearsal succeeds.
+
+## Migration Log
+
+Record each production database change here or in a linked issue/PR before release. Keep credentials and private data out of the log.
+
+| Date | Release / Commit | Migration or Action | Backup Timestamp | Audit / Verification | Operator | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pending | Pending | Pending production release rehearsal | Pending | Pending | Pending | Pending |
+
+For each applied migration, record:
+
+- The migration filename.
+- Whether it was applied through Supabase SQL Editor, CLI, or another controlled process.
+- The exact audit SQL file run afterward.
+- Whether any manual recovery step was needed.
+
+## Health Check
+
+Run this after every production deploy and after every database migration.
+
+### Browser Checks
+
+1. Open the production URL in Chrome.
+2. Open the production URL in Edge.
+3. Confirm the sign-in screen loads.
+4. Confirm **Create Account** is hidden when `allowSignup` is false.
+5. Sign in as Admin and open Scheduler, People, Departments, Rotations, Requests, Activity, and Settings.
+6. Sign in as a Department Lead and confirm the Lead sees only allowed department workflows.
+7. Sign in as an Employee and confirm personal profile and vacation request flows work.
+8. Sign in with an unmatched test account and confirm operational data is blocked.
+
+### Data Checks
+
+1. Confirm the expected departments and sub-departments load.
+2. Confirm the selected pilot department has the expected people.
+3. Confirm rotations resolve for the current week.
+4. Confirm vacation balances display for at least one pilot employee.
+5. Confirm a profile photo loads from `profile-photos` or falls back cleanly.
+6. Confirm the Activity view records a harmless test change, then reverse the change if needed.
+
+### Technical Checks
+
+1. Open browser devtools and confirm there are no startup console errors.
+2. Confirm `runtime-config.js` points to the production Supabase URL and expected release value.
+3. Confirm network calls to Supabase return successful responses for the signed-in role.
+4. Confirm Netlify deploy logs show a successful build.
+5. Run `npm.cmd run check`, `npm.cmd test`, and demo smoke tests locally before merging the release branch.
+
+## Monitoring During Pilot
+
+During the five-business-day pilot, check these at the start and end of each business day.
+
+- Netlify deploy status and error logs.
+- Supabase API/database health.
+- Supabase Auth user issues.
+- Failed or unusual schedule, vacation, profile, and rotation writes.
+- `audit_log` entries for unexpected Admin or Lead changes.
+- Pilot department feedback: missing shifts, wrong leads, confusing vacation status, or blocked actions.
+
+Capture issues with:
+
+- Date and time.
+- Signed-in role.
+- Department.
+- Browser.
+- Steps that caused the issue.
+- Screenshot when useful.
+- Whether data was changed.
+
+Critical or high-severity issues pause rollout beyond the pilot department.
+
+## Rollback
+
+Rollback should restore a usable production state quickly while preserving data.
+
+### Frontend Rollback
+
+Use this when the issue is visual, navigation-related, runtime-config-related, or isolated to frontend behavior.
+
+1. Open Netlify **Deploys**.
+2. Select the last known good production deploy.
+3. Use **Publish deploy** to roll back the frontend.
+4. Confirm the production URL loads.
+5. Run the health check again.
+6. Record the rollback in the migration log.
+
+### Database Rollback
+
+Database rollback is higher risk because production data may have changed after migration.
+
+1. Stop new production use if data integrity is at risk.
+2. Identify the migration or manual change that introduced the issue.
+3. Prefer a forward fix migration when possible.
+4. If restore is required, restore into a non-production project first and verify the result.
+5. Decide whether to restore production from backup only after confirming the data-loss window and business impact.
+6. Record the decision, backup timestamp, affected data window, and verifier.
+
+Do not run destructive rollback SQL from memory. Use reviewed SQL, a backup, and a second human check.
+
+### Auth Or Access Rollback
+
+Use this when users cannot sign in or roles are wrong.
+
+1. Confirm Supabase Auth health.
+2. Confirm `user_roles` and profile claim state for one affected user.
+3. Re-run the role read/write audits when policies or RPCs are involved.
+4. Revert frontend deploy only if the issue came from UI/runtime configuration.
+5. Use a forward database fix for policy or RPC mistakes.
+
+## Emergency Contacts And Ownership
+
+Fill this before pilot launch.
+
+| Area | Owner | Backup Owner | Where To Check |
+| --- | --- | --- | --- |
+| Netlify deploys | Pending | Pending | Netlify project deploys |
+| Supabase database | Pending | Pending | Supabase database dashboard |
+| Supabase Auth | Pending | Pending | Supabase Authentication |
+| Pilot department signoff | Pending | Pending | Pilot feedback log |
+| Incident decisions | Pending | Pending | Release issue or PR |

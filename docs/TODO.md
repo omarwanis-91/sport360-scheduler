@@ -4,15 +4,10 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [x] Replace committed environment details with generated runtime configuration.
-- [x] Generate production configuration from Netlify variables and ignored local configuration.
-- [x] Disable public signup in production and verify Admin-created onboarding.
-- [x] Add GitHub Actions Chromium smoke tests for demo-mode browser coverage.
-- [x] Verify Chrome/Edge layouts at all supported desktop widths with automated viewport smoke coverage.
+- [~] Rehearse production backup, restore, health check, monitoring, and rollback using the production runbook.
 
 ## Next
 
-- [ ] Document and rehearse production backup, restore, health check, monitoring, and rollback.
 - [ ] Pilot one department for five business days and record signoff.
 
 ## Later
@@ -27,6 +22,11 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Documented production backup/export, restore rehearsal, migration log, health check, monitoring, and rollback procedures.
+- [x] Replace committed environment details with generated runtime configuration.
+- [x] Generate production configuration from Netlify variables and ignored local configuration.
+- [x] Disable public signup in production and verify Admin-created onboarding.
+- [x] Add GitHub Actions Chromium smoke tests for demo-mode browser coverage.
 - [x] Added and passed automated viewport smoke coverage for 1024px, 1280px, 1440px, and 1920px desktop widths.
 - [x] Fixed Scheduler/Rotation hover states so cells glow in their own status color with a smoother gradual transition.
 - [x] Removed heavy coverage drawer row lines and made Scheduler/Rotation non-working cells quiet by default with stronger hover and filter focus.

@@ -97,7 +97,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Extract pure schedule and permission logic sufficiently to support automated Node tests.
 - ✅ Add GitHub Actions for static checks, unit tests, the production build, and demo-mode Chromium smoke tests.
 - ✅ Support current Chrome and Edge at 1024px, 1280px, 1440px, and 1920px widths. Mobile remains best-effort.
-- ⬜ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
+- ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
 - ⬜ Pilot the production release with one department for five business days before expanding internally.
 
 ### Acceptance Gate
