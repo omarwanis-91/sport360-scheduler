@@ -56,16 +56,17 @@ Local development uses the same variable names in ignored `.env.local`.
 Use this checklist before promoting an internal release.
 
 1. Confirm the release branch is merged into `main`.
-2. Confirm GitHub checks pass: static check, unit tests, build, and Chromium smoke tests.
-3. Confirm Netlify production deploy uses the expected commit.
-4. Confirm Netlify environment variables are present and production signup is disabled.
-5. Run the latest Supabase audit SQL files that match the migrations being released.
-6. On Supabase Free, create a fresh manual export and store it off-site. On paid plans, confirm the most recent managed backup is current.
-7. Export critical operational tables before the release if a full logical dump is not available.
-8. Verify Admin, Lead, Employee, and unmatched-account sign-in behavior.
-9. Record the migration log entry for this release.
-10. Keep rollback instructions open while the first production checks are performed.
-11. Complete `docs/PRODUCTION_REHEARSAL_REPORT.md` before starting the pilot.
+2. Run `npm.cmd run phase4:local` and confirm local syntax, unit, build, and demo smoke checks pass.
+3. Confirm GitHub checks pass: static check, unit tests, build, and Chromium smoke tests.
+4. Confirm Netlify production deploy uses the expected commit.
+5. Confirm Netlify environment variables are present and production signup is disabled.
+6. Run the latest Supabase audit SQL files that match the migrations being released.
+7. On Supabase Free, create a fresh manual export and store it off-site. On paid plans, confirm the most recent managed backup is current.
+8. Export critical operational tables before the release if a full logical dump is not available.
+9. Verify Admin, Lead, Employee, and unmatched-account sign-in behavior.
+10. Record the migration log entry for this release.
+11. Keep rollback instructions open while the first production checks are performed.
+12. Complete `docs/PRODUCTION_REHEARSAL_REPORT.md` before starting the pilot.
 
 ## Backup And Export
 
@@ -262,7 +263,7 @@ Run this after every production deploy and after every database migration.
 2. Confirm `runtime-config.js` points to the production Supabase URL and expected release value.
 3. Confirm network calls to Supabase return successful responses for the signed-in role.
 4. Confirm Netlify deploy logs show a successful build.
-5. Run `npm.cmd run check`, `npm.cmd test`, and demo smoke tests locally before merging the release branch.
+5. Run `npm.cmd run phase4:local` before merging the release branch.
 
 ## Monitoring During Pilot
 

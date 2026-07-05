@@ -12,6 +12,14 @@ Do not record database passwords, connection strings, access tokens, private emp
 - Reviewer: Pending
 - Release branch / commit: Pending
 
+## Local Release Verification
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm.cmd run phase4:local` passed | Pass | 2026-07-05 local run passed syntax, 7 unit tests, production build, and 13 demo smoke tests. |
+| GitHub checks passed | Pending |  |
+| Netlify deploy preview is healthy | Pending |  |
+
 ## Manual Export
 
 | Check | Result | Notes |

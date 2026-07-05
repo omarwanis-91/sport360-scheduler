@@ -70,3 +70,13 @@ npm.cmd run backup:verify
 ```
 
 The helper writes SQL dumps outside the repository by default. See [Production runbook](docs/PRODUCTION_RUNBOOK.md) for restore rehearsal and rollback steps.
+
+## Phase 4 Local Verification
+
+Before production rehearsal or pilot work, run the local release check:
+
+```powershell
+npm.cmd run phase4:local
+```
+
+It runs syntax checks, unit tests, the production build, and demo-mode Chromium smoke tests.
