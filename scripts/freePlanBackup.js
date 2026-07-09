@@ -74,7 +74,7 @@ function resolveSupabaseCommand() {
   const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
   const npxPath = findCommand(npxCommand);
   if (npxPath) {
-    return { command: npxPath, prefixArgs: ["-y", "supabase"], source: "npx fallback" };
+    return { command: npxCommand, prefixArgs: ["-y", "supabase"], source: "npx fallback" };
   }
 
   return null;
