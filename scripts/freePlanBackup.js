@@ -133,9 +133,16 @@ function readHiddenLine(question) {
 }
 
 async function getDbUrl() {
-  if (process.env.SUPABASE_DB_URL) return process.env.SUPABASE_DB_URL.trim();
-  if (process.env.SPORT360_SUPABASE_DB_URL) return process.env.SPORT360_SUPABASE_DB_URL.trim();
+  if (process.env.SUPABASE_DB_URL) return cleanDbUrl(process.env.SUPABASE_DB_URL);
+  if (process.env.SPORT360_SUPABASE_DB_URL) return cleanDbUrl(process.env.SPORT360_SUPABASE_DB_URL);
   return readHiddenLine("Paste Supabase database connection string (input hidden): ");
+}
+
+function cleanDbUrl(value) {
+  return String(value || "")
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim();
 }
 
 function getGitCommit() {
@@ -179,9 +186,12 @@ async function main() {
     return;
   }
 
-  const dbUrl = await getDbUrl();
+  const dbUrl = cleanDbUrl(await getDbUrl());
   if (!dbUrl) {
     throw new Error("A Supabase database connection string is required.");
+  }
+  if (!dbUrl.startsWith("postgresql://")) {
+    throw new Error("The database connection string must start with postgresql://");
   }
 
   const outputDir = path.join(backupRoot, stamp());
