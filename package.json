@@ -6,6 +6,15 @@
   "scripts": {
     "start": "node server.js",
     "build": "node scripts/build.js",
-    "check": "node --check server.js && node --check src/config.js && node --check src/data.js && node --check src/supabaseStore.js && node --check src/main.js"
+    "backup:check": "node scripts/freePlanBackup.js --check",
+    "backup:manual": "node scripts/freePlanBackup.js",
+    "backup:verify": "node scripts/verifyFreePlanBackup.js",
+    "phase4:local": "node scripts/phase4LocalVerify.js",
+    "check": "node --check server.js && node --check scripts/runtimeConfig.js && node --check scripts/smokeServer.js && node --check scripts/freePlanBackup.js && node --check scripts/verifyFreePlanBackup.js && node --check scripts/phase4LocalVerify.js && node --check src/config.js && node --check src/data.js && node --check src/supabaseStore.js && node --check src/scheduleLogic.mjs && node --check src/main.js",
+    "test": "node --test test/scheduleLogic.test.mjs",
+    "test:smoke": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }

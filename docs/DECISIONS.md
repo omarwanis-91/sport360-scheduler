@@ -126,3 +126,117 @@ Authentication alone does not grant access to employee or schedule data. The sig
 **Status:** Accepted
 
 `SECURITY DEFINER` functions that do not perform their own authorization checks are internal helpers. They must not be directly executable by browser roles and should only be reached through authorized RPC workflows.
+
+## D-021 - Roadmap And Tactical Queue Separation
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+`docs/ROADMAP.md` is the durable phased project plan and records phase status and acceptance gates. `docs/TODO.md` is the short actionable queue for current and immediately upcoming work. Both are maintained as the project progresses.
+
+## D-022 - Production Gate Follows Department Rotations
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+The project enters production hardening immediately after department-wide rotation editing is complete. Later product expansion does not block the first production release unless evidence from hardening or the pilot establishes that it is required.
+
+## D-023 - Internal Production Rollout
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+The first production release is an internal Sport360 rollout. One department pilots the release for five business days before broader internal expansion, subject to the documented production acceptance gate.
+
+## D-024 - Admin-Controlled Account Onboarding
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+Production accounts are created or invited by an Admin. Public account creation is hidden when runtime configuration sets `allowSignup` to false. Existing email-based profile linking remains part of onboarding.
+
+## D-025 - Initial Production Device Support
+
+**Date:** 2026-06-21
+**Status:** Accepted
+
+The initial production guarantee covers current Chrome and Edge on desktop and laptop displays 1024px wide and above. Mobile behavior remains best-effort until mobile is explicitly promoted to a supported target.
+
+## D-026 - Department Lead Rotation
+
+**Date:** 2026-06-25
+**Status:** Accepted
+
+Each department has an effective-dated seven-day lead rotation. The Scheduler resolves that weekly default for every date, while `department_daily_leads` remains a one-day override. This allows weekend and weekday leads to differ without duplicating daily assignments or rewriting historical patterns.
+
+Lead assignment candidates come from current department membership, not from a permanent profile-level Department Lead tag. A senior can therefore lead while the usual lead is on vacation.
+
+## D-027 - Equal Department Memberships
+
+**Date:** 2026-06-25
+**Status:** Accepted
+
+An employee can belong to multiple equal departments. The profile editor shows departments as one checklist, and hierarchy, schedule, and rotation views use those memberships directly.
+
+A legacy `department_id` value is still kept internally as a compatibility anchor for existing permission checks and older database objects, but the UI does not present it as primary.
+
+## D-028 - Seniority Hierarchy View
+
+**Date:** 2026-06-25
+**Status:** Accepted
+
+The Hierarchy workspace lets the user select one or more departments, then groups visible employees from Manager through Department Lead, Senior, Mid-level, and Junior within each selected department. It is a people-structure view based on profile seniority, not a replacement for application access roles or daily lead scheduling.
+
+## D-029 - Temporary Admin Control For Pseudo Profiles
+
+**Date:** 2026-06-27
+**Status:** Accepted
+
+During setup, profiles are pseudo profiles created and controlled by Admins. Admins can create, edit, unlink, and delete these profiles while the team structure is still being shaped.
+
+Longer term, employees should be able to create or claim their own profile and edit basic personal information, while Admins retain control over operational fields such as roles, departments, rotations, and scheduling rules.
+
+## D-030 - Vacation Requests And Lead Replacement
+
+**Date:** 2026-07-04
+**Status:** Accepted
+
+Vacation is not manually assigned from the shift override editor. Vacation must come through the vacation request and approval workflow so balance deduction, schedule impact, and audit history stay connected.
+
+If a scheduled department lead becomes unavailable through Vacation, Sick, On Ground, or another non-working state, the Scheduler should stop showing that person as the active lead for that day and surface a missing-lead alert. Approving vacation for an affected lead should guide the manager to assign a replacement daily lead.
+
+## D-031 - Manual Override Label Reserved For Manual Edits
+
+**Date:** 2026-07-04
+**Status:** Accepted
+
+Approved vacation days should not be shown as overrides in the interface. Even if the persistence layer stores request-approved vacation as schedule replacement rows, the user-facing source is "Vacation request". The "Override" label and manual counts are reserved for manager-entered daily changes.
+
+## D-032 - Any Department Member Can Cover Day Lead
+
+**Date:** 2026-07-04
+**Status:** Accepted
+
+Daily and weekly department lead assignment is an operational scheduling choice, not a permanent seniority or title gate. Any current member of the department can be selected as day lead when coverage requires it. Seniority and application roles remain useful for hierarchy and permissions, but they must not prevent a temporary day-lead assignment.
+
+Scheduler cells should use the vertical bar as the primary working versus non-working signal. Shift and exception types should be secondary through icon, label, and subtle texture so the grid stays readable.
+
+## D-033 - Free-Plan Backup Path
+
+**Date:** 2026-07-05
+**Status:** Accepted
+
+While the production Supabase project remains on the Free plan, Phase 4 backup readiness uses manual logical exports stored off-site rather than Supabase managed daily backups.
+
+Before production release, migrations, bulk edits, or pilot launch, the team must create a manual export and rehearse restoring it into a non-production Supabase project. Managed dashboard backups become the preferred path only after upgrading to a plan that includes them.
+
+## D-034 - Online Preview Before Full Backup Gate
+
+**Date:** 2026-07-12
+**Status:** Accepted
+
+The app may be put online for internal preview through the connected static host before the full Phase 4 backup/restore gate is closed.
+
+This does not mark the project production-ready. The SQL backup helper is currently blocked on the local Windows Docker/WSL configuration required by Supabase CLI dumps. Until that is repaired, a Supabase dashboard CSV export stored outside the repository is the temporary safety net for preview use only.
+
+The full production-ready internal release still requires a verified logical export, restore rehearsal in a non-production Supabase project, browser health checks, live role/auth checks, rollback ownership, and pilot signoff.

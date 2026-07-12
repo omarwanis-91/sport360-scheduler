@@ -118,4 +118,32 @@ Verified restrictions include:
 
 ## Next Action
 
-Repeat this role regression after any material permission, navigation, profile, schedule, rotation, or request workflow change.
+Run `supabase/audit/004_department_rotation_batch_audit.sql` after migration `012`. It verifies history preservation, valid Admin/Lead saves, invalid-status rejection, atomic failure, past-date restrictions, cross-department restrictions, and Employee denial. Every successful test write is rolled back.
+
+After applying migration `013_private_profile_photos.sql`, run `supabase/audit/005_profile_photo_storage_audit.sql`. It is read-only and verifies the private bucket, size limit, authenticated policy commands, and the count of storage versus legacy photo references.
+
+After applying migration `014_profile_seniority_and_lead_rotations.sql`, run `supabase/audit/006_department_lead_rotation_audit.sql`. It verifies profile seniority and lead-eligibility columns, the effective-dated lead-rotation table, RLS, and its read/write policies.
+
+After applying migration `015_multi_department_memberships_and_self_title.sql`, run `supabase/audit/007_multi_department_membership_audit.sql`. It verifies the membership table, RLS, primary-membership backfill, and the four-argument owner profile update RPC that persists titles.
+
+### Profile Photo Storage Audit Result - 2026-06-22
+
+All eight static Storage checks passed:
+
+- The `profile-photos` bucket exists, is private, and enforces the 750 KB limit.
+- Authenticated claimed users have signed-read access.
+- Admin and profile-owner INSERT, UPDATE, and DELETE policies are present.
+- The initial reference count is `storage=0, legacy=1`; the legacy image remains supported until replaced.
+- Live upload, save, reload, and private bucket visibility were verified after bucket creation.
+
+### Department Rotation Batch Audit Result - 2026-06-21
+
+All eight checks passed:
+
+- Existing rotation history remained unchanged while new effective-dated versions were created.
+- Invalid rotational statuses were rejected.
+- Mixed-department failure was atomic and retained no rows.
+- Admin batch saves, Lead future own-department saves, and Employee denial behaved as designed.
+- Lead past-date and cross-department batch saves were rejected.
+
+Repeat the broader role regression after any material permission, navigation, profile, schedule, rotation, or request workflow change.

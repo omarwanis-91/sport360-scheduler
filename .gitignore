@@ -9,3 +9,13 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+test-results/
+playwright-report/
+sport360-backups/
+backups/
+*.dump
+roles.sql
+schema.sql
+data.sql
+migration_history_schema.sql
+migration_history_data.sql

@@ -1,0 +1,42 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run syntax checks
+        run: npm run check
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+        env:
+          SPORT360_SUPABASE_URL: ${{ secrets.SPORT360_SUPABASE_URL }}
+          SPORT360_SUPABASE_ANON_KEY: ${{ secrets.SPORT360_SUPABASE_ANON_KEY }}
+          SPORT360_ALLOW_SIGNUP: "false"
+          SPORT360_DEMO_MODE: "true"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Chromium smoke test
+        run: npm run test:smoke

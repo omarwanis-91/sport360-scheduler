@@ -1,6 +1,22 @@
 import { seedState } from "./data.js";
 import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
+import {
+  addDays as addDaysLogic,
+  byId,
+  dateDiff as dateDiffLogic,
+  datesBetween as datesBetweenLogic,
+  departmentLeadForDate as departmentLeadForDateLogic,
+  latestRotationForProfile as latestRotationForProfileLogic,
+  normalizeWeekPattern as normalizeWeekPatternLogic,
+  parseDate as parseDateLogic,
+  roleForProfile as roleForProfileLogic,
+  sanitizeRotationPattern as sanitizeRotationPatternLogic,
+  scheduleFor as scheduleForLogic,
+  toIso as toIsoLogic,
+  weekdayIndex as weekdayIndexLogic,
+  workdayCount as workdayCountLogic
+} from "./scheduleLogic.mjs";
 
 const storageKey = "sport360-scheduler-state";
 const todayIso = toIso(new Date());
@@ -23,7 +39,9 @@ const icons = {
   ground: '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.4 7-11a7 7 0 1 0-14 0c0 6.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   chevron: '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
-  close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+  close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
+  lead: '<svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88Z"/></svg>'
 };
 
 const statusIcons = {
@@ -40,6 +58,14 @@ const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const defaultWeekPattern = ["morning", "morning", "morning", "morning", "morning", "weekend", "weekend"];
 const rotationStatusIds = ["morning", "midday", "night", "weekend"];
 const exceptionStatusIds = ["vacation", "sick", "ground"];
+const manualExceptionStatusIds = ["sick", "ground"];
+const seniorityLevels = [
+  ["junior", "Junior"],
+  ["mid", "Mid-level"],
+  ["senior", "Senior"],
+  ["lead", "Lead"],
+  ["manager", "Manager"]
+];
 
 let dataStore;
 let state = structuredClone(seedState);
@@ -50,23 +76,64 @@ const ui = {
   selectedDepartmentId: state.departments[0]?.id,
   peopleDepartmentId: "all",
   peopleView: "default",
+  departmentView: "tiles",
+  expandedDepartmentIds: [],
   rangeDays: appConfig.defaultScheduleDays,
   startDate: todayIso,
   calendarMonth: todayIso.slice(0, 7),
   profileViewId: null,
   selectedFilter: "all",
+  scheduleStatusFilter: "all",
   requestFilter: "pending",
   activityType: "all",
   activitySearch: "",
+  hierarchyDepartmentIds: state.departments.map((department) => department.id),
+  rotationDepartmentEdit: false,
+  selectedRotationProfileIds: [],
+  rotationBulkEditing: false,
+  rotationBulkPattern: [...defaultWeekPattern],
+  rotationBulkEffectiveStart: todayIso,
+  pendingPhotoFile: null,
+  pendingPhotoDataUrl: "",
   drawer: null,
   loading: true,
   error: "",
-  notice: ""
+  notice: "",
+  noticeKind: "info",
+  mutation: { key: "", status: "idle", message: "" }
 };
 
-function notify(message) {
+function notify(message, kind = "info") {
   ui.notice = message;
+  ui.noticeKind = kind;
   render();
+}
+
+function isMutationPending() {
+  return ui.mutation.status === "pending";
+}
+
+async function runMutation(key, messages, action) {
+  if (isMutationPending()) return { ok: false };
+  if (dataStore?.mode === "supabase" && !navigator.onLine) {
+    notify("You appear to be offline. Reconnect, then try again.", "error");
+    return { ok: false };
+  }
+  ui.mutation = { key, status: "pending", message: messages.pending };
+  ui.notice = messages.pending;
+  ui.noticeKind = "info";
+  render();
+  try {
+    const result = await action();
+    ui.mutation = { key, status: "success", message: messages.success };
+    notify(messages.success, "success");
+    return { ok: true, result };
+  } catch (error) {
+    const message = error.message || messages.failure;
+    ui.mutation = { key, status: "error", message };
+    notify(message, "error");
+    return { ok: false, error };
+  }
 }
 
 function loadState() {
@@ -100,28 +167,35 @@ function exceptionStatuses() {
   return exceptionStatusIds.map((id) => byId(state.statuses, id)).filter(Boolean);
 }
 
+function manualExceptionStatuses() {
+  return manualExceptionStatusIds.map((id) => byId(state.statuses, id)).filter(Boolean);
+}
+
 function dailyStatusGroups() {
   return [
     { label: "Rotation shifts", statuses: rotationStatuses() },
-    { label: "Daily exceptions", statuses: exceptionStatuses() }
+    { label: "Daily exceptions", statuses: manualExceptionStatuses() }
   ];
 }
 
 function sanitizeRotationPattern(pattern) {
-  return normalizeWeekPattern(pattern).map((statusId) => rotationStatusIds.includes(statusId) ? statusId : "weekend");
+  return sanitizeRotationPatternLogic(pattern, rotationStatusIds, defaultWeekPattern);
 }
 
 async function saveState() {
   await dataStore.persist(state);
 }
 
+function syncHierarchyDepartmentSelection() {
+  const departmentIds = state.departments.map((department) => department.id);
+  const valid = new Set(departmentIds);
+  const selected = (ui.hierarchyDepartmentIds || []).filter((departmentId) => valid.has(departmentId));
+  ui.hierarchyDepartmentIds = selected.length ? selected : departmentIds;
+}
+
 async function resetDemo() {
   await dataStore.reset();
   location.reload();
-}
-
-function byId(collection, id) {
-  return collection.find((item) => item.id === id);
 }
 
 function makeId(prefix) {
@@ -130,21 +204,15 @@ function makeId(prefix) {
 }
 
 function parseDate(iso) {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  return parseDateLogic(iso);
 }
 
 function toIso(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return toIsoLogic(date);
 }
 
 function addDays(iso, amount) {
-  const date = parseDate(iso);
-  date.setDate(date.getDate() + amount);
-  return toIso(date);
+  return addDaysLogic(iso, amount);
 }
 
 function addMonths(monthIso, amount) {
@@ -153,12 +221,11 @@ function addMonths(monthIso, amount) {
 }
 
 function dateDiff(startIso, endIso) {
-  return Math.round((parseDate(endIso) - parseDate(startIso)) / 86400000);
+  return dateDiffLogic(startIso, endIso);
 }
 
 function weekdayIndex(iso) {
-  const jsDay = parseDate(iso).getDay();
-  return jsDay === 0 ? 6 : jsDay - 1;
+  return weekdayIndexLogic(iso);
 }
 
 function formatDay(iso) {
@@ -169,13 +236,110 @@ function formatDate(iso) {
   return parseDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function formatMonthYear(iso) {
+  return parseDate(iso).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 function datesInRange() {
   return Array.from({ length: ui.rangeDays }, (_, index) => addDays(ui.startDate, index));
 }
 
+function schedulerRangeClass() {
+  if (ui.rangeDays >= 30) return "range-month";
+  if (ui.rangeDays >= 14) return "range-two-weeks";
+  return "range-week";
+}
+
+function zoomScheduleRange(direction) {
+  const ranges = [7, 14, 30];
+  const currentIndex = Math.max(0, ranges.indexOf(ui.rangeDays));
+  const nextIndex = Math.min(ranges.length - 1, Math.max(0, currentIndex + direction));
+  ui.rangeDays = ranges[nextIndex];
+}
+
+function schedulerMonthLabel(dates) {
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  if (!first || !last) return "";
+  const firstLabel = formatMonthYear(first);
+  const lastLabel = formatMonthYear(last);
+  return firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
+}
+
+function monthStart(iso) {
+  return `${iso.slice(0, 7)}-01`;
+}
+
+function isWeekStart(date) {
+  return weekdayIndex(date) === 0;
+}
+
+function leadForWeekday(departmentId, weekday) {
+  const rotation = latestLeadRotation(departmentId);
+  return byId(state.profiles, rotation?.pattern?.[weekday]);
+}
+
+function leadForProfileWeekday(profile, departmentId, weekday) {
+  return departmentScopeIds(departmentId)
+    .filter((id) => profileBelongsToDepartment(profile, id))
+    .map((id) => leadForWeekday(id, weekday))
+    .find((lead) => lead?.id === profile.id);
+}
+
+function departmentLabel(department) {
+  const parent = byId(state.departments, department?.parentDepartmentId);
+  return parent ? `${parent.name} / ${department.name}` : department?.name || "";
+}
+
+function departmentOptions(selectedId, { excludeId = "", includeNone = false, noneLabel = "Top-level department" } = {}) {
+  return `
+    ${includeNone ? `<option value="" ${selectedId ? "" : "selected"}>${noneLabel}</option>` : ""}
+    ${state.departments
+      .filter((department) => department.id !== excludeId)
+      .map((department) => `<option value="${department.id}" ${department.id === selectedId ? "selected" : ""}>${departmentLabel(department)}</option>`)
+      .join("")}
+  `;
+}
+
+function orderedDepartments() {
+  const byParent = new Map();
+  state.departments.forEach((department) => {
+    const parentId = department.parentDepartmentId || "";
+    if (!byParent.has(parentId)) byParent.set(parentId, []);
+    byParent.get(parentId).push(department);
+  });
+  const sorted = (items = []) => [...items].sort((a, b) => a.name.localeCompare(b.name));
+  const output = [];
+  const visit = (department, depth = 0) => {
+    output.push({ department, depth });
+    sorted(byParent.get(department.id)).forEach((child) => visit(child, depth + 1));
+  };
+  sorted(byParent.get("")).forEach((department) => visit(department));
+  return output;
+}
+
+function childDepartmentsOf(departmentId) {
+  return state.departments.filter((department) => department.parentDepartmentId === departmentId);
+}
+
+function descendantDepartmentIds(departmentId) {
+  const descendants = [];
+  const visit = (parentId) => {
+    childDepartmentsOf(parentId).forEach((child) => {
+      descendants.push(child.id);
+      visit(child.id);
+    });
+  };
+  visit(departmentId);
+  return descendants;
+}
+
+function departmentScopeIds(departmentId) {
+  return [departmentId, ...descendantDepartmentIds(departmentId)].filter(Boolean);
+}
+
 function datesBetween(startIso, endIso) {
-  const days = Math.max(0, dateDiff(startIso, endIso));
-  return Array.from({ length: days + 1 }, (_, index) => addDays(startIso, index));
+  return datesBetweenLogic(startIso, endIso);
 }
 
 function currentUser() {
@@ -187,14 +351,34 @@ function currentProfile() {
 }
 
 function roleForProfile(profile) {
-  if (!profile?.userId) return "unclaimed";
-  return state.userRoles?.find((role) => role.userId === profile.userId)?.role
-    || state.users?.find((user) => user.id === profile.userId)?.role
-    || "employee";
+  return roleForProfileLogic(state, profile);
 }
 
-function departmentProfiles() {
-  let profiles = state.profiles.filter((profile) => profile.departmentId === ui.selectedDepartmentId);
+function profileDepartmentIds(profile) {
+  return [profile?.departmentId, ...(profile?.departmentIds || [])]
+    .filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index);
+}
+
+function profileDepartmentNames(profile) {
+  return profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
+}
+
+function profileBelongsToDepartment(profile, departmentId) {
+  const scope = new Set(departmentScopeIds(departmentId));
+  return profileDepartmentIds(profile).some((id) => scope.has(id));
+}
+
+function selectedHierarchyDepartments() {
+  const selected = new Set(ui.hierarchyDepartmentIds || []);
+  return state.departments.filter((department) => selected.has(department.id));
+}
+
+function hierarchyProfilesForDepartment(departmentId) {
+  return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId));
+}
+
+function departmentProfiles({ applyScheduleFilter = true } = {}) {
+  let profiles = state.profiles.filter((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId));
   if (ui.selectedFilter === "leads") {
     const leadIds = new Set(state.departmentLeads.filter((lead) => lead.departmentId === ui.selectedDepartmentId).map((lead) => lead.profileId));
     profiles = profiles.filter((profile) => leadIds.has(profile.id));
@@ -203,7 +387,19 @@ function departmentProfiles() {
   if (ui.selectedFilter === "vacation") {
     profiles = profiles.filter((profile) => datesInRange().some((date) => scheduleFor(profile.id, date).id === "vacation"));
   }
+  if (applyScheduleFilter && ui.scheduleStatusFilter !== "all") {
+    const dates = datesInRange();
+    profiles = profiles.filter((profile) => dates.some((date) => scheduleMatchesFilter(scheduleFor(profile.id, date))));
+  }
   return profiles;
+}
+
+function scheduleMatchesFilter(schedule) {
+  if (ui.scheduleStatusFilter === "all") return true;
+  if (ui.scheduleStatusFilter === "available") return schedule.kind === "working" && schedule.id !== "ground";
+  if (ui.scheduleStatusFilter === "unavailable") return schedule.kind !== "working";
+  if (ui.scheduleStatusFilter === "manual") return isManualOverrideSchedule(schedule);
+  return schedule.id === ui.scheduleStatusFilter;
 }
 
 function canEditPast() {
@@ -282,36 +478,124 @@ function editableDate(iso) {
 }
 
 function activeRotation(profileId, dateIso) {
-  return state.rotationVersions
-    .filter((rotation) => rotation.profileId === profileId && rotation.effectiveStart <= dateIso)
+  return latestRotationForProfileLogic(
+    state.rotationVersions.filter((rotation) => rotation.effectiveStart <= dateIso),
+    profileId
+  );
+}
+
+function leadCandidates(departmentId) {
+  return state.profiles.filter((profile) => profileBelongsToDepartment(profile, departmentId));
+}
+
+function latestLeadRotation(departmentId) {
+  return (state.departmentLeadRotations || [])
+    .filter((rotation) => rotation.departmentId === departmentId)
     .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
 }
 
-function scheduleFor(profileId, dateIso) {
-  const override = state.scheduleOverrides.find((entry) => entry.profileId === profileId && entry.date === dateIso);
-  const rotation = activeRotation(profileId, dateIso);
-  const rotationStatus = rotation ? byId(state.statuses, rotation.pattern.length === 7
-    ? rotation.pattern[weekdayIndex(dateIso)]
-    : rotation.pattern[Math.max(0, dateDiff(rotation.effectiveStart, dateIso)) % rotation.pattern.length]) : null;
-  if (override) {
-    return {
-      ...byId(state.statuses, override.statusId),
-      source: "Override",
-      note: override.note,
-      override,
-      rotation,
-      rotationStatus
-    };
+function departmentLeadForDate(departmentId, dateIso) {
+  return departmentLeadForDateLogic(state, departmentId, dateIso);
+}
+
+function isScheduleLeadAvailable(schedule) {
+  return schedule?.kind === "working" && schedule.id !== "ground";
+}
+
+function leadAvailabilityForDepartmentDate(departmentId, dateIso) {
+  const lead = departmentLeadForDate(departmentId, dateIso);
+  const schedule = lead.profile ? scheduleFor(lead.profile.id, dateIso) : null;
+  const available = Boolean(lead.profile && isScheduleLeadAvailable(schedule));
+  return {
+    ...lead,
+    department: byId(state.departments, departmentId),
+    schedule,
+    available,
+    missing: !available
+  };
+}
+
+function leadAvailabilityForScopeDate(departmentId, dateIso) {
+  return departmentScopeIds(departmentId)
+    .filter((id) => childDepartmentsOf(id).length === 0 || state.profiles.some((profile) => profileDepartmentIds(profile).includes(id)))
+    .map((id) => leadAvailabilityForDepartmentDate(id, dateIso));
+}
+
+function unavailableLeadAssignmentsForProfile(profileId, dates) {
+  const departmentIds = profileDepartmentIds(byId(state.profiles, profileId));
+  return departmentIds.flatMap((departmentId) => dates.map((date) => {
+    const lead = departmentLeadForDate(departmentId, date);
+    if (lead.profile?.id !== profileId) return null;
+    const schedule = scheduleFor(profileId, date);
+    return isScheduleLeadAvailable(schedule) ? null : { departmentId, date, schedule };
+  }).filter(Boolean));
+}
+
+function assignedLeadDatesForProfile(profileId, dates) {
+  const departmentIds = profileDepartmentIds(byId(state.profiles, profileId));
+  return departmentIds.flatMap((departmentId) => dates.map((date) => {
+    const lead = departmentLeadForDate(departmentId, date);
+    return lead.profile?.id === profileId ? { departmentId, date } : null;
+  }).filter(Boolean));
+}
+
+function availableLeadCandidates(departmentId, dateIso, excludeProfileId = "") {
+  return leadCandidates(departmentId).filter((profile) =>
+    profile.id !== excludeProfileId && isScheduleLeadAvailable(scheduleFor(profile.id, dateIso))
+  );
+}
+
+function missingLeadInfo(departmentId, dateIso) {
+  const unavailable = leadAvailabilityForScopeDate(departmentId, dateIso).filter((lead) => lead.missing);
+  return {
+    missing: unavailable.length > 0,
+    items: unavailable,
+    label: unavailable.length === 1
+      ? "Lead missing"
+      : unavailable.length > 1 ? `${unavailable.length} leads missing` : ""
+  };
+}
+
+function openLeadPromptForAssignment(assignment, message) {
+  if (!assignment) return false;
+  ui.selectedDepartmentId = assignment.departmentId;
+  ui.activeView = "scheduler";
+  ui.drawer = { type: "lead", date: assignment.date, departmentId: assignment.departmentId };
+  if (message) {
+    ui.notice = message;
+    ui.noticeKind = "warning";
   }
+  return true;
+}
 
-  if (!rotation) return { id: "empty", label: "Unassigned", color: "#3f3f46", kind: "off", source: "No rotation" };
+function departmentLeadsForDate(departmentId, dateIso) {
+  return leadAvailabilityForScopeDate(departmentId, dateIso).filter((lead) => lead.profile && lead.available);
+}
 
-  return { ...rotationStatus, source: "Rotation", rotation, rotationStatus };
+function leadForProfileDate(profile, departmentId, dateIso) {
+  return leadAvailabilityForScopeDate(departmentId, dateIso)
+    .filter((lead) => profileBelongsToDepartment(profile, lead.department?.id))
+    .find((lead) => lead?.profile?.id === profile.id && lead.available);
+}
+
+function scheduleFor(profileId, dateIso) {
+  const schedule = scheduleForLogic(state, profileId, dateIso);
+  if (schedule.override?.statusId === "vacation" && /^Vacation request\b/i.test(schedule.override.note || "")) {
+    return { ...schedule, source: "Vacation request" };
+  }
+  return schedule;
+}
+
+function isManualOverrideSchedule(schedule) {
+  return schedule?.source === "Override";
+}
+
+function activeDrawerDepartmentId() {
+  return ui.drawer?.departmentId || ui.selectedDepartmentId;
 }
 
 function workdayCount(profileId, startIso, endIso) {
-  const days = dateDiff(startIso, endIso) + 1;
-  return Array.from({ length: days }, (_, index) => addDays(startIso, index)).filter((date) => scheduleFor(profileId, date).kind === "working").length;
+  return workdayCountLogic(state, profileId, startIso, endIso);
 }
 
 function coverageForDate(profiles, date) {
@@ -392,6 +676,7 @@ function render() {
   if (dataStore?.mode === "supabase" && !dataStore.session) {
     app.innerHTML = renderAuth();
     bindAuthEvents();
+    applyMutationPendingUi();
     return;
   }
 
@@ -410,6 +695,7 @@ function render() {
         ${navButton("scheduler", "Scheduler", icons.scheduler)}
         ${navButton("requests", "Requests", icons.requests)}
         ${navButton("people", "People", icons.people)}
+        ${navButton("hierarchy", "Hierarchy", icons.departments)}
         ${navButton("departments", "Departments", icons.departments)}
         ${navButton("rotations", "Rotations", icons.rotations)}
         ${navButton("activity", "Activity", icons.activity)}
@@ -483,7 +769,7 @@ function showFatalError(error) {
 function renderAppNotice() {
   if (!ui.notice || (dataStore?.mode === "supabase" && !dataStore.session)) return "";
   return `
-    <div class="app-notice" role="status">
+    <div class="app-notice ${ui.noticeKind || "info"}" role="status">
       <span>${ui.notice}</span>
       <button type="button" class="icon-button" id="dismiss-notice">${icons.close}</button>
     </div>
@@ -500,16 +786,16 @@ function renderAuth() {
         </div>
         <div>
           <span class="eyebrow">Supabase Sign In</span>
-          <h1>Claim your schedule profile</h1>
-          <p>Use the same email that was created on your employee profile.</p>
+          <h1>${appConfig.allowSignup ? "Claim your schedule profile" : "Sign in to your schedule"}</h1>
+          <p>${appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
         </div>
         ${ui.error ? `<p class="form-error">${ui.error}</p>` : ""}
         ${ui.notice ? `<p class="form-notice">${ui.notice}</p>` : ""}
         <label>Email<input name="email" type="email" autocomplete="email" required></label>
         <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
         <button class="primary wide" name="intent" value="sign-in">Sign In</button>
-        <button class="ghost wide" name="intent" value="sign-up">Create Account</button>
-        <p class="hint">After sign-in, the app links your account to the unclaimed profile with the same email.</p>
+        ${appConfig.allowSignup ? `<button class="ghost wide" name="intent" value="sign-up">Create Account</button>` : ""}
+        <p class="hint">${appConfig.allowSignup ? "After sign-in, the app links your account to the unclaimed profile with the same email." : "If your access is not ready, contact your administrator instead of creating another account."}</p>
       </form>
     </main>
   `;
@@ -524,6 +810,7 @@ function renderActiveView() {
   if (ui.activeView === "profile-page") return renderProfilePage();
   if (ui.activeView === "requests") return renderRequests();
   if (ui.activeView === "people") return renderPeople();
+  if (ui.activeView === "hierarchy") return renderHierarchy();
   if (ui.activeView === "departments") return renderDepartments();
   if (ui.activeView === "rotations") return renderRotations();
   if (ui.activeView === "activity") return renderActivity();
@@ -543,6 +830,7 @@ function renderMyProfile() {
     `;
   }
   const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "No department";
   const upcoming = datesInRange().slice(0, 7);
   return `
     ${renderTopbar("My Profile", "Your profile, vacation balance, and upcoming shifts.", `<button class="primary" data-open-drawer="profile" data-profile-id="${profile.id}">Edit My Profile</button>`)}
@@ -566,7 +854,7 @@ function renderMyProfile() {
         ${upcoming.map((date) => {
           const status = scheduleFor(profile.id, date);
           return `
-            <button class="request-row ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">
+            <button class="request-row ${status.id}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}">
               <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
               <div>
                 <strong>${formatDay(date)} ${formatDate(date)}</strong>
@@ -586,6 +874,7 @@ function renderProfilePage() {
   const profile = byId(state.profiles, ui.profileViewId) || currentProfile();
   if (!profile) return renderMyProfile();
   const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "No department";
   const vacationRequests = vacationRequestsForProfile(profile.id).slice(0, 6);
   const upcoming = datesInRange().slice(0, 7);
   const actions = `
@@ -595,7 +884,7 @@ function renderProfilePage() {
     </div>
   `;
   return `
-    ${renderTopbar(profile.name, `${profile.title} Â· ${department?.name || "No department"}`, actions)}
+    ${renderTopbar(profile.name, `${profile.title} · ${departmentSummary}`, actions)}
     <section class="profile-page-layout">
       <aside class="profile-page-side">
         ${renderProfileHero(profile)}
@@ -618,7 +907,7 @@ function renderProfilePage() {
           ${upcoming.map((date) => {
             const status = scheduleFor(profile.id, date);
             return `
-              <button class="request-row ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">
+              <button class="request-row ${status.id}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}">
                 <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
                 <div>
                   <strong>${formatDay(date)} ${formatDate(date)}</strong>
@@ -647,7 +936,8 @@ function renderProfilePage() {
 }
 
 function renderProfileHero(profile) {
-  const department = byId(state.departments, profile.departmentId);
+  const departments = profileDepartmentNames(profile);
+  const departmentSummary = departments.join(", ") || "No department";
   const role = profile.userId ? roleForProfile(profile) : "unclaimed";
   return `
     <article class="profile-hero-card">
@@ -655,11 +945,11 @@ function renderProfileHero(profile) {
       <div>
         <span class="eyebrow">${role}</span>
         <h2>${profile.name}</h2>
-        <p>${profile.employeeId} - ${profile.title} - ${department?.name || "No department"}</p>
+        <p>${profile.employeeId} - ${profile.title} - ${departmentSummary}</p>
         <div class="profile-tags">
           <span>${role}</span>
           <span>${profile.userId ? "claimed" : "unclaimed"}</span>
-          <span>${department?.name || "no department"}</span>
+          ${departments.length ? departments.map((department) => `<span>${department}</span>`).join("") : `<span>no department</span>`}
         </div>
       </div>
     </article>
@@ -673,7 +963,7 @@ function renderProfileQuickStats(profile) {
   const monthSchedules = monthDates.map((date) => scheduleFor(profile.id, date));
   const workDays = monthSchedules.filter((schedule) => schedule.kind === "working" && schedule.id !== "ground").length;
   const leaveDays = monthSchedules.filter((schedule) => schedule.kind === "leave").length;
-  const manualDays = monthDates.filter((date) => scheduleFor(profile.id, date).source === "Override").length;
+  const manualDays = monthDates.filter((date) => isManualOverrideSchedule(scheduleFor(profile.id, date))).length;
   return `
     <div class="profile-stat-grid">
       <article><span>Vacation</span><strong>${profile.remainingVacationDays}</strong><em>of ${profile.yearlyVacationDays}</em></article>
@@ -684,7 +974,7 @@ function renderProfileQuickStats(profile) {
 }
 
 function renderProfileInfoCards(profile, density = "regular") {
-  const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "None";
   const role = profile.userId ? roleForProfile(profile) : "Unclaimed";
   const rotation = latestRotationForProfile(profile.id);
   const nextWorkingDate = datesBetween(todayIso, addDays(todayIso, 30)).find((date) => {
@@ -697,7 +987,7 @@ function renderProfileInfoCards(profile, density = "regular") {
   return `
     <section class="profile-info-grid ${density}">
       <article class="profile-info-card">
-        <div class="profile-card-head"><span>Department</span><em>${department?.name || "None"}</em></div>
+        <div class="profile-card-head"><span>Departments</span><em>${departmentSummary}</em></div>
         <strong>${profile.title}</strong>
         <small>${profile.email}</small>
       </article>
@@ -733,7 +1023,7 @@ function renderPersonMonthCalendar(profile, placement = "drawer") {
   const monthSchedules = cells.filter(Boolean).map((date) => scheduleFor(profile.id, date));
   const workingDays = monthSchedules.filter((schedule) => schedule.kind === "working" && schedule.id !== "ground").length;
   const leaveDays = monthSchedules.filter((schedule) => schedule.kind === "leave").length;
-  const manualDays = cells.filter(Boolean).filter((date) => scheduleFor(profile.id, date).source === "Override").length;
+  const manualDays = cells.filter(Boolean).filter((date) => isManualOverrideSchedule(scheduleFor(profile.id, date))).length;
   return `
     <section class="person-calendar ${placement}">
       <div class="calendar-head">
@@ -770,13 +1060,17 @@ function renderCalendarDay(profile, date) {
   const schedule = scheduleFor(profile.id, date);
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
+  const isSelected = ui.drawer?.type === "calendar-day"
+    && ui.drawer.profileId === profile.id
+    && ui.drawer.date === date;
   const sourceClass = schedule.source.toLowerCase().replace(/\s+/g, "-");
   const dayClass = schedule.id === "ground" ? "away" : schedule.kind;
   const weekendClass = weekdayIndex(date) >= 5 ? "weekend-day" : "";
-  const calendarClass = `month-day ${dayClass} ${schedule.id} ${sourceClass} ${weekendClass} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""}`;
+  const calendarClass = `month-day ${dayClass} ${schedule.id} ${sourceClass} ${weekendClass} ${approvedVacation ? "approved-vacation" : ""} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
   return `
-    <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" title="${schedule.label} - ${schedule.source}">
+    <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${schedule.label} - ${schedule.source}">
       <span>${parseDate(date).getDate()}</span>
+      ${date === todayIso ? `<small class="today-label">Today</small>` : ""}
       <em>${statusIcons[schedule.id] || icons.scheduler}</em>
       ${pendingVacation ? `<i class="day-marker pending"></i>` : ""}
       ${approvedVacation ? `<i class="day-marker approved"></i>` : ""}
@@ -800,29 +1094,14 @@ function renderTopbar(title, subtitle, action = "") {
 function renderScheduler() {
   const dates = datesInRange();
   const profiles = departmentProfiles();
+  const coverageProfiles = departmentProfiles({ applyScheduleFilter: false });
   const department = byId(state.departments, ui.selectedDepartmentId);
   if (!department) {
     return renderTopbar("No Departments", "Create at least one department in Supabase before building schedules.", "");
   }
-  const action = `
-    <div class="top-actions">
-      <select id="department-select">
-        ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
-      </select>
-      <select id="range-select">
-        <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>Week</option>
-        <option value="14" ${ui.rangeDays === 14 ? "selected" : ""}>2 Weeks</option>
-        <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>Month</option>
-      </select>
-      <button class="ghost" id="prev-range">Previous</button>
-      <button class="ghost" id="today-range">Today</button>
-      <button class="ghost" id="next-range">Next</button>
-      ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
-    </div>
-  `;
 
   return `
-    ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.", action)}
+    ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.")}
     <section class="control-row">
       ${filterButton("all", "All people")}
       ${filterButton("leads", "Leads")}
@@ -830,13 +1109,38 @@ function renderScheduler() {
       ${filterButton("vacation", "On vacation")}
     </section>
     <section class="scheduler-shell">
-      <div class="schedule-grid" style="--days: ${dates.length}">
+      <div class="schedule-grid ${schedulerRangeClass()}" style="--days: ${dates.length}">
+        <div class="month-corner">
+          <select id="department-select" title="Department">
+            ${departmentOptions(ui.selectedDepartmentId)}
+          </select>
+        </div>
+        <div class="scheduler-month-bar">
+          <div class="month-title-control">
+            <button class="ghost icon-button" id="month-prev-range" title="Previous range">${icons.chevron}</button>
+            <strong>${schedulerMonthLabel(dates)}</strong>
+            <button class="ghost icon-button" id="month-next-range" title="Next range">${icons.chevron}</button>
+          </div>
+          <label class="bar-date-control">Start <input id="schedule-start-date" type="date" value="${ui.startDate}"></label>
+          <button class="ghost" id="month-start-range">Month Start</button>
+          <button class="ghost icon-button" id="zoom-in-range" title="Zoom in">${icons.plus}</button>
+          <select id="range-select" title="Schedule zoom">
+            <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>1 Week</option>
+            <option value="14" ${ui.rangeDays === 14 ? "selected" : ""}>2 Weeks</option>
+            <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>1 Month</option>
+          </select>
+          <select id="schedule-status-filter" title="Schedule filter">
+            ${scheduleFilterOptions()}
+          </select>
+          <button class="ghost icon-button" id="zoom-out-range" title="Zoom out">${icons.minus}</button>
+          <button class="ghost" id="today-range">Today</button>
+        </div>
         <div class="employee-head">
           <span>People</span>
           <strong>${profiles.length} profiles</strong>
         </div>
         ${dates.map((date) => renderDateHead(date)).join("")}
-        ${renderCoverageRow(profiles, dates, department)}
+        ${renderCoverageRow(coverageProfiles, dates, department)}
         ${profiles.map((profile) => renderProfileRow(profile, dates)).join("")}
       </div>
     </section>
@@ -853,19 +1157,37 @@ function renderCoverageRow(profiles, dates, department) {
     ${dates.map((date) => {
       const coverage = coverageForDate(profiles, date);
       const isLow = coverage.available < target;
+      const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
+      const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
       return `
-        <button class="coverage-cell ${isLow ? "low" : ""}" data-open-drawer="coverage" data-date="${date}">
+        <button class="coverage-cell ${isLow ? "low" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${leadInfo.missing ? "lead" : "coverage"}" data-date="${date}" data-department-id="${leadDepartmentId}">
           <span class="coverage-count">${coverage.available}</span>
           <span class="coverage-meta">avail</span>
-          <small>${coverage.unavailable} off · ${coverage.away} ground</small>
+          <small>${leadInfo.missing ? leadInfo.label : `${coverage.unavailable} off - ${coverage.away} ground`}</small>
         </button>
       `;
     }).join("")}
   `;
 }
-
 function filterButton(id, label) {
   return `<button class="segment ${ui.selectedFilter === id ? "active" : ""}" data-filter="${id}">${label}</button>`;
+}
+
+function scheduleFilterOptions() {
+  const options = [
+    ["all", "All shifts"],
+    ["available", "Available"],
+    ["unavailable", "Unavailable"],
+    ["morning", "Morning"],
+    ["midday", "Mid-day"],
+    ["night", "Night"],
+    ["weekend", "Weekend"],
+    ["vacation", "Vacation"],
+    ["sick", "Sick"],
+    ["ground", "On Ground"],
+    ["manual", "Manual changes"]
+  ];
+  return options.map(([id, label]) => `<option value="${id}" ${ui.scheduleStatusFilter === id ? "selected" : ""}>${label}</option>`).join("");
 }
 
 function requestFilterButton(id, label, count) {
@@ -876,18 +1198,28 @@ function peopleViewButton(id, label) {
   return `<button class="segment ${ui.peopleView === id ? "active" : ""}" data-people-view="${id}">${label}</button>`;
 }
 
+function departmentViewButton(id, label) {
+  return `<button class="segment ${ui.departmentView === id ? "active" : ""}" data-department-view="${id}">${label}</button>`;
+}
+
 function coverageTargetForDepartment(department) {
   return Number(department?.coverageTarget ?? coverageTargets[department?.id] ?? 1);
 }
 
 function renderDateHead(date) {
-  const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === date);
-  const leadProfile = byId(state.profiles, lead?.profileId);
+  const leads = departmentLeadsForDate(ui.selectedDepartmentId, date);
+  const isToday = date === todayIso;
+  const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
+  const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
+  const drawerType = leadInfo.missing ? "lead" : "coverage";
+  const leadLabel = leads.length > 1
+    ? `${leads.length} leads`
+    : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
   return `
-    <button class="date-head ${date === todayIso ? "today" : ""}" data-open-drawer="lead" data-date="${date}">
-      <span>${formatDay(date)}</span>
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}">
+      <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
-      <em>${leadProfile ? `Lead: ${leadProfile.name.split(" ")[0]}` : "No lead"}</em>
+      <em>${leadLabel}</em>
     </button>
   `;
 }
@@ -908,15 +1240,20 @@ function renderProfileRow(profile, dates) {
 function renderShiftCell(profile, date) {
   const status = scheduleFor(profile.id, date);
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
+  const lead = leadForProfileDate(profile, ui.selectedDepartmentId, date);
+  const isDayLead = lead?.profile?.id === profile.id;
   const icon = statusIcons[status.id] || icons.scheduler;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
-  const availabilityLabel = availabilityState === "state-working" ? "Available" : "Unavailable";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
+  const filterClass = scheduleMatchesFilter(status)
+    ? ui.scheduleStatusFilter === "all" ? "" : "filtered-match"
+    : "filtered-out";
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
       <span class="shift-icon">${icon}</span>
+      ${isDayLead ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status.label}</span>
-      <small><span class="availability-badge">${availabilityLabel}</span>${status.source}</small>
+      <small>${status.source}</small>
       ${pendingVacation ? `<span class="cell-alert">Pending vacation</span>` : ""}
     </button>
   `;
@@ -963,7 +1300,7 @@ function renderRequestRow(request) {
 function renderPeople() {
   const profiles = ui.peopleDepartmentId === "all"
     ? state.profiles
-    : state.profiles.filter((profile) => profile.departmentId === ui.peopleDepartmentId);
+    : state.profiles.filter((profile) => profileBelongsToDepartment(profile, ui.peopleDepartmentId));
   const action = `
     <div class="top-actions">
       <div class="people-view-switch">
@@ -974,7 +1311,7 @@ function renderPeople() {
       </div>
       <select id="people-department-select">
         <option value="all" ${ui.peopleDepartmentId === "all" ? "selected" : ""}>All departments</option>
-        ${state.departments.map((department) => `<option value="${department.id}" ${ui.peopleDepartmentId === department.id ? "selected" : ""}>${department.name}</option>`).join("")}
+        ${state.departments.map((department) => `<option value="${department.id}" ${ui.peopleDepartmentId === department.id ? "selected" : ""}>${departmentLabel(department)}</option>`).join("")}
       </select>
       ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
     </div>
@@ -997,10 +1334,10 @@ function renderPeopleDepartmentGroups(profiles, selectedDepartment = null) {
   const departments = selectedDepartment ? [selectedDepartment] : state.departments;
   const groups = departments.map((department) => renderPeopleGroup(
     department?.name || "Department",
-    profiles.filter((profile) => profile.departmentId === department?.id),
+    profiles.filter((profile) => profileBelongsToDepartment(profile, department?.id)),
     department
   ));
-  const unassigned = profiles.filter((profile) => !byId(state.departments, profile.departmentId));
+  const unassigned = profiles.filter((profile) => !profileDepartmentIds(profile).some((id) => byId(state.departments, id)));
   if (!selectedDepartment && unassigned.length) groups.push(renderPeopleGroup("Unassigned", unassigned));
   return `<section class="people-department-stack">${groups.join("")}</section>`;
 }
@@ -1011,10 +1348,10 @@ function peopleGroupsForView(profiles, selectedDepartment = null) {
     id: department?.id || "department",
     label: department?.name || "Department",
     department,
-    profiles: profiles.filter((profile) => profile.departmentId === department?.id)
+    profiles: profiles.filter((profile) => profileBelongsToDepartment(profile, department?.id))
   }));
   if (!selectedDepartment) {
-    const unassigned = profiles.filter((profile) => !byId(state.departments, profile.departmentId));
+    const unassigned = profiles.filter((profile) => !profileDepartmentIds(profile).some((id) => byId(state.departments, id)));
     if (unassigned.length) groups.push({ id: "unassigned", label: "Unassigned", department: null, profiles: unassigned });
   }
   return groups;
@@ -1132,14 +1469,21 @@ function renderPersonTile(profile) {
 
 function renderDepartments() {
   const dates = datesInRange();
+  const ordered = orderedDepartments();
   return `
     ${renderTopbar("Departments", "Create departments, review team size, and jump into each schedule.", canManageDepartments() ? `<button class="primary" data-open-drawer="department">${icons.plus} New Department</button>` : "")}
-    <section class="department-grid">
-      ${state.departments.map((department) => renderDepartmentCard(department, dates)).join("")}
+    <section class="control-row people-view-switch">
+      ${departmentViewButton("tiles", "Tiles")}
+      ${departmentViewButton("details", "Details")}
+    </section>
+    <section class="${ui.departmentView === "details" ? "department-details-list" : "department-grid"}">
+      ${ui.departmentView === "details"
+        ? ordered.map(({ department, depth }) => renderDepartmentDetailRow(department, dates, depth)).join("")
+        : ordered.map(({ department, depth }) => renderDepartmentCard(department, dates, depth)).join("")}
       <template>
       ${state.departments.map((department) => {
-        const members = state.profiles.filter((profile) => profile.departmentId === department.id);
-        const leadCount = dates.filter((date) => state.departmentLeads.some((lead) => lead.departmentId === department.id && lead.date === date)).length;
+        const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
+        const leadCount = dates.filter((date) => departmentLeadForDate(department.id, date).profile).length;
         return `
           <button class="metric-card" data-open-drawer="department-detail" data-department-id="${department.id}">
             <span class="eyebrow">${department.name}</span>
@@ -1154,38 +1498,76 @@ function renderDepartments() {
 }
 
 function departmentStats(department, dates = datesInRange()) {
-  const members = state.profiles.filter((profile) => profile.departmentId === department.id);
-  const leadCount = dates.filter((date) => state.departmentLeads.some((lead) => lead.departmentId === department.id && lead.date === date)).length;
+  const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
+  const leadCount = dates.reduce((count, date) => count + departmentLeadsForDate(department.id, date).length, 0);
   const pendingRequests = state.vacationRequests.filter((request) => {
     const profile = byId(state.profiles, request.profileId);
-    return profile?.departmentId === department.id && request.status === "pending";
+    return profile && profileBelongsToDepartment(profile, department.id) && request.status === "pending";
   }).length;
   const rotations = state.rotationVersions.filter((rotation) => members.some((profile) => profile.id === rotation.profileId)).length;
   const unclaimed = members.filter((profile) => !profile.userId).length;
   return { members, leadCount, pendingRequests, rotations, unclaimed, target: coverageTargetForDepartment(department) };
 }
 
-function renderDepartmentCard(department, dates) {
+function renderDepartmentCard(department, dates, depth = 0) {
   const stats = departmentStats(department, dates);
+  const children = childDepartmentsOf(department.id);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  const isSubDepartment = Boolean(parent);
+  const isExpanded = ui.expandedDepartmentIds.includes(department.id);
+  const compactClass = isSubDepartment && !isExpanded ? "is-compact" : "";
   return `
-    <article class="department-card">
+    <article class="department-card ${depth ? "sub-department-card" : children.length ? "parent-department-card" : ""} ${compactClass}" style="--department-depth: ${depth}">
       <button class="department-card-main" data-open-drawer="department-detail" data-department-id="${department.id}">
         <div class="department-card-head">
-          <span class="eyebrow">Department</span>
+          <span class="department-kind">${parent ? "Sub-department" : "Department"}</span>
           <strong>${department.name}</strong>
+          ${parent ? `<em>${parent.name}</em>` : children.length ? `<em>${children.length} child ${children.length === 1 ? "department" : "departments"}</em>` : ""}
         </div>
+        ${isSubDepartment ? `<div class="department-compact-line"><span>${stats.members.length} members</span><span>${stats.leadCount}/${dates.length} leads</span></div>` : ""}
         <div class="department-card-stats">
           <span><strong>${stats.members.length}</strong> members</span>
           <span><strong>${stats.target}</strong> target</span>
           <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
           <span><strong>${stats.pendingRequests}</strong> pending</span>
         </div>
-        <p>${stats.unclaimed} unclaimed profiles - ${stats.rotations} rotation versions</p>
+        <p>${children.length ? `${children.length} sub-${children.length === 1 ? "department" : "departments"} - ` : ""}${stats.unclaimed} unclaimed profiles - ${stats.rotations} rotation versions</p>
+        ${children.length ? `
+          <div class="department-child-strip">
+            ${children.map((child) => {
+              const childStats = departmentStats(child, dates);
+              return `<span><strong>${child.name}</strong><small>${childStats.members.length} members</small></span>`;
+            }).join("")}
+          </div>
+        ` : ""}
       </button>
       <div class="department-card-actions">
+        ${isSubDepartment ? `<button type="button" class="ghost compact-toggle" data-toggle-department-card="${department.id}">${isExpanded ? "Collapse" : "Expand"}</button>` : ""}
         ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
       </div>
     </article>
+  `;
+}
+
+function renderDepartmentDetailRow(department, dates, depth = 0) {
+  const stats = departmentStats(department, dates);
+  const children = childDepartmentsOf(department.id);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  return `
+    <button class="department-detail-row ${depth ? "is-child" : ""}" style="--department-depth: ${depth}" data-open-drawer="department-detail" data-department-id="${department.id}">
+      <div class="department-tree-name">
+        <span class="tree-rail"></span>
+        <div>
+          <em>${parent ? `${parent.name} /` : "Top level"}</em>
+          <strong>${department.name}</strong>
+        </div>
+      </div>
+      <span><strong>${stats.members.length}</strong> members</span>
+      <span><strong>${stats.target}</strong> target</span>
+      <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
+      <span><strong>${children.length}</strong> sub-depts</span>
+      <small>${stats.unclaimed} unclaimed - ${stats.rotations} rotation versions</small>
+    </button>
   `;
 }
 
@@ -1198,9 +1580,14 @@ function renderRotations() {
     ${renderTopbar("Rotations", "Weekly rotation templates by department. Each column maps to a real weekday.", `
       <div class="top-actions">
         <select id="department-select">
-          ${state.departments.map((item) => `<option value="${item.id}" ${item.id === ui.selectedDepartmentId ? "selected" : ""}>${item.name}</option>`).join("")}
+          ${departmentOptions(ui.selectedDepartmentId)}
         </select>
-        ${canEditDepartmentRotations ? `<button class="primary" data-open-drawer="rotation">${icons.plus} New Rotation</button>` : ""}
+        ${canEditDepartmentRotations ? `
+          <button class="ghost" data-open-drawer="rotation">${icons.plus} New Rotation</button>
+          <button class="${ui.rotationDepartmentEdit ? "ghost" : "primary"}" id="toggle-department-rotation-edit">
+            ${ui.rotationDepartmentEdit ? `${icons.close} Cancel Edit` : `${icons.plus} Edit Department`}
+          </button>
+        ` : ""}
       </div>
     `)}
     <section class="rotation-overview">
@@ -1217,6 +1604,8 @@ function renderRotations() {
         <span><strong>${stats.nextEffective || "None"}</strong> next start</span>
       </div>
     </section>
+    ${renderLeadRotationPanel(department)}
+    ${ui.rotationDepartmentEdit ? renderDepartmentRotationToolbar(profiles) : ""}
     <section class="rotation-board">
       <div class="rotation-grid">
         <div class="rotation-head">
@@ -1257,37 +1646,185 @@ function renderRotationRow(profile) {
   const rotation = latestRotationForProfile(profile.id);
   const pattern = rotation ? sanitizeRotationPattern(rotation.pattern) : Array.from({ length: 7 });
   const missingClass = rotation ? "" : " missing";
+  const isSelected = ui.selectedRotationProfileIds.includes(profile.id);
+  const personContent = `
+    <div class="avatar">${avatar(profile)}</div>
+    <div class="rotation-person-meta">
+      <strong>${profile.name}</strong>
+      <span>${rotation ? `Effective ${rotation.effectiveStart}` : "Missing weekly pattern"}</span>
+    </div>
+    ${rotation ? "" : `<mark>Setup</mark>`}
+  `;
   return `
-    <button class="employee-cell rotation-person${missingClass}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
-      <div class="avatar">${avatar(profile)}</div>
-      <div class="rotation-person-meta">
-        <strong>${profile.name}</strong>
-        <span>${rotation ? `Effective ${rotation.effectiveStart}` : "Missing weekly pattern"}</span>
-      </div>
-      ${rotation ? "" : `<mark>Setup</mark>`}
-    </button>
-    ${pattern.map((statusId) => renderRotationCell(profile, rotation, statusId)).join("")}
+    ${ui.rotationDepartmentEdit ? `
+      <label class="employee-cell rotation-person rotation-person-selectable${missingClass}${isSelected ? " selected" : ""}">
+        <input type="checkbox" data-rotation-profile-select="${profile.id}" ${isSelected ? "checked" : ""}>
+        ${personContent}
+      </label>
+    ` : `
+      <button class="employee-cell rotation-person${missingClass}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
+        ${personContent}
+      </button>
+    `}
+    ${pattern.map((statusId, index) => renderRotationCell(profile, rotation, statusId, index)).join("")}
   `;
 }
 
-function renderRotationCell(profile, rotation, statusId) {
+function renderHierarchy() {
+  const levels = [
+    ["manager", "Managers"],
+    ["lead", "Department Leads"],
+    ["senior", "Senior"],
+    ["mid", "Mid-level"],
+    ["junior", "Junior"]
+  ];
+  const visibleDepartments = selectedHierarchyDepartments();
+  const unassignedProfiles = state.profiles.filter((profile) => !profileDepartmentIds(profile).length);
+  const departmentSections = [
+    ...visibleDepartments.map((department) => {
+      const profiles = hierarchyProfilesForDepartment(department.id);
+      return {
+        id: department.id,
+        name: department.name,
+        meta: `${profiles.length} ${profiles.length === 1 ? "person" : "people"}`,
+        profiles
+      };
+    }),
+    ...(unassignedProfiles.length && visibleDepartments.length === state.departments.length ? [{
+      id: "unassigned",
+      name: "Unassigned",
+      meta: `${unassignedProfiles.length} ${unassignedProfiles.length === 1 ? "person" : "people"}`,
+      profiles: unassignedProfiles
+    }] : [])
+  ];
+  const action = `
+    <div class="top-actions compact-actions hierarchy-filters">
+      <button class="segment" data-hierarchy-select="all">All</button>
+      <button class="segment" data-hierarchy-select="none">Clear</button>
+      ${state.departments.map((department) => `
+        <button class="segment ${ui.hierarchyDepartmentIds.includes(department.id) ? "active" : ""}" data-hierarchy-department-filter="${department.id}">
+          ${departmentLabel(department)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+  return `
+    ${renderTopbar("Hierarchy", "Pick one or more departments and view people by seniority inside each.", action)}
+    <section class="hierarchy-board">
+      ${departmentSections.length ? departmentSections.map((section) => renderHierarchyDepartment(section, levels)).join("") : `<div class="empty-state"><strong>No departments selected</strong><span>Choose one or more departments above.</span></div>`}
+    </section>
+  `;
+}
+
+function renderHierarchyDepartment(section, levels) {
+  return `
+    <section class="hierarchy-department" data-hierarchy-department="${section.id}">
+      <div class="hierarchy-department-head">
+        <span class="eyebrow">Department</span>
+        <strong>${section.name}</strong>
+        <small>${section.meta}</small>
+      </div>
+      <div class="hierarchy-levels">
+        ${levels.map(([level, label], index) => {
+          const profiles = section.profiles.filter((profile) => (profile.seniorityLevel || "mid") === level);
+          return `
+            <section class="hierarchy-level level-${level}">
+              <div class="hierarchy-level-head">
+                <span>${String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <strong>${label}</strong>
+                  <small>${profiles.length} ${profiles.length === 1 ? "person" : "people"}</small>
+                </div>
+              </div>
+              <div class="hierarchy-people">
+                ${profiles.length ? profiles.map((profile) => renderHierarchyPerson(profile, section.id)).join("") : `<span class="hierarchy-empty">No people assigned</span>`}
+              </div>
+            </section>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderHierarchyPerson(profile, activeDepartmentId) {
+  const departments = profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
+  const activeDepartmentName = byId(state.departments, activeDepartmentId)?.name;
+  const otherDepartments = activeDepartmentName ? departments.filter((department) => department !== activeDepartmentName) : departments;
+  return `
+    <button class="hierarchy-person" data-open-drawer="person" data-profile-id="${profile.id}">
+      <div class="avatar">${avatar(profile)}</div>
+      <div>
+        <strong>${profile.name}</strong>
+        <span>${profile.title}</span>
+      </div>
+      <div class="hierarchy-departments">
+        ${activeDepartmentName ? `<em>${activeDepartmentName}</em>` : ""}
+        ${otherDepartments.length ? otherDepartments.map((department) => `<em>${department}</em>`).join("") : activeDepartmentName ? "" : `<em>Unassigned</em>`}
+      </div>
+    </button>
+  `;
+}
+
+function renderLeadRotationPanel(department) {
+  if (!department) return "";
+  const candidates = leadCandidates(department.id);
+  const rotation = latestLeadRotation(department.id);
+  const fallbackId = candidates[0]?.id || "";
+  const pattern = Array.from({ length: 7 }, (_, index) => rotation?.pattern?.[index] || fallbackId);
+  const canEdit = canManageDepartment(department.id);
+  return `
+    <form class="lead-rotation-panel" id="lead-rotation-form">
+      <div class="lead-rotation-head">
+        <div>
+          <span class="eyebrow">Department Lead Rotation</span>
+          <strong>${rotation ? `Effective ${formatDay(rotation.effectiveStart)} ${formatDate(rotation.effectiveStart)}` : "No weekly lead rotation"}</strong>
+          <p>Choose the default lead for each weekday. Scheduler day assignments override this pattern.</p>
+        </div>
+        <label>Effective start<input type="date" name="effectiveStart" value="${rotation?.effectiveStart || todayIso}" ${canEdit ? "" : "disabled"} required></label>
+      </div>
+      ${candidates.length ? `
+        <div class="lead-rotation-days">
+          ${weekDays.map((day, index) => `
+            <label>
+              <span>${day}</span>
+              <select name="lead-${index}" ${canEdit ? "" : "disabled"}>
+                ${candidates.map((profile) => `<option value="${profile.id}" ${pattern[index] === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}
+              </select>
+            </label>
+          `).join("")}
+        </div>
+        <button class="primary" ${canEdit ? "" : "disabled"}>Save Lead Rotation</button>
+      ` : `
+        <div class="empty-state compact">
+          <strong>No department members</strong>
+          <span>Add people to this department before setting a lead rotation.</span>
+        </div>
+      `}
+    </form>
+  `;
+}
+
+function renderRotationCell(profile, rotation, statusId, weekday = 0) {
+  const isLeadSlot = leadForProfileWeekday(profile, ui.selectedDepartmentId, weekday)?.id === profile.id;
   if (!rotation) {
     return `
       <button class="rotation-cell shift-cell state-off missing" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="">
         <span class="shift-icon">${icons.scheduler}</span>
+        ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
         <span class="shift-label">No template</span>
-        <small><span class="availability-badge">Missing</span>Template</small>
+        <small>Template</small>
       </button>
     `;
   }
   const status = byId(state.statuses, statusId) || byId(state.statuses, "weekend");
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
-  const availabilityLabel = availabilityState === "state-working" ? "Available" : "Unavailable";
   return `
     <button class="rotation-cell shift-cell ${availabilityState} ${status?.id || ""}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
       <span class="shift-icon">${statusIcons[status?.id] || icons.scheduler}</span>
+      ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status?.label || "Unassigned"}</span>
-      <small><span class="availability-badge">${availabilityLabel}</span>Template</small>
+      <small>Template</small>
     </button>
   `;
 }
@@ -1493,13 +2030,14 @@ function renderMiniActivity(entries) {
 
 function renderDrawer() {
   if (!ui.drawer) return "";
+  const isCreation = isCreationDrawer();
   const titleMap = {
     shift: "Shift Override",
     person: "Employee Profile",
-    profile: "New Profile",
+    profile: ui.drawer.profileId ? "Edit Profile" : "New Profile",
     request: "New Vacation",
     "request-detail": "Vacation Request",
-    lead: "Day Editor",
+    lead: "Lead Assignment",
     "calendar-day": "Day Details",
     coverage: "Coverage",
     department: "New Department",
@@ -1512,17 +2050,23 @@ function renderDrawer() {
   };
 
   return `
-    <aside class="drawer open">
+    <aside class="drawer open ${isCreation ? "creation-modal" : "edit-sidebar"}" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
       <div class="drawer-head">
         <div>
-          <span class="eyebrow">Details</span>
-          <h2>${titleMap[ui.drawer.type]}</h2>
+          <span class="eyebrow">${isCreation ? "Create" : "Details"}</span>
+          <h2 id="drawer-title">${titleMap[ui.drawer.type]}</h2>
         </div>
         <button class="icon-button" id="close-drawer">${icons.close}</button>
       </div>
       ${drawerBody()}
     </aside>
   `;
+}
+
+function isCreationDrawer() {
+  if (!ui.drawer) return false;
+  if (ui.drawer.type === "profile") return !ui.drawer.profileId;
+  return ["request", "department", "department-member", "rotation", "status", "lead"].includes(ui.drawer.type);
 }
 
 function drawerBody() {
@@ -1543,7 +2087,7 @@ function drawerBody() {
 
 function coverageDrawer() {
   const department = byId(state.departments, ui.selectedDepartmentId);
-  const profiles = state.profiles.filter((profile) => profile.departmentId === ui.selectedDepartmentId);
+  const profiles = state.profiles.filter((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId));
   const groups = coverageGroupsForDate(profiles, ui.drawer.date);
   const target = coverageTargetForDepartment(department);
   return `
@@ -1591,7 +2135,11 @@ function shiftDrawer() {
     <form id="shift-form" class="drawer-form">
       <div class="person-summary">
         <div class="avatar large">${avatar(profile)}</div>
-        <div><strong>${profile.name}</strong><span>${ui.drawer.date} · ${schedule.source}</span></div>
+        <div class="person-summary-copy">
+          <strong>${profile.name}</strong>
+          <span>${formatDay(ui.drawer.date)} ${formatDate(ui.drawer.date)}</span>
+          <small>${schedule.source}</small>
+        </div>
       </div>
       ${pendingVacation ? `
         <button type="button" class="request-context pending" data-open-drawer="request-detail" data-request-id="${pendingVacation.id}">
@@ -1609,7 +2157,7 @@ function shiftDrawer() {
         <label>Apply to<input name="endDate" type="date" value="${ui.drawer.date}" ${canEdit ? "" : "disabled"}></label>
       </div>
       <label>Note<textarea name="note" ${canEdit ? "" : "disabled"}>${schedule.note || ""}</textarea></label>
-      <p class="hint">${canEdit ? "Saving creates a manual daily change. Vacation, Sick, and On Ground live here, not in rotations." : "This date or department is locked for your role."}</p>
+      <p class="hint">${canEdit ? "Saving creates a manual daily change. Sick and On Ground live here; vacations are approved through requests." : "This date or department is locked for your role."}</p>
       <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Daily Change</button>
       ${canManageDepartment(profile.departmentId) ? `<button type="button" class="ghost wide" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">${rotation ? "Edit Weekly Rotation" : "Create Weekly Rotation"}</button>` : ""}
       <button type="button" class="danger wide" id="clear-override" ${canEdit && existingOverride ? "" : "disabled"}>Clear Override</button>
@@ -1636,7 +2184,7 @@ function renderDailyStatusGroups(inputName, selectedStatusId, canEdit) {
 
 function personDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
-  const department = byId(state.departments, profile.departmentId);
+  const departmentSummary = profileDepartmentNames(profile).join(", ") || "Unassigned";
   const vacationRequests = vacationRequestsForProfile(profile.id).slice(0, 4);
   const history = relatedAuditEntries((entry) => entry.entityId === profile.id || entry.detail.includes(profile.email) || entry.detail.includes(profile.name));
   return `
@@ -1645,8 +2193,9 @@ function personDrawer() {
         <div class="avatar large">${avatar(profile)}</div>
         <div><strong>${profile.name}</strong><span>${profile.employeeId} · ${profile.title}</span></div>
       </div>
-      <div class="detail-line"><span>Department</span><strong>${department?.name || "Unassigned"}</strong></div>
+      <div class="detail-line"><span>Departments</span><strong>${departmentSummary}</strong></div>
       <div class="detail-line"><span>Email</span><strong>${profile.email}</strong></div>
+      <div class="detail-line"><span>Seniority</span><strong>${seniorityLevels.find(([id]) => id === profile.seniorityLevel)?.[1] || "Mid-level"}</strong></div>
       <div class="detail-line"><span>Role</span><strong>${profile.userId ? roleForProfile(profile) : "Unclaimed"}</strong></div>
       <div class="detail-line"><span>Vacation</span><strong>${profile.remainingVacationDays} / ${profile.yearlyVacationDays}</strong></div>
       <div class="detail-line"><span>Claiming</span><strong>${profile.userId ? "Account linked" : "Waiting for matching sign-in"}</strong></div>
@@ -1659,6 +2208,7 @@ function personDrawer() {
       ${canManageProfiles() && profile.departmentId ? `<button type="button" class="ghost wide" id="remove-department">Remove From Department</button>` : ""}
       ${canRequestVacationFor(profile) ? `<button class="ghost wide" data-open-drawer="request" data-profile-id="${profile.id}">Create Vacation Request</button>` : ""}
       ${canManageProfiles() && profile.userId ? `<button class="danger wide" id="unlink-profile">Unlink Account</button>` : ""}
+      ${canManageProfiles() ? `<button type="button" class="danger wide" id="delete-profile">Delete Profile</button>` : ""}
       <div class="mini-activity">
         <span class="eyebrow">Vacation Requests</span>
         ${vacationRequests.length ? vacationRequests.map((request) => `
@@ -1687,24 +2237,36 @@ function profileDrawer() {
           <span>${canEditPhoto ? "Drop an image here or choose from your PC." : "Photo editing is locked for your role."}</span>
         </div>
         <input id="photo-input" type="file" accept="image/*" ${canEditPhoto ? "" : "disabled"}>
-        <input name="photo" type="hidden" value="${profile?.photo || ""}">
+        <input name="photoRef" type="hidden" value="${profile?.photoRef || profile?.photo || ""}">
       </div>
       <label>Name<input name="name" required placeholder="Employee name" value="${profile?.name || ""}" ${canEdit ? "" : "disabled"}></label>
       <label>Email<input name="email" type="email" required placeholder="employee@sport360.test" value="${profile?.email || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <label>Title<input name="title" required placeholder="Agent" value="${profile?.title || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <label>Employee ID<input name="employeeId" required placeholder="SCH-100" value="${profile?.employeeId || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <label>Department<select name="departmentId" ${canEditAdminFields ? "" : "disabled"}>
-        <option value="" ${!(profile?.departmentId || ui.drawer.departmentId) ? "selected" : ""}>Unassigned</option>
-        ${state.departments.map((department) => `<option value="${department.id}" ${(profile?.departmentId || ui.drawer.departmentId) === department.id ? "selected" : ""}>${department.name}</option>`).join("")}
+      <label>Title<input name="title" required placeholder="Agent" value="${profile?.title || ""}" ${canEdit ? "" : "disabled"}></label>
+      <label>Seniority<select name="seniorityLevel" ${canEditAdminFields ? "" : "disabled"}>
+        ${seniorityLevels.map(([id, label]) => `<option value="${id}" ${(profile?.seniorityLevel || "mid") === id ? "selected" : ""}>${label}</option>`).join("")}
       </select></label>
+      <label>Employee ID<input name="employeeId" required placeholder="SCH-100" value="${profile?.employeeId || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
+      <fieldset class="department-memberships" ${canEditAdminFields ? "" : "disabled"}>
+        <legend>Departments</legend>
+        ${state.departments.map((department) => {
+          const isMember = profileDepartmentIds(profile).includes(department.id) || ui.drawer.departmentId === department.id;
+          return `
+            <label>
+              <input type="checkbox" name="departmentMembership" value="${department.id}" ${isMember ? "checked" : ""}>
+              <span>${departmentLabel(department)}</span>
+            </label>
+          `;
+        }).join("")}
+        <small>Each selected department is equal for schedules, rotations, and hierarchy.</small>
+      </fieldset>
       <label>Yearly vacation days<input name="yearlyVacationDays" type="number" min="0" value="${profile?.yearlyVacationDays || 21}" ${canEditAdminFields ? "" : "disabled"}></label>
       <label>Remaining vacation days<input name="remainingVacationDays" type="number" min="0" value="${profile?.remainingVacationDays ?? profile?.yearlyVacationDays ?? 21}" ${canEditAdminFields ? "" : "disabled"}></label>
       ${canEditAdminFields && profile?.userId ? `
-        <label>Role<select name="role">
+        <label>Application access role<select name="role">
           ${["employee", "lead", "admin"].map((role) => `<option value="${role}" ${roleForProfile(profile) === role ? "selected" : ""}>${role}</option>`).join("")}
         </select></label>
       ` : ""}
-      <p class="hint">${canEditAdminFields ? (profile?.userId ? "This profile is claimed. Changing email affects future sign-ins, not the linked account." : "The employee can claim this profile by signing in with the same email.") : "Employees can only update their display name here. Admins manage role, department, email, and balances."}</p>
+      <p class="hint">${canEditAdminFields ? "Application access controls permissions. Daily and weekly lead assignments are handled in Scheduler and Rotations." : "You can update your display name, title, and photo. Admins manage seniority, departments, access, email, and balances."}</p>
       <button class="primary wide" ${canEdit ? "" : "disabled"}>${profile ? "Save Profile" : "Create Profile"}</button>
     </form>
   `;
@@ -1712,15 +2274,18 @@ function profileDrawer() {
 
 function departmentDrawer() {
   const department = byId(state.departments, ui.drawer.departmentId);
-  const members = department ? state.profiles.filter((profile) => profile.departmentId === department.id) : [];
+  const members = department ? state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id)) : [];
   const coverageTarget = department ? coverageTargetForDepartment(department) : 1;
   const canEdit = canManageDepartments();
   const dates = datesInRange();
-  const assignedLeadDays = department ? dates.filter((date) => state.departmentLeads.some((lead) => lead.departmentId === department.id && lead.date === date)).length : 0;
+  const assignedLeadDays = department ? dates.filter((date) => departmentLeadForDate(department.id, date).profile).length : 0;
   const stats = department ? departmentStats(department, dates) : null;
   return `
     <form id="department-form" class="drawer-form">
       <label>Department name<input name="name" required placeholder="Department name" value="${department?.name || ""}" ${canEdit ? "" : "disabled"}></label>
+      <label>Parent department<select name="parentDepartmentId" ${canEdit ? "" : "disabled"}>
+        ${departmentOptions(department?.parentDepartmentId || "", { excludeId: department?.id || "", includeNone: true })}
+      </select></label>
       <label>Minimum available people<input name="coverageTarget" type="number" min="0" value="${coverageTarget}" ${canEdit ? "" : "disabled"}></label>
       ${department ? `
         <div class="department-drawer-summary">
@@ -1748,6 +2313,7 @@ function departmentDrawer() {
         </div>
       ` : ""}
       <button class="primary wide" ${canEdit ? "" : "disabled"}>${department ? "Save Department" : "Create Department"}</button>
+      ${department && canEdit ? `<button type="button" class="danger wide" id="delete-department">Delete Department</button>` : ""}
     </form>
   `;
 }
@@ -1831,20 +2397,25 @@ function calendarDayDrawer() {
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
   const canRequest = canRequestVacationFor(profile);
+  const canOpenScheduler = canManageDepartment(profile.departmentId);
   return `
     <div class="drawer-stack">
       <div class="person-summary">
         <div class="avatar large">${avatar(profile)}</div>
-        <div><strong>${profile.name}</strong><span>${formatDay(date)} ${formatDate(date)} · ${department?.name || "No department"}</span></div>
+        <div class="person-summary-copy">
+          <strong>${profile.name}</strong>
+          <span>${profile.title}</span>
+        </div>
       </div>
-      <div class="calendar-day-summary ${schedule.kind}">
+      <div class="calendar-day-summary ${schedule.kind} ${schedule.id}">
         <span class="shift-icon">${statusIcons[schedule.id] || icons.scheduler}</span>
         <div>
           <strong>${schedule.label}</strong>
           <span>${schedule.id === "ground" ? "Away" : schedule.kind === "working" ? "Available" : "Unavailable"} · ${schedule.source}</span>
         </div>
       </div>
-      <div class="detail-line"><span>Date</span><strong>${date}</strong></div>
+      <div class="detail-line"><span>Date</span><strong>${formatDay(date)} ${formatDate(date)}</strong></div>
+      <div class="detail-line"><span>Departments</span><strong>${profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean).join(", ") || "Unassigned"}</strong></div>
       <div class="detail-line"><span>Rotation default</span><strong>${rotationStatus?.label || "No rotation"}</strong></div>
       <div class="detail-line"><span>Manual override</span><strong>${schedule.override ? "Yes" : "No"}</strong></div>
       ${schedule.note ? `<p class="hint">${schedule.note}</p>` : ""}
@@ -1860,7 +2431,7 @@ function calendarDayDrawer() {
           <span>${approvedVacation.startDate} to ${approvedVacation.endDate}</span>
         </button>
       ` : ""}
-      <button type="button" class="ghost wide" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}">View Shift Details</button>
+      ${canOpenScheduler ? `<button type="button" class="ghost wide" data-open-scheduler-date="${date}" data-department-id="${profile.departmentId}">Open in Scheduler</button>` : ""}
       <button type="button" class="primary wide" data-open-drawer="request" data-profile-id="${profile.id}" data-date="${date}" ${canRequest ? "" : "disabled"}>Request Vacation From This Day</button>
     </div>
   `;
@@ -1962,66 +2533,101 @@ function renderVacationImpactRow(row, requestStatus, profileId) {
   `;
 }
 
-function leadDrawer() {
-  const lead = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
-  const profiles = state.profiles.filter((profile) => profile.departmentId === ui.selectedDepartmentId);
-  const canEdit = canManageDepartment(ui.selectedDepartmentId) && editableDate(ui.drawer.date);
-  const department = byId(state.departments, ui.selectedDepartmentId);
-  const coverage = coverageForDate(profiles, ui.drawer.date);
-  const target = department.coverageTarget || coverageTargets[department.id] || 0;
-  const lowCoverage = target > 0 && coverage.available < target;
-  const projected = coverageCountForStatusIds(profiles.map((profile) => scheduleFor(profile.id, ui.drawer.date).id));
-  const unassigned = profiles.filter((profile) => scheduleFor(profile.id, ui.drawer.date).id === "empty").length;
-  const manualCount = profiles.filter((profile) => scheduleFor(profile.id, ui.drawer.date).source === "Override").length;
-  const exceptionCount = profiles.filter((profile) => exceptionStatusIds.includes(scheduleFor(profile.id, ui.drawer.date).id)).length;
+function renderDepartmentRotationToolbar(profiles) {
+  const selectedCount = ui.selectedRotationProfileIds.length;
+  const allSelected = profiles.length > 0 && selectedCount === profiles.length;
+  if (ui.rotationBulkEditing) return renderDepartmentRotationEditor();
   return `
-    <div class="day-editor">
-      <div class="day-editor-summary ${lowCoverage ? "low" : ""}">
+    <section class="rotation-edit-toolbar">
+      <div>
+        <span class="eyebrow">Department edit</span>
+        <strong>${selectedCount} ${selectedCount === 1 ? "person" : "people"} selected</strong>
+        <p>Select the people whose weekly patterns should change together.</p>
+      </div>
+      <div class="rotation-edit-actions">
+        <button type="button" class="ghost" id="toggle-all-rotation-people" ${profiles.length ? "" : "disabled"}>${allSelected ? "Clear selection" : "Select all"}</button>
+        <button type="button" class="primary" id="continue-department-rotation-edit" ${selectedCount ? "" : "disabled"}>Continue with ${selectedCount || 0}</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderDepartmentRotationEditor() {
+  const pattern = sanitizeRotationPattern(ui.rotationBulkPattern);
+  const selectedProfiles = ui.selectedRotationProfileIds.map((id) => byId(state.profiles, id)).filter(Boolean);
+  return `
+    <form class="rotation-bulk-editor" id="department-rotation-form">
+      <div class="rotation-bulk-head">
+        <div>
+          <span class="eyebrow">Shared weekly pattern</span>
+          <strong>${selectedProfiles.length} ${selectedProfiles.length === 1 ? "person" : "people"}</strong>
+          <p>${selectedProfiles.map((profile) => profile.name).join(", ")}</p>
+        </div>
+        <label>Effective start<input type="date" name="effectiveStart" value="${ui.rotationBulkEffectiveStart}" required></label>
+      </div>
+      ${rotationPresets.length ? `
+        <div class="rotation-bulk-presets">
+          <span>Apply preset</span>
+          ${rotationPresets.map((preset) => `<button type="button" class="ghost" data-bulk-rotation-preset="${preset.id}">${preset.label}</button>`).join("")}
+        </div>
+      ` : ""}
+      <div class="rotation-bulk-days">
+        ${pattern.map((statusId, index) => bulkRotationDay(statusId, index)).join("")}
+      </div>
+      <div class="rotation-bulk-footer">
+        <button type="button" class="ghost" id="back-to-rotation-selection">Back to selection</button>
+        <button type="submit" class="primary">Save ${selectedProfiles.length} ${selectedProfiles.length === 1 ? "rotation" : "rotations"}</button>
+      </div>
+    </form>
+  `;
+}
+
+function bulkRotationDay(statusId, index) {
+  const status = byId(state.statuses, statusId) || byId(state.statuses, "weekend");
+  return `
+    <div class="rotation-bulk-day">
+      <div><span>${weekDays[index]}</span><strong>${status.label}</strong></div>
+      <div class="pattern-chip-row">
+        ${rotationStatuses().map((item) => `
+          <button type="button" class="pattern-chip ${item.id} ${item.id === status.id ? "active" : ""}" data-bulk-pattern-day="${index}" data-pattern-status="${item.id}" title="${item.label}">
+            ${statusIcons[item.id] || icons.scheduler}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function leadDrawer() {
+  const departmentId = activeDrawerDepartmentId();
+  const lead = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === ui.drawer.date);
+  const resolvedLead = departmentLeadForDate(departmentId, ui.drawer.date);
+  const candidates = availableLeadCandidates(departmentId, ui.drawer.date, resolvedLead.profile?.id);
+  const canEdit = canManageDepartment(departmentId) && editableDate(ui.drawer.date);
+  const department = byId(state.departments, departmentId);
+  const leadHealth = leadAvailabilityForDepartmentDate(departmentId, ui.drawer.date);
+  const activeLeadText = leadHealth.available
+    ? `${leadHealth.profile.name} is active for this day.`
+    : leadHealth.profile ? `${leadHealth.profile.name} is ${leadHealth.schedule?.label || "unavailable"} on this day.` : "No leader is assigned for this day.";
+  return `
+    <div class="lead-only-editor">
+      <div class="lead-only-summary ${leadHealth.missing ? "missing" : ""}">
         <div>
           <span class="eyebrow">${department.name}</span>
           <strong>${formatDay(ui.drawer.date)} ${formatDate(ui.drawer.date)}</strong>
           <small>${ui.drawer.date}</small>
         </div>
-        <div class="day-editor-score">
-          <strong>${coverage.available}</strong>
-          <span>${target ? `of ${target} target` : "available"}</span>
-        </div>
+        <span class="lead-state">${leadHealth.missing ? "Needs lead" : "Covered"}</span>
       </div>
-
-      <div class="day-editor-metrics">
-        <span><strong>${coverage.unavailable}</strong> unavailable</span>
-        <span><strong>${coverage.away}</strong> on ground</span>
-        <span><strong>${exceptionCount}</strong> exceptions</span>
-        <span><strong>${manualCount}</strong> manual</span>
-      </div>
-
-      <div class="day-editor-projection" data-day-projection data-target="${target}">
-        <div>
-          <span class="eyebrow">Coverage Preview</span>
-          <strong><b data-projected-available>${projected.available}</b>${target ? ` / ${target}` : ""} available after edits</strong>
-        </div>
-        <div class="day-editor-projection-metrics">
-          <span><b data-projected-unavailable>${projected.unavailable}</b> unavailable</span>
-          <span><b data-projected-away>${projected.away}</b> on ground</span>
-          <span><b data-projected-changes>0</b> changed</span>
-        </div>
-      </div>
+      <p class="lead-only-copy">${activeLeadText}</p>
 
       <form id="lead-form" class="day-lead-form">
-        <label>Day Lead<select name="profileId" ${canEdit ? "" : "disabled"}>${profiles.map((profile) => `<option value="${profile.id}" ${lead?.profileId === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}</select></label>
-        <button class="ghost" ${canEdit ? "" : "disabled"}>Save</button>
-      </form>
-
-      <form id="day-bulk-form" class="drawer-form">
-        <div class="section-title">
-          <span class="eyebrow">Daily Exceptions</span>
-          <strong>${profiles.length} people - ${manualCount} saved manual changes</strong>
-        </div>
-        <div class="bulk-shift-list">
-          ${profiles.map((profile) => renderBulkShiftRow(profile, ui.drawer.date, canEdit)).join("")}
-        </div>
-        <p class="hint">${canEdit ? "Use rotation shifts for normal one-day swaps. Use Vacation, Sick, and On Ground for daily exceptions. Clear returns a row to its rotation." : "This day is locked for your role."}</p>
-        <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Daily Changes</button>
+        <label>Daily lead override<select name="profileId" ${canEdit ? "" : "disabled"}>
+          <option value="">Use weekly rotation${resolvedLead.rotation && resolvedLead.profile ? ` (${resolvedLead.profile.name})` : ""}</option>
+          ${candidates.map((profile) => `<option value="${profile.id}" ${lead?.profileId === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}
+        </select></label>
+        <p class="hint">${candidates.length ? "Only people available on this day are listed." : "No available replacement leaders for this department on this day."}</p>
+        <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Lead</button>
       </form>
     </div>
   `;
@@ -2066,7 +2672,7 @@ function renderBulkShiftRow(profile, date, canEdit) {
 function rotationDrawer() {
   const rotation = byId(state.rotationVersions, ui.drawer.rotationId) || latestRotationForProfile(ui.drawer.profileId);
   const departmentEditableProfiles = state.profiles.filter((profile) => canManageDepartment(profile.departmentId));
-  const selectedProfileId = ui.drawer.profileId || rotation?.profileId || departmentEditableProfiles.find((profile) => profile.departmentId === ui.selectedDepartmentId)?.id || departmentEditableProfiles[0]?.id;
+  const selectedProfileId = ui.drawer.profileId || rotation?.profileId || departmentEditableProfiles.find((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId))?.id || departmentEditableProfiles[0]?.id;
   const selectedProfile = byId(state.profiles, selectedProfileId);
   const canEdit = canManageDepartment(selectedProfile?.departmentId || ui.selectedDepartmentId);
   const profiles = canEdit
@@ -2144,8 +2750,7 @@ function patternSlot(statusId, index, canEdit = true) {
 }
 
 function normalizeWeekPattern(pattern = defaultWeekPattern) {
-  if (pattern.length === 7) return [...pattern];
-  return Array.from({ length: 7 }, (_, index) => pattern[index % pattern.length] || defaultWeekPattern[index]);
+  return normalizeWeekPatternLogic(pattern, defaultWeekPattern);
 }
 
 function rotationPatternStats(pattern) {
@@ -2183,6 +2788,13 @@ function bindEvents() {
 
   document.querySelectorAll("[data-open-drawer]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (button.dataset.openDrawer === "profile") {
+        ui.pendingPhotoFile = null;
+        ui.pendingPhotoDataUrl = "";
+      }
+      if (button.dataset.openDrawer === "lead" && button.dataset.departmentId) {
+        ui.selectedDepartmentId = button.dataset.departmentId;
+      }
       ui.drawer = { type: button.dataset.openDrawer, ...button.dataset };
       render();
     });
@@ -2198,14 +2810,75 @@ function bindEvents() {
   });
 
   document.querySelector("#close-drawer")?.addEventListener("click", () => {
+    ui.pendingPhotoFile = null;
+    ui.pendingPhotoDataUrl = "";
     ui.drawer = null;
     render();
   });
 
   document.querySelector("#department-select")?.addEventListener("change", (event) => {
     ui.selectedDepartmentId = event.target.value;
+    ui.rotationDepartmentEdit = false;
+    ui.selectedRotationProfileIds = [];
+    ui.rotationBulkEditing = false;
     render();
   });
+
+  document.querySelector("#toggle-department-rotation-edit")?.addEventListener("click", () => {
+    ui.rotationDepartmentEdit = !ui.rotationDepartmentEdit;
+    ui.selectedRotationProfileIds = [];
+    ui.rotationBulkEditing = false;
+    render();
+  });
+
+  document.querySelectorAll("[data-rotation-profile-select]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const profileId = input.dataset.rotationProfileSelect;
+      ui.selectedRotationProfileIds = input.checked
+        ? [...new Set([...ui.selectedRotationProfileIds, profileId])]
+        : ui.selectedRotationProfileIds.filter((id) => id !== profileId);
+      render();
+    });
+  });
+
+  document.querySelector("#toggle-all-rotation-people")?.addEventListener("click", () => {
+    const profileIds = departmentProfiles().map((profile) => profile.id);
+    ui.selectedRotationProfileIds = ui.selectedRotationProfileIds.length === profileIds.length ? [] : profileIds;
+    render();
+  });
+
+  document.querySelector("#continue-department-rotation-edit")?.addEventListener("click", () => {
+    const firstRotation = latestRotationForProfile(ui.selectedRotationProfileIds[0]);
+    ui.rotationBulkPattern = sanitizeRotationPattern(firstRotation?.pattern || defaultWeekPattern);
+    ui.rotationBulkEffectiveStart = todayIso;
+    ui.rotationBulkEditing = true;
+    render();
+  });
+
+  document.querySelector("#back-to-rotation-selection")?.addEventListener("click", () => {
+    ui.rotationBulkEditing = false;
+    render();
+  });
+
+  document.querySelectorAll("[data-bulk-pattern-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pattern = sanitizeRotationPattern(ui.rotationBulkPattern);
+      pattern[Number(button.dataset.bulkPatternDay)] = button.dataset.patternStatus;
+      ui.rotationBulkPattern = pattern;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-bulk-rotation-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = rotationPresets.find((item) => item.id === button.dataset.bulkRotationPreset);
+      if (!preset) return;
+      ui.rotationBulkPattern = sanitizeRotationPattern(preset.pattern);
+      render();
+    });
+  });
+
+  document.querySelector("#department-rotation-form")?.addEventListener("submit", saveDepartmentRotations);
 
   document.querySelector("#people-department-select")?.addEventListener("change", (event) => {
     ui.peopleDepartmentId = event.target.value;
@@ -2219,23 +2892,85 @@ function bindEvents() {
     });
   });
 
+  document.querySelectorAll("[data-department-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.departmentView = button.dataset.departmentView;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-toggle-department-card]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const departmentId = button.dataset.toggleDepartmentCard;
+      const expanded = new Set(ui.expandedDepartmentIds);
+      if (expanded.has(departmentId)) expanded.delete(departmentId);
+      else expanded.add(departmentId);
+      ui.expandedDepartmentIds = [...expanded];
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-hierarchy-select]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.hierarchyDepartmentIds = button.dataset.hierarchySelect === "all" ? state.departments.map((department) => department.id) : [];
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-hierarchy-department-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const departmentId = button.dataset.hierarchyDepartmentFilter;
+      const selected = new Set(ui.hierarchyDepartmentIds || []);
+      if (selected.has(departmentId)) selected.delete(departmentId);
+      else selected.add(departmentId);
+      ui.hierarchyDepartmentIds = [...selected];
+      render();
+    });
+  });
+
   document.querySelector("#range-select")?.addEventListener("change", (event) => {
     ui.rangeDays = Number(event.target.value);
     render();
   });
 
-  document.querySelector("#prev-range")?.addEventListener("click", () => {
+  document.querySelector("#schedule-status-filter")?.addEventListener("change", (event) => {
+    ui.scheduleStatusFilter = event.target.value;
+    render();
+  });
+
+  document.querySelector("#schedule-start-date")?.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    ui.startDate = event.target.value;
+    render();
+  });
+
+  document.querySelector("#zoom-in-range")?.addEventListener("click", () => {
+    zoomScheduleRange(-1);
+    render();
+  });
+
+  document.querySelector("#zoom-out-range")?.addEventListener("click", () => {
+    zoomScheduleRange(1);
+    render();
+  });
+
+  document.querySelector("#month-prev-range")?.addEventListener("click", () => {
     ui.startDate = addDays(ui.startDate, -ui.rangeDays);
     render();
   });
 
-  document.querySelector("#next-range")?.addEventListener("click", () => {
+  document.querySelector("#month-next-range")?.addEventListener("click", () => {
     ui.startDate = addDays(ui.startDate, ui.rangeDays);
     render();
   });
 
   document.querySelector("#today-range")?.addEventListener("click", () => {
     ui.startDate = todayIso;
+    render();
+  });
+
+  document.querySelector("#month-start-range")?.addEventListener("click", () => {
+    ui.startDate = monthStart(ui.startDate);
     render();
   });
 
@@ -2313,6 +3048,7 @@ function bindEvents() {
   document.querySelector("#shift-form")?.addEventListener("submit", saveShiftOverride);
   document.querySelector("#clear-override")?.addEventListener("click", clearShiftOverride);
   document.querySelector("#unlink-profile")?.addEventListener("click", unlinkProfileAccount);
+  document.querySelector("#delete-profile")?.addEventListener("click", deleteProfile);
   document.querySelector("#remove-department")?.addEventListener("click", removeProfileDepartment);
   document.querySelector("#profile-form")?.addEventListener("submit", saveProfile);
   bindPhotoUploader();
@@ -2321,8 +3057,10 @@ function bindEvents() {
   document.querySelector("#day-bulk-form")?.addEventListener("submit", saveDayBulkOverrides);
   bindDayEditorPreview();
   document.querySelector("#department-form")?.addEventListener("submit", saveDepartment);
+  document.querySelector("#delete-department")?.addEventListener("click", deleteDepartment);
   document.querySelector("#department-member-form")?.addEventListener("submit", assignDepartmentMembers);
   document.querySelector("#rotation-form")?.addEventListener("submit", saveRotation);
+  document.querySelector("#lead-rotation-form")?.addEventListener("submit", saveLeadRotation);
   document.querySelector("#status-form")?.addEventListener("submit", saveStatus);
 
   document.querySelector("#save-rotation-preset")?.addEventListener("click", () => {
@@ -2400,6 +3138,16 @@ function bindEvents() {
     });
   });
 
+  document.querySelectorAll("[data-open-scheduler-date]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.selectedDepartmentId = button.dataset.departmentId;
+      ui.startDate = button.dataset.openSchedulerDate;
+      ui.activeView = "scheduler";
+      ui.drawer = null;
+      render();
+    });
+  });
+
   document.querySelectorAll("[data-create-member]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.drawer = { type: "department-member", departmentId: button.dataset.createMember };
@@ -2416,6 +3164,16 @@ function bindEvents() {
       }
       render();
     });
+  });
+
+  applyMutationPendingUi();
+}
+
+function applyMutationPendingUi() {
+  if (!isMutationPending()) return;
+  document.querySelectorAll("button, input, select, textarea").forEach((control) => {
+    if (control.id === "dismiss-notice") return;
+    control.disabled = true;
   });
 }
 
@@ -2445,7 +3203,11 @@ function bindPhotoUploader() {
 }
 
 function handlePhotoFile(file) {
-  if (!file || !file.type.startsWith("image/")) return;
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!file || !allowedTypes.includes(file.type)) {
+    notify("Choose a JPG, PNG, WebP, or GIF image.");
+    return;
+  }
   if (file.size > 750000) {
     notify("Please choose an image under 750 KB for now.");
     return;
@@ -2453,9 +3215,9 @@ function handlePhotoFile(file) {
   const reader = new FileReader();
   reader.addEventListener("load", () => {
     const dataUrl = reader.result;
-    const photoInput = document.querySelector('input[name="photo"]');
     const preview = document.querySelector("#photo-preview");
-    if (photoInput) photoInput.value = dataUrl;
+    ui.pendingPhotoFile = file;
+    ui.pendingPhotoDataUrl = dataUrl;
     if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="">`;
   });
   reader.readAsDataURL(file);
@@ -2466,30 +3228,46 @@ function bindAuthEvents() {
     event.preventDefault();
     const submitter = event.submitter;
     const form = new FormData(event.currentTarget);
+    const intent = submitter?.value === "sign-up" ? "sign-up" : "sign-in";
+    const email = form.get("email");
+    const password = form.get("password");
     ui.error = "";
     ui.notice = "";
-    try {
-      if (submitter?.value === "sign-up") {
-        const result = await dataStore.signUp(form.get("email"), form.get("password"));
+    const result = await runMutation("auth", {
+      pending: intent === "sign-up" ? "Creating account..." : "Signing in...",
+      success: intent === "sign-up" ? "Account is ready." : "Signed in.",
+      failure: "Unable to authenticate."
+    }, async () => {
+      if (intent === "sign-up") {
+        if (!appConfig.allowSignup) throw new Error("Account creation is disabled. Ask an Admin for an invitation.");
+        const result = await dataStore.signUp(email, password);
         if (!result?.session) {
           ui.notice = "Account created. Check your email if confirmation is enabled, then sign in here.";
+          ui.noticeKind = "success";
           render();
           return;
         }
       } else {
-        await dataStore.signIn(form.get("email"), form.get("password"));
+        await dataStore.signIn(email, password);
       }
       await reloadState();
-    } catch (error) {
-      ui.error = error.message || "Unable to authenticate.";
+    });
+    if (!result.ok) {
+      ui.error = result.error?.message || "Unable to authenticate.";
       render();
     }
   });
 }
 
 async function signOut() {
-  await dataStore.signOut();
-  await reloadState();
+  await runMutation("sign-out", {
+    pending: "Signing out...",
+    success: "Signed out.",
+    failure: "Unable to sign out."
+  }, async () => {
+    await dataStore.signOut();
+    await reloadState();
+  });
 }
 
 async function saveShiftOverride(event) {
@@ -2502,23 +3280,43 @@ async function saveShiftOverride(event) {
   const rangeStart = startDate <= endDate ? startDate : endDate;
   const rangeEnd = startDate <= endDate ? endDate : startDate;
   const targetDates = datesBetween(rangeStart, rangeEnd).filter(editableDate);
-  for (const date of targetDates) {
+  const selectedStatusId = form.get("statusId");
+  const selectedStatus = byId(state.statuses, selectedStatusId);
+  const leadAssignmentsToReplace = selectedStatus && !isScheduleLeadAvailable(selectedStatus)
+    ? assignedLeadDatesForProfile(profile.id, targetDates)
+    : [];
+  const payloads = targetDates.map((date) => {
     const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === date);
-    const payload = {
-      id: existing?.id || makeId("ovr"),
-      profileId: ui.drawer.profileId,
-      date,
-      statusId: form.get("statusId"),
-      note: form.get("note").trim()
+    return {
+      existing,
+      payload: {
+        id: existing?.id || makeId("ovr"),
+        profileId: ui.drawer.profileId,
+        date,
+        statusId: selectedStatusId,
+        note: form.get("note").trim()
+      }
     };
-    if (existing) Object.assign(existing, payload);
-    else state.scheduleOverrides.push(payload);
-    audit("schedule.override", "schedule_override", payload.id, `${payload.date} set to ${payload.statusId}`);
-    await dataStore.upsertScheduleOverride(payload);
-  }
-  await saveState();
-  ui.drawer = null;
-  render();
+  });
+  await runMutation("shift-override", {
+    pending: "Saving daily change...",
+    success: "Daily change saved.",
+    failure: "The daily change could not be saved."
+  }, async () => {
+    for (const item of payloads) {
+      if (item.existing) Object.assign(item.existing, item.payload);
+      else state.scheduleOverrides.push(item.payload);
+      audit("schedule.override", "schedule_override", item.payload.id, `${item.payload.date} set to ${item.payload.statusId}`);
+      await dataStore.upsertScheduleOverride(item.payload);
+    }
+    await saveState();
+    ui.drawer = null;
+    if (leadAssignmentsToReplace.length) {
+      ui.notice = "Leader is unavailable on one or more edited days. Use the Lead missing alert to assign a replacement.";
+      ui.noticeKind = "warning";
+    }
+    render();
+  });
 }
 
 async function clearShiftOverride() {
@@ -2526,12 +3324,18 @@ async function clearShiftOverride() {
   if (!profile || !canManageDepartment(profile.departmentId) || !editableDate(ui.drawer.date)) return;
   const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === ui.drawer.date);
   if (!existing) return;
-  state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
-  audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
-  await dataStore.deleteScheduleOverride(existing);
-  await saveState();
-  ui.drawer = null;
-  render();
+  await runMutation("shift-clear", {
+    pending: "Clearing daily change...",
+    success: "Daily change cleared.",
+    failure: "The daily change could not be cleared."
+  }, async () => {
+    state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
+    audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
+    await dataStore.deleteScheduleOverride(existing);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveProfile(event) {
@@ -2540,58 +3344,132 @@ async function saveProfile(event) {
   const existing = byId(state.profiles, ui.drawer.profileId);
   const hadProfileAdmin = canManageProfiles();
   if (!hadProfileAdmin && (!existing || currentProfile()?.id !== existing.id)) return;
+  const departmentIds = hadProfileAdmin
+    ? form.getAll("departmentMembership").filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index)
+    : profileDepartmentIds(existing);
+  const departmentId = hadProfileAdmin ? (departmentIds[0] || null) : existing.departmentId;
   const profile = {
     id: existing?.id || makeId("emp"),
     employeeId: hadProfileAdmin ? form.get("employeeId") : existing.employeeId,
     email: hadProfileAdmin ? form.get("email") : existing.email,
     name: form.get("name"),
-    title: hadProfileAdmin ? form.get("title") : existing.title,
-    departmentId: hadProfileAdmin ? (form.get("departmentId") || null) : existing.departmentId,
-    photo: form.get("photo") || "",
+    title: form.get("title"),
+    seniorityLevel: hadProfileAdmin ? form.get("seniorityLevel") : existing.seniorityLevel,
+    leadEligible: existing?.leadEligible ?? true,
+    departmentId,
+    departmentIds,
+    photo: existing?.photo || "",
+    photoRef: existing?.photoRef || form.get("photoRef") || "",
     yearlyVacationDays: hadProfileAdmin ? Number(form.get("yearlyVacationDays")) : existing.yearlyVacationDays,
     remainingVacationDays: hadProfileAdmin ? Number(form.get("remainingVacationDays")) : existing.remainingVacationDays,
     userId: existing?.userId || null
   };
-  if (existing) Object.assign(existing, profile);
-  else state.profiles.push(profile);
-  if (hadProfileAdmin && existing?.userId && form.get("role")) {
-    const userRole = { userId: existing.userId, role: form.get("role") };
-    const existingRole = state.userRoles?.find((role) => role.userId === userRole.userId);
-    if (existingRole) Object.assign(existingRole, userRole);
-    else {
-      state.userRoles ||= [];
-      state.userRoles.push(userRole);
+  const previousPhotoRef = existing?.photoRef || "";
+  await runMutation("profile-save", {
+    pending: ui.pendingPhotoFile ? "Uploading photo and saving profile..." : "Saving profile...",
+    success: existing ? "Profile saved." : "Profile created.",
+    failure: "The profile could not be saved."
+  }, async () => {
+    let uploadedPhoto = null;
+    try {
+      if (ui.pendingPhotoFile) {
+        uploadedPhoto = await dataStore.uploadProfilePhoto(profile.id, ui.pendingPhotoFile, ui.pendingPhotoDataUrl);
+        profile.photo = uploadedPhoto.url;
+        profile.photoRef = uploadedPhoto.reference;
+      }
+      if (existing && !hadProfileAdmin) await dataStore.updateOwnProfile(profile);
+      else if (existing) await dataStore.updateProfile(profile);
+      else {
+        await dataStore.createProfile(profile);
+        if (hadProfileAdmin) await dataStore.setProfileDepartments(profile);
+      }
+
+      if (hadProfileAdmin && existing?.userId && form.get("role")) {
+        const userRole = { userId: existing.userId, role: form.get("role") };
+        await dataStore.upsertUserRole(userRole);
+        const existingRole = state.userRoles?.find((role) => role.userId === userRole.userId);
+        if (existingRole) Object.assign(existingRole, userRole);
+        else {
+          state.userRoles ||= [];
+          state.userRoles.push(userRole);
+        }
+        if (existing.userId === currentUser()?.id) currentUser().role = userRole.role;
+        audit("role.updated", "user_role", userRole.userId, `${profile.name} set to ${userRole.role}`);
+      }
+    } catch (error) {
+      if (uploadedPhoto) await dataStore.deleteProfilePhoto(uploadedPhoto.reference).catch(() => {});
+      throw error;
     }
-    if (existing.userId === currentUser()?.id) currentUser().role = userRole.role;
-    await dataStore.upsertUserRole(userRole);
-    audit("role.updated", "user_role", userRole.userId, `${profile.name} set to ${userRole.role}`);
-  }
-  audit(existing ? "profile.updated" : "profile.created", "profile", profile.id, profile.email);
-  if (existing && !hadProfileAdmin) await dataStore.updateOwnProfileName(profile);
-  else if (existing) await dataStore.updateProfile(profile);
-  else await dataStore.createProfile(profile);
-  await saveState();
-  ui.drawer = { type: "person", profileId: profile.id };
-  render();
+
+    if (existing) Object.assign(existing, profile);
+    else state.profiles.push(profile);
+    if (uploadedPhoto && previousPhotoRef && previousPhotoRef !== uploadedPhoto.reference) {
+      await dataStore.deleteProfilePhoto(previousPhotoRef).catch(() => {});
+    }
+    ui.pendingPhotoFile = null;
+    ui.pendingPhotoDataUrl = "";
+    audit(existing ? "profile.updated" : "profile.created", "profile", profile.id, profile.email);
+    await saveState();
+    ui.drawer = { type: "person", profileId: profile.id };
+    render();
+  });
 }
 
 async function unlinkProfileAccount() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile?.userId || !canManageProfiles()) return;
   const previousUserId = profile.userId;
-  profile.userId = null;
-  state.userRoles = (state.userRoles || []).filter((role) => role.userId !== previousUserId);
-  audit("profile.unlinked", "profile", profile.id, `${profile.email} account link removed`);
-  await dataStore.unlinkProfileAccount({ ...profile, userId: previousUserId });
-  await saveState();
-  ui.drawer = { type: "person", profileId: profile.id };
-  render();
+  await runMutation("profile-unlink", {
+    pending: "Unlinking account...",
+    success: "Account unlinked.",
+    failure: "The account could not be unlinked."
+  }, async () => {
+    profile.userId = null;
+    state.userRoles = (state.userRoles || []).filter((role) => role.userId !== previousUserId);
+    audit("profile.unlinked", "profile", profile.id, `${profile.email} account link removed`);
+    await dataStore.unlinkProfileAccount({ ...profile, userId: previousUserId });
+    await saveState();
+    ui.drawer = { type: "person", profileId: profile.id };
+    render();
+  });
+}
+
+async function deleteProfile() {
+  const profile = byId(state.profiles, ui.drawer.profileId);
+  if (!profile || !canManageProfiles()) return;
+  const confirmed = confirm(`Delete ${profile.name}'s profile? This removes their schedule history, requests, rotations, and profile link from this app.`);
+  if (!confirmed) return;
+
+  const deletedPhotoRef = profile.photoRef || "";
+  await runMutation("profile-delete", {
+    pending: "Deleting profile...",
+    success: "Profile deleted.",
+    failure: "The profile could not be deleted."
+  }, async () => {
+    state.profiles = state.profiles.filter((item) => item.id !== profile.id);
+    state.rotationVersions = state.rotationVersions.filter((rotation) => rotation.profileId !== profile.id);
+    state.scheduleOverrides = state.scheduleOverrides.filter((override) => override.profileId !== profile.id);
+    state.vacationRequests = state.vacationRequests.filter((request) => request.profileId !== profile.id);
+    state.departmentLeads = state.departmentLeads.filter((lead) => lead.profileId !== profile.id);
+    state.departmentLeadRotations = (state.departmentLeadRotations || []).filter((rotation) => !rotation.pattern.includes(profile.id));
+    state.userRoles = (state.userRoles || []).filter((role) => role.userId !== profile.userId);
+    state.auditLog = (state.auditLog || []).filter((entry) => entry.entityId !== profile.id && !entry.detail?.includes(profile.email));
+
+    audit("profile.deleted", "profile", profile.id, `${profile.name} deleted`);
+    await dataStore.deleteProfile(profile);
+    if (deletedPhotoRef) await dataStore.deleteProfilePhoto(deletedPhotoRef).catch(() => {});
+    await saveState();
+    if (ui.profileViewId === profile.id) ui.profileViewId = null;
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function removeProfileDepartment() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile?.departmentId || !canManageProfiles()) return;
   const previousDepartmentId = profile.departmentId;
+  const previousDepartmentIds = [...profileDepartmentIds(profile)];
   const previousDepartment = byId(state.departments, profile.departmentId);
   const previousLeads = [...state.departmentLeads];
   const auditEntry = {
@@ -2603,22 +3481,28 @@ async function removeProfileDepartment() {
     detail: `${profile.name} removed from ${previousDepartment?.name || "department"}`,
     createdAt: new Date().toISOString()
   };
-  profile.departmentId = null;
-  state.departmentLeads = state.departmentLeads.filter((lead) => lead.profileId !== profile.id);
-  state.auditLog.unshift(auditEntry);
-  ui.drawer = null;
-  render();
-  try {
+  await runMutation("profile-remove-department", {
+    pending: "Removing department...",
+    success: "Department removed from profile.",
+    failure: "Unable to remove department."
+  }, async () => {
+    profile.departmentId = null;
+    profile.departmentIds = [];
+    state.departmentLeads = state.departmentLeads.filter((lead) => lead.profileId !== profile.id);
+    state.auditLog.unshift(auditEntry);
+    ui.drawer = null;
+    render();
     await dataStore.updateProfile(profile);
     if (dataStore?.mode === "supabase") void dataStore.insertAudit(auditEntry);
     await saveState();
-  } catch (error) {
+  }).then((result) => {
+    if (result.ok) return;
     profile.departmentId = previousDepartmentId;
+    profile.departmentIds = previousDepartmentIds;
     state.departmentLeads = previousLeads;
     state.auditLog = state.auditLog.filter((entry) => entry.id !== auditEntry.id);
-    ui.notice = error.message || "Unable to remove department.";
     render();
-  }
+  });
 }
 
 async function saveDepartment(event) {
@@ -2629,17 +3513,66 @@ async function saveDepartment(event) {
   const department = {
     id: existing?.id || makeId("dep"),
     name: form.get("name").trim(),
+    parentDepartmentId: form.get("parentDepartmentId") || null,
     coverageTarget: Number(form.get("coverageTarget") || 0)
   };
-  if (existing) Object.assign(existing, department);
-  else state.departments.push(department);
-  coverageTargets[department.id] = department.coverageTarget;
-  saveCoverageTargets();
-  audit(existing ? "department.updated" : "department.created", "department", department.id, department.name);
-  await dataStore.upsertDepartment(department);
-  await saveState();
-  ui.drawer = { type: "department-detail", departmentId: department.id };
-  render();
+  await runMutation("department-save", {
+    pending: "Saving department...",
+    success: existing ? "Department saved." : "Department created.",
+    failure: "The department could not be saved."
+  }, async () => {
+    if (existing) Object.assign(existing, department);
+    else state.departments.push(department);
+    coverageTargets[department.id] = department.coverageTarget;
+    saveCoverageTargets();
+    audit(existing ? "department.updated" : "department.created", "department", department.id, department.name);
+    await dataStore.upsertDepartment(department);
+    await saveState();
+    ui.drawer = { type: "department-detail", departmentId: department.id };
+    render();
+  });
+}
+
+async function deleteDepartment() {
+  const department = byId(state.departments, ui.drawer.departmentId);
+  if (!department || !canManageDepartments()) return;
+  const previousDepartments = [...state.departments];
+  const previousProfiles = state.profiles.map((profile) => ({ ...profile }));
+  const previousLeads = [...state.departmentLeads];
+  const previousSelectedDepartmentId = ui.selectedDepartmentId;
+  const affectedProfiles = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
+  const confirmed = window.confirm(`Delete ${department.name}? ${affectedProfiles.length} ${affectedProfiles.length === 1 ? "person" : "people"} will become unassigned.`);
+  if (!confirmed) return;
+
+  await runMutation("department-delete", {
+    pending: `Deleting ${department.name}...`,
+    success: `${department.name} deleted. ${affectedProfiles.length} ${affectedProfiles.length === 1 ? "person is" : "people are"} now unassigned.`,
+    failure: "The department could not be deleted."
+  }, async () => {
+    for (const profile of affectedProfiles) {
+      profile.departmentIds = profileDepartmentIds(profile).filter((departmentId) => departmentId !== department.id);
+      if (profile.departmentId === department.id) profile.departmentId = profile.departmentIds[0] || null;
+      await dataStore.updateProfile(profile);
+    }
+    state.departmentLeads = state.departmentLeads.filter((lead) => lead.departmentId !== department.id);
+    state.departments = state.departments.filter((item) => item.id !== department.id);
+    delete coverageTargets[department.id];
+    saveCoverageTargets();
+    if (ui.selectedDepartmentId === department.id) ui.selectedDepartmentId = state.departments[0]?.id || "";
+    audit("department.deleted", "department", department.id, `${department.name} deleted`);
+    await dataStore.deleteDepartment(department);
+    await saveState();
+    ui.drawer = null;
+    ui.activeView = "departments";
+    render();
+  }).then((result) => {
+    if (result.ok) return;
+    state.departments = previousDepartments;
+    state.profiles = previousProfiles;
+    state.departmentLeads = previousLeads;
+    ui.selectedDepartmentId = previousSelectedDepartmentId;
+    render();
+  });
 }
 
 async function assignDepartmentMembers(event) {
@@ -2650,16 +3583,23 @@ async function assignDepartmentMembers(event) {
   const form = new FormData(event.currentTarget);
   const profileIds = form.getAll("profileId");
   if (!profileIds.length) return;
-  for (const profileId of profileIds) {
-    const profile = byId(state.profiles, profileId);
-    if (!profile) continue;
-    profile.departmentId = department.id;
-    audit("profile.department_assigned", "profile", profile.id, `${profile.name} added to ${department.name}`);
-    await dataStore.updateProfile(profile);
-  }
-  await saveState();
-  ui.drawer = { type: "department-detail", departmentId: department.id };
-  render();
+  await runMutation("department-members", {
+    pending: "Adding selected members...",
+    success: `${profileIds.length} ${profileIds.length === 1 ? "member" : "members"} added.`,
+    failure: "Selected members could not be added."
+  }, async () => {
+    for (const profileId of profileIds) {
+      const profile = byId(state.profiles, profileId);
+      if (!profile) continue;
+      profile.departmentId = department.id;
+      profile.departmentIds = [department.id];
+      audit("profile.department_assigned", "profile", profile.id, `${profile.name} added to ${department.name}`);
+      await dataStore.updateProfile(profile);
+    }
+    await saveState();
+    ui.drawer = { type: "department-detail", departmentId: department.id };
+    render();
+  });
 }
 
 async function saveVacationRequest(event) {
@@ -2679,13 +3619,19 @@ async function saveVacationRequest(event) {
     decidedAt: null,
     deductedDays: 0
   };
-  state.vacationRequests.unshift(request);
-  audit("vacation.requested", "vacation_request", request.id, `${request.startDate} to ${request.endDate}`);
-  await dataStore.createVacationRequest(request);
-  await saveState();
-  ui.activeView = "requests";
-  ui.drawer = null;
-  render();
+  await runMutation("vacation-request", {
+    pending: "Submitting vacation request...",
+    success: "Vacation request submitted.",
+    failure: "The vacation request could not be submitted."
+  }, async () => {
+    state.vacationRequests.unshift(request);
+    audit("vacation.requested", "vacation_request", request.id, `${request.startDate} to ${request.endDate}`);
+    await dataStore.createVacationRequest(request);
+    await saveState();
+    ui.activeView = "requests";
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function decideRequest(requestId, decision) {
@@ -2693,53 +3639,124 @@ async function decideRequest(requestId, decision) {
   const profile = byId(state.profiles, request.profileId);
   if (!request || !profile || request.status !== "pending" || !canManageDepartment(profile.departmentId)) return;
   const days = workdayCount(profile.id, request.startDate, request.endDate);
-  if (dataStore?.mode === "supabase") {
-    await dataStore.updateVacationDecision({ ...request, status: decision }, profile, []);
-    audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
-    ui.drawer = null;
-    await reloadState();
-    return;
-  }
-
-  const changedOverrides = [];
-  request.status = decision;
-  request.decidedBy = currentUser().id;
-  request.decidedAt = new Date().toISOString();
-  request.deductedDays = decision === "approved" ? days : 0;
-
-  if (decision === "approved") {
-    profile.remainingVacationDays -= days;
-    for (let offset = 0; offset <= dateDiff(request.startDate, request.endDate); offset += 1) {
-      const date = addDays(request.startDate, offset);
-      if (scheduleFor(profile.id, date).kind !== "working") continue;
-      const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
-      const payload = { id: existing?.id || makeId("ovr"), profileId: profile.id, date, statusId: "vacation", note: `Vacation request ${request.id}` };
-      if (existing) Object.assign(existing, payload);
-      else state.scheduleOverrides.push(payload);
-      changedOverrides.push(payload);
+  const requestDates = datesBetween(request.startDate, request.endDate);
+  const leadAssignmentsToReplace = decision === "approved"
+    ? assignedLeadDatesForProfile(profile.id, requestDates).filter((assignment) => isScheduleLeadAvailable(scheduleFor(profile.id, assignment.date)))
+    : [];
+  await runMutation("vacation-decision", {
+    pending: decision === "approved" ? "Approving request..." : "Rejecting request...",
+    success: decision === "approved" ? "Request approved." : "Request rejected.",
+    failure: "The request decision could not be saved."
+  }, async () => {
+    if (dataStore?.mode === "supabase") {
+      await dataStore.updateVacationDecision({ ...request, status: decision }, profile, []);
+      audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
+      await reloadState();
+      if (!openLeadPromptForAssignment(leadAssignmentsToReplace[0], "Vacation approved. Choose another leader for the affected day.")) {
+        ui.drawer = null;
+      }
+      render();
+      return;
     }
-  }
 
-  audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
-  await dataStore.updateVacationDecision(request, profile, changedOverrides);
-  await saveState();
-  ui.drawer = null;
-  render();
+    const changedOverrides = [];
+    request.status = decision;
+    request.decidedBy = currentUser().id;
+    request.decidedAt = new Date().toISOString();
+    request.deductedDays = decision === "approved" ? days : 0;
+
+    if (decision === "approved") {
+      profile.remainingVacationDays -= days;
+      for (let offset = 0; offset <= dateDiff(request.startDate, request.endDate); offset += 1) {
+        const date = addDays(request.startDate, offset);
+        if (scheduleFor(profile.id, date).kind !== "working") continue;
+        const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
+        const payload = { id: existing?.id || makeId("ovr"), profileId: profile.id, date, statusId: "vacation", note: `Vacation request ${request.id}` };
+        if (existing) Object.assign(existing, payload);
+        else state.scheduleOverrides.push(payload);
+        changedOverrides.push(payload);
+      }
+    }
+
+    audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
+    await dataStore.updateVacationDecision(request, profile, changedOverrides);
+    await saveState();
+    if (!openLeadPromptForAssignment(leadAssignmentsToReplace[0], "Vacation approved. Choose another leader for the affected day.")) {
+      ui.drawer = null;
+    }
+    render();
+  });
 }
 
 async function saveLead(event) {
   event.preventDefault();
-  if (!canManageDepartment(ui.selectedDepartmentId) || !editableDate(ui.drawer.date)) return;
+  const departmentId = activeDrawerDepartmentId();
+  if (!canManageDepartment(departmentId) || !editableDate(ui.drawer.date)) return;
   const form = new FormData(event.currentTarget);
-  const existing = state.departmentLeads.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === ui.drawer.date);
-  const payload = { id: existing?.id || makeId("lead"), departmentId: ui.selectedDepartmentId, date: ui.drawer.date, profileId: form.get("profileId") };
-  if (existing) Object.assign(existing, payload);
-  else state.departmentLeads.push(payload);
-  audit("department.lead_set", "department_lead", payload.id, `${payload.date} lead`);
-  await dataStore.upsertDailyLead(payload);
-  await saveState();
-  ui.drawer = null;
-  render();
+  const existing = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === ui.drawer.date);
+  const profileId = form.get("profileId");
+  const selectedProfile = byId(state.profiles, profileId);
+  if (profileId && (!selectedProfile || !isScheduleLeadAvailable(scheduleFor(profileId, ui.drawer.date)))) {
+    notify("Choose a leader who is available on this day.", "error");
+    return;
+  }
+  const payload = { id: existing?.id || makeId("lead"), departmentId, date: ui.drawer.date, profileId };
+  await runMutation("daily-lead", {
+    pending: "Saving daily lead...",
+    success: profileId ? "Daily lead override saved." : "Daily lead returned to weekly rotation.",
+    failure: "The daily lead could not be saved."
+  }, async () => {
+    if (!profileId) {
+      if (existing) {
+        state.departmentLeads = state.departmentLeads.filter((item) => item.id !== existing.id);
+        await dataStore.deleteDailyLead(existing);
+        audit("department.lead_cleared", "department_lead", existing.id, `${existing.date} returned to weekly lead rotation`);
+      }
+    } else {
+      if (existing) Object.assign(existing, payload);
+      else state.departmentLeads.push(payload);
+      audit("department.lead_set", "department_lead", payload.id, `${payload.date} lead`);
+      await dataStore.upsertDailyLead(payload);
+    }
+    await saveState();
+    ui.selectedDepartmentId = departmentId;
+    ui.drawer = null;
+    render();
+  });
+}
+
+async function saveLeadRotation(event) {
+  event.preventDefault();
+  const departmentId = ui.selectedDepartmentId;
+  if (!canManageDepartment(departmentId)) return;
+  const form = new FormData(event.currentTarget);
+  const effectiveStart = form.get("effectiveStart");
+  if (!effectiveStart || (!editableDate(effectiveStart) && !isAdmin())) return;
+  const pattern = weekDays.map((_, index) => form.get(`lead-${index}`));
+  if (pattern.some((profileId) => !leadCandidates(departmentId).some((profile) => profile.id === profileId))) {
+    notify("Every weekday needs a person from this department.", "error");
+    return;
+  }
+  const existing = (state.departmentLeadRotations || []).find((rotation) => rotation.departmentId === departmentId && rotation.effectiveStart === effectiveStart);
+  const payload = {
+    id: existing?.id || makeId("lead-rotation"),
+    departmentId,
+    effectiveStart,
+    pattern
+  };
+  await runMutation("lead-rotation", {
+    pending: "Saving department lead rotation...",
+    success: "Department lead rotation saved.",
+    failure: "The department lead rotation could not be saved."
+  }, async () => {
+    await dataStore.upsertDepartmentLeadRotation(payload);
+    state.departmentLeadRotations ||= [];
+    if (existing) Object.assign(existing, payload);
+    else state.departmentLeadRotations.push(payload);
+    audit("department.lead_rotation_saved", "department_lead_rotation", payload.id, `${effectiveStart} weekly lead pattern`);
+    await saveState();
+    render();
+  });
 }
 
 function bindDayEditorPreview() {
@@ -2776,8 +3793,9 @@ async function saveDayBulkOverrides(event) {
   const date = ui.drawer.date;
   if (!canManageDepartment(ui.selectedDepartmentId) || !editableDate(date)) return;
   const form = new FormData(event.currentTarget);
-  const profiles = state.profiles.filter((profile) => profile.departmentId === ui.selectedDepartmentId);
+  const profiles = state.profiles.filter((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId));
   const changed = [];
+  const cleared = [];
 
   for (const profile of profiles) {
     const statusId = form.get(`status-${profile.id}`);
@@ -2787,9 +3805,7 @@ async function saveDayBulkOverrides(event) {
     const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
     if (shouldClear) {
       if (!existing) continue;
-      state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
-      audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
-      await dataStore.deleteScheduleOverride(existing);
+      cleared.push(existing);
       continue;
     }
     if (!existing && statusId === originalStatusId && !note) continue;
@@ -2801,19 +3817,31 @@ async function saveDayBulkOverrides(event) {
       statusId,
       note
     };
-    if (existing) Object.assign(existing, payload);
-    else state.scheduleOverrides.push(payload);
-    changed.push(payload);
+    changed.push({ existing, payload });
   }
 
-  for (const payload of changed) {
-    audit("schedule.override", "schedule_override", payload.id, `${payload.date} set to ${payload.statusId}`);
-    await dataStore.upsertScheduleOverride(payload);
-  }
+  await runMutation("day-bulk", {
+    pending: "Saving daily changes...",
+    success: "Daily changes saved.",
+    failure: "The daily changes could not be saved."
+  }, async () => {
+    for (const existing of cleared) {
+      state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
+      audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
+      await dataStore.deleteScheduleOverride(existing);
+    }
 
-  await saveState();
-  ui.drawer = null;
-  render();
+    for (const item of changed) {
+      if (item.existing) Object.assign(item.existing, item.payload);
+      else state.scheduleOverrides.push(item.payload);
+      audit("schedule.override", "schedule_override", item.payload.id, `${item.payload.date} set to ${item.payload.statusId}`);
+      await dataStore.upsertScheduleOverride(item.payload);
+    }
+
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveRotation(event) {
@@ -2830,13 +3858,53 @@ async function saveRotation(event) {
   }
   const existing = event.submitter?.value === "new-version" ? null : byId(state.rotationVersions, ui.drawer.rotationId);
   const payload = { id: existing?.id || makeId("rot"), profileId: form.get("profileId"), effectiveStart: form.get("effectiveStart"), pattern };
-  if (existing) Object.assign(existing, payload);
-  else state.rotationVersions.push(payload);
-  audit("rotation.saved", "rotation_version", payload.id, `${payload.pattern.length} day pattern`);
-  await dataStore.upsertRotation(payload);
-  await saveState();
-  ui.drawer = null;
-  render();
+  await runMutation("rotation-save", {
+    pending: "Saving rotation...",
+    success: existing ? "Rotation saved." : "Rotation created.",
+    failure: "The rotation could not be saved."
+  }, async () => {
+    if (existing) Object.assign(existing, payload);
+    else state.rotationVersions.push(payload);
+    audit("rotation.saved", "rotation_version", payload.id, `${payload.pattern.length} day pattern`);
+    await dataStore.upsertRotation(payload);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
+}
+
+async function saveDepartmentRotations(event) {
+  event.preventDefault();
+  if (!canManageDepartment(ui.selectedDepartmentId) || !ui.selectedRotationProfileIds.length) return;
+  const form = new FormData(event.currentTarget);
+  const effectiveStart = form.get("effectiveStart");
+  const pattern = sanitizeRotationPattern(ui.rotationBulkPattern);
+  const selectedProfiles = ui.selectedRotationProfileIds.map((id) => byId(state.profiles, id)).filter(Boolean);
+  if (selectedProfiles.some((profile) => !profileBelongsToDepartment(profile, ui.selectedDepartmentId))) {
+    notify("Every selected person must belong to this department.");
+    return;
+  }
+  if (selectedProfiles.some((profile) => state.rotationVersions.some((rotation) => rotation.profileId === profile.id && rotation.effectiveStart === effectiveStart))) {
+    notify("One or more selected people already have a rotation starting on that date. Choose another effective date.");
+    return;
+  }
+
+  const patterns = selectedProfiles.map((profile) => ({ profileId: profile.id, pattern }));
+  await runMutation("department-rotations", {
+    pending: "Saving department rotations...",
+    success: `Saved ${patterns.length} ${patterns.length === 1 ? "rotation" : "rotations"}.`,
+    failure: "The department rotations could not be saved."
+  }, async () => {
+    const rotations = await dataStore.saveDepartmentRotations(ui.selectedDepartmentId, effectiveStart, patterns);
+    state.rotationVersions.push(...rotations);
+    rotations.forEach((rotation) => audit("rotation.saved", "rotation_version", rotation.id, `${rotation.pattern.length} day department pattern`));
+    await saveState();
+    ui.rotationDepartmentEdit = false;
+    ui.rotationBulkEditing = false;
+    ui.selectedRotationProfileIds = [];
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function saveStatus(event) {
@@ -2850,13 +3918,19 @@ async function saveStatus(event) {
     color: "#991b1b",
     kind: form.get("kind")
   };
-  if (existing) Object.assign(existing, payload);
-  else state.statuses.push(payload);
-  audit("status.saved", "status", payload.id, payload.label);
-  await dataStore.upsertStatus(payload);
-  await saveState();
-  ui.drawer = null;
-  render();
+  await runMutation("status-save", {
+    pending: "Saving status...",
+    success: existing ? "Status saved." : "Status created.",
+    failure: "The status could not be saved."
+  }, async () => {
+    if (existing) Object.assign(existing, payload);
+    else state.statuses.push(payload);
+    audit("status.saved", "status", payload.id, payload.label);
+    await dataStore.upsertStatus(payload);
+    await saveState();
+    ui.drawer = null;
+    render();
+  });
 }
 
 async function reloadState() {
@@ -2866,6 +3940,7 @@ async function reloadState() {
   try {
     state = await dataStore.load();
     ui.selectedDepartmentId = state.departments[0]?.id;
+    syncHierarchyDepartmentSelection();
   } catch (error) {
     ui.error = error.message || "Unable to load live scheduler data.";
     if (/session|jwt|invalid|expired/i.test(ui.error)) {
@@ -2883,6 +3958,7 @@ async function boot() {
     dataStore = await createSupabaseStore();
     state = await dataStore.load();
     ui.selectedDepartmentId = state.departments[0]?.id;
+    syncHierarchyDepartmentSelection();
   } catch (error) {
     ui.error = error.message || "Unable to load scheduler.";
     if (dataStore?.mode === "supabase" && /session|jwt|invalid|expired/i.test(ui.error)) {
@@ -2896,6 +3972,7 @@ async function boot() {
         async reset() {}
       };
       state = loadState();
+      syncHierarchyDepartmentSelection();
     }
   } finally {
     ui.loading = false;

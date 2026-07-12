@@ -10,6 +10,8 @@ with expected_tables(table_name) as (
     ('rotation_versions'),
     ('schedule_overrides'),
     ('department_daily_leads'),
+    ('department_lead_rotation_versions'),
+    ('employee_profile_departments'),
     ('vacation_requests'),
     ('audit_log')
 ),
@@ -18,9 +20,13 @@ expected_functions(routine_name) as (
     ('current_role'),
     ('current_profile_department'),
     ('current_profile_id'),
+    ('profile_belongs_to_department'),
     ('is_claimed_user'),
     ('claim_profile_for_current_user'),
     ('update_own_profile'),
+    ('update_admin_profile'),
+    ('save_admin_profile'),
+    ('delete_admin_profile'),
     ('vacation_workday_count'),
     ('apply_vacation_overrides'),
     ('decide_vacation_request')
@@ -80,6 +86,19 @@ audit_checks as (
 
   select
     'column',
+    'departments.parent_department_id',
+    case when exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'departments'
+        and column_name = 'parent_department_id'
+    ) then 'pass' else 'fail' end,
+    'optional parent department for sub-departments'
+
+  union all
+
+  select
+    'column',
     'employee_profiles.department_id nullable',
     case when exists (
       select 1 from information_schema.columns
@@ -89,6 +108,20 @@ audit_checks as (
         and is_nullable = 'YES'
     ) then 'pass' else 'fail' end,
     'required for unassigned profiles'
+
+  union all
+
+  select
+    'column',
+    'employee_profiles lead fields',
+    case when (
+      select count(*)
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'employee_profiles'
+        and column_name in ('seniority_level', 'is_department_lead')
+    ) = 2 then 'pass' else 'fail' end,
+    'seniority and department lead eligibility'
 
   union all
 

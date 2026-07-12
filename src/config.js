@@ -1,9 +1,13 @@
+const runtimeConfig = window.__SPORT360_CONFIG__ || {};
+
 export const supabaseConfig = {
-  url: "https://zehdjadirhhiqfxudikp.supabase.co",
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplaGRqYWRpcmhoaXFmeHVkaWtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMDc0MjYsImV4cCI6MjA5NDU4MzQyNn0.ZgD0KiNnDViLsfl5EBIamqErDG8hyaKHgO0E-avl7yM"
+  url: runtimeConfig.supabaseUrl || "",
+  anonKey: runtimeConfig.supabaseAnonKey || ""
 };
 
 export const appConfig = {
-  demoMode: false,
-  defaultScheduleDays: 14
+  demoMode: runtimeConfig.demoMode === true,
+  defaultScheduleDays: 14,
+  allowSignup: runtimeConfig.allowSignup === true,
+  release: runtimeConfig.release || "local"
 };

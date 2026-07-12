@@ -1,6 +1,8 @@
 import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
 
+const profilePhotoPrefix = "storage:profile-photos/";
+
 export function shouldUseSupabase() {
   return Boolean(!appConfig.demoMode && supabaseConfig.url && supabaseConfig.anonKey);
 }
@@ -28,17 +30,34 @@ function createLocalStore() {
     async signOut() {},
     async createProfile() {},
     async updateProfile() {},
-    async updateOwnProfileName() {},
+    async updateOwnProfile() {},
+    async setProfileDepartments() {},
     async upsertUserRole() {},
     async unlinkProfileAccount() {},
+    async deleteProfile() {},
     async upsertDepartment() {},
+    async deleteDepartment() {},
     async upsertScheduleOverride() {},
     async deleteScheduleOverride() {},
     async createVacationRequest() {},
     async updateVacationDecision() {},
     async upsertDailyLead() {},
+    async deleteDailyLead() {},
+    async upsertDepartmentLeadRotation() {},
     async upsertRotation() {},
+    async saveDepartmentRotations(departmentId, effectiveStart, patterns) {
+      return patterns.map((item) => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : `rot-${Math.random().toString(36).slice(2, 8)}`,
+        profileId: item.profileId,
+        effectiveStart,
+        pattern: [...item.pattern]
+      }));
+    },
     async upsertStatus() {},
+    async uploadProfilePhoto(profileId, file, dataUrl) {
+      return { reference: dataUrl, url: dataUrl };
+    },
+    async deleteProfilePhoto() {},
     async insertAudit() {}
   };
 }
@@ -78,10 +97,51 @@ function createRemoteStore(client) {
       await client.insert("employee_profiles", toDbProfile(profile));
     },
     async updateProfile(profile) {
-      await client.update("employee_profiles", `id=eq.${profile.id}`, toDbProfile(profile));
+      try {
+        const row = await client.rpc("save_admin_profile", {
+          p_profile_id: profile.id,
+          p_employee_code: profile.employeeId,
+          p_email: profile.email,
+          p_full_name: profile.name,
+          p_title: profile.title,
+          p_seniority_level: profile.seniorityLevel || "mid",
+          p_department_ids: profile.departmentIds || [],
+          p_photo_url: profile.photoRef || profile.photo || null,
+          p_yearly_vacation_days: profile.yearlyVacationDays,
+          p_remaining_vacation_days: profile.remainingVacationDays,
+          p_user_id: profile.userId || null
+        });
+        return row ? fromDbProfile(row) : null;
+      } catch (error) {
+        if (!/schema cache|Could not find the function|save_admin_profile/i.test(error.message || "")) throw error;
+        const row = await client.rpc("update_admin_profile", {
+          p_profile_id: profile.id,
+          p_employee_code: profile.employeeId,
+          p_email: profile.email,
+          p_full_name: profile.name,
+          p_title: profile.title,
+          p_seniority_level: profile.seniorityLevel || "mid",
+          p_is_department_lead: false,
+          p_department_id: profile.departmentId || null,
+          p_photo_url: profile.photoRef || profile.photo || null,
+          p_yearly_vacation_days: profile.yearlyVacationDays,
+          p_remaining_vacation_days: profile.remainingVacationDays,
+          p_user_id: profile.userId || null
+        });
+        await saveProfileMemberships(client, profile);
+        return row ? fromDbProfile(row) : null;
+      }
     },
-    async updateOwnProfileName(profile) {
-      await client.rpc("update_own_profile", { p_profile_id: profile.id, p_full_name: profile.name, p_photo_url: profile.photo || null });
+    async updateOwnProfile(profile) {
+      await client.rpc("update_own_profile", {
+        p_profile_id: profile.id,
+        p_full_name: profile.name,
+        p_photo_url: profile.photoRef || profile.photo || null,
+        p_title: profile.title
+      });
+    },
+    async setProfileDepartments(profile) {
+      await saveProfileMemberships(client, profile);
     },
     async upsertUserRole(userRole) {
       await client.upsert("user_roles", toDbUserRole(userRole), "user_id");
@@ -90,8 +150,20 @@ function createRemoteStore(client) {
       if (profile.userId) await client.delete("user_roles", `user_id=eq.${profile.userId}`);
       await client.update("employee_profiles", `id=eq.${profile.id}`, { user_id: null });
     },
+    async deleteProfile(profile) {
+      try {
+        await client.rpc("delete_admin_profile", { p_profile_id: profile.id });
+      } catch (error) {
+        if (!/schema cache|Could not find the function|delete_admin_profile/i.test(error.message || "")) throw error;
+        if (profile.userId) await client.delete("user_roles", `user_id=eq.${profile.userId}`);
+        await client.delete("employee_profiles", `id=eq.${profile.id}`);
+      }
+    },
     async upsertDepartment(department) {
       await client.upsert("departments", toDbDepartment(department), "id");
+    },
+    async deleteDepartment(department) {
+      await client.delete("departments", `id=eq.${department.id}`);
     },
     async upsertScheduleOverride(override) {
       await client.upsert("schedule_overrides", toDbOverride(override), "profile_id,shift_date");
@@ -108,11 +180,41 @@ function createRemoteStore(client) {
     async upsertDailyLead(lead) {
       await client.upsert("department_daily_leads", toDbLead(lead), "department_id,lead_date");
     },
+    async deleteDailyLead(lead) {
+      await client.delete("department_daily_leads", `department_id=eq.${lead.departmentId}&lead_date=eq.${lead.date}`);
+    },
+    async upsertDepartmentLeadRotation(rotation) {
+      await client.upsert("department_lead_rotation_versions", toDbLeadRotation(rotation), "department_id,effective_start");
+    },
     async upsertRotation(rotation) {
       await client.upsert("rotation_versions", toDbRotation(rotation), "id");
     },
+    async saveDepartmentRotations(departmentId, effectiveStart, patterns) {
+      const rows = await client.rpc("save_department_rotation_versions", {
+        p_department_id: departmentId,
+        p_effective_start: effectiveStart,
+        p_patterns_json: patterns
+      });
+      return rows.map(fromDbRotation);
+    },
     async upsertStatus(status) {
       await client.upsert("shift_statuses", toDbStatus(status), "id");
+    },
+    async uploadProfilePhoto(profileId, file) {
+      const extension = photoExtension(file.type);
+      const path = `${profileId}/${crypto.randomUUID()}.${extension}`;
+      await client.uploadObject("profile-photos", path, file);
+      try {
+        const url = await client.signObject("profile-photos", path, 3600);
+        return { reference: `${profilePhotoPrefix}${path}`, url };
+      } catch (error) {
+        await client.deleteObject("profile-photos", path).catch(() => {});
+        throw error;
+      }
+    },
+    async deleteProfilePhoto(reference) {
+      const path = storagePhotoPath(reference);
+      if (path) await client.deleteObject("profile-photos", path);
     },
     async insertAudit(entry) {
       await client.insert("audit_log", toDbAudit(entry));
@@ -154,13 +256,13 @@ function createRestClient() {
     const text = await response.text();
     const body = text ? JSON.parse(text) : null;
     if (!response.ok) {
-      const message = body?.msg || body?.message || body?.error_description || body?.hint || `Supabase request failed (${response.status})`;
+      const message = normalizeSupabaseMessage(body?.msg || body?.message || body?.error_description || body?.hint || `Supabase request failed (${response.status})`);
       if (!retrying && response.status === 401 && /jwt expired/i.test(message)) {
         await refreshSession();
         const session = getSession();
         return fetchJson(path, options, { ...headers, Authorization: `Bearer ${session?.access_token || supabaseConfig.anonKey}` }, true);
       }
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         clearStoredSession();
       }
       throw new Error(message);
@@ -278,8 +380,63 @@ function createRestClient() {
         method: "DELETE",
         headers: { Prefer: "return=minimal" }
       });
+    },
+    async uploadObject(bucket, objectPath, file) {
+      return request(`/storage/v1/object/${bucket}/${encodeObjectPath(objectPath)}`, {
+        method: "POST",
+        headers: { "Content-Type": file.type, "x-upsert": "false" },
+        body: file
+      });
+    },
+    async signObject(bucket, objectPath, expiresIn) {
+      const result = await request(`/storage/v1/object/sign/${bucket}/${encodeObjectPath(objectPath)}`, {
+        method: "POST",
+        body: JSON.stringify({ expiresIn })
+      });
+      const signedPath = result?.signedURL || result?.signedUrl || result?.signed_url;
+      if (!signedPath) throw new Error("Supabase did not return a signed photo URL.");
+      if (signedPath.startsWith("http")) return signedPath;
+      if (signedPath.startsWith("/storage/v1/")) return `${baseUrl}${signedPath}`;
+      return `${baseUrl}/storage/v1${signedPath.startsWith("/") ? signedPath : `/${signedPath}`}`;
+    },
+    async deleteObject(bucket, objectPath) {
+      return request(`/storage/v1/object/${bucket}`, {
+        method: "DELETE",
+        body: JSON.stringify({ prefixes: [objectPath] })
+      });
     }
   };
+}
+
+function normalizeSupabaseMessage(message) {
+  if (/employee_profile_departments/i.test(message || "")) {
+    return "Profile department memberships are not ready in Supabase. Run migration 020_ensure_profile_department_memberships.sql, then reload the app.";
+  }
+  if (/parent_department_id/i.test(message || "")) {
+    return "Sub-departments are not ready in Supabase. Run migration 021_department_parent_structure.sql, then reload the app.";
+  }
+  return message;
+}
+
+async function saveProfileMemberships(client, profile) {
+  await client.delete("employee_profile_departments", `profile_id=eq.${profile.id}`);
+  const rows = (profile.departmentIds || []).map((departmentId) => ({
+    profile_id: profile.id,
+    department_id: departmentId
+  }));
+  if (rows.length) await client.insert("employee_profile_departments", rows);
+}
+
+function encodeObjectPath(objectPath) {
+  return objectPath.split("/").map(encodeURIComponent).join("/");
+}
+
+function photoExtension(contentType) {
+  return ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" })[contentType] || "jpg";
+}
+
+function storagePhotoPath(reference = "") {
+  return reference.startsWith(profilePhotoPrefix) ? reference.slice(profilePhotoPrefix.length) : "";
 }
 
 function emptyState() {
@@ -292,6 +449,7 @@ function emptyState() {
     rotationVersions: [],
     scheduleOverrides: [],
     departmentLeads: [],
+    departmentLeadRotations: [],
     vacationRequests: [],
     userRoles: [],
     auditLog: []
@@ -299,18 +457,35 @@ function emptyState() {
 }
 
 async function loadRemoteState(client, session) {
-  const [departments, profiles, statuses, rotations, overrides, leads, requests, roles] = await Promise.all([
+  const [departments, profiles, profileDepartments, statuses, rotations, overrides, leads, leadRotations, requests, roles] = await Promise.all([
     client.select("departments", "created_at"),
     client.select("employee_profiles", "full_name"),
+    safeSelect(client, "employee_profile_departments", "profile_id"),
     client.select("shift_statuses", "sort_order"),
     client.select("rotation_versions", "effective_start"),
     client.select("schedule_overrides", "shift_date"),
     client.select("department_daily_leads", "lead_date"),
+    safeSelect(client, "department_lead_rotation_versions", "effective_start"),
     client.select("vacation_requests", "requested_at", false),
     client.select("user_roles", "created_at")
   ]);
 
-  const mappedProfiles = profiles.map(fromDbProfile);
+  const mappedProfiles = await Promise.all(profiles.map(async (row) => {
+    const profile = fromDbProfile(row);
+    profile.departmentIds = [
+      profile.departmentId,
+      ...profileDepartments.filter((membership) => membership.profile_id === profile.id).map((membership) => membership.department_id)
+    ].filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index);
+    const photoPath = storagePhotoPath(profile.photoRef);
+    if (photoPath) {
+      try {
+        profile.photo = await client.signObject("profile-photos", photoPath, 3600);
+      } catch {
+        profile.photo = "";
+      }
+    }
+    return profile;
+  }));
   const currentProfile = mappedProfiles.find((profile) => profile.userId === session.user.id);
   const currentRole = roles.find((role) => role.user_id === session.user.id);
   const auditLog = currentRole?.role === "admin" ? await safeAuditLoad(client) : [];
@@ -325,6 +500,7 @@ async function loadRemoteState(client, session) {
     rotationVersions: rotations.map(fromDbRotation),
     scheduleOverrides: overrides.map(fromDbOverride),
     departmentLeads: leads.map(fromDbLead),
+    departmentLeadRotations: leadRotations.map(fromDbLeadRotation),
     vacationRequests: requests.map(fromDbVacationRequest),
     auditLog
   };
@@ -339,32 +515,46 @@ async function safeAuditLoad(client) {
   }
 }
 
+async function safeSelect(client, table, orderColumn, ascending = true) {
+  try {
+    return await client.select(table, orderColumn, ascending);
+  } catch {
+    return [];
+  }
+}
+
 async function claimProfileForSession(client, session) {
   if (!session?.user?.email) return;
   await client.rpc("claim_profile_for_current_user");
 }
 
 function fromDbDepartment(row) {
-  return { id: row.id, name: row.name, coverageTarget: row.min_available_people ?? 1 };
+  return { id: row.id, name: row.name, parentDepartmentId: row.parent_department_id || null, coverageTarget: row.min_available_people ?? 1 };
 }
 
 function toDbDepartment(department) {
   return {
     id: department.id,
     name: department.name,
+    parent_department_id: department.parentDepartmentId || null,
     min_available_people: department.coverageTarget ?? 1
   };
 }
 
 function fromDbProfile(row) {
+  const photoRef = row.photo_url || "";
   return {
     id: row.id,
     employeeId: row.employee_code,
     email: row.email,
     name: row.full_name,
     title: row.title,
+    seniorityLevel: row.seniority_level || "mid",
+    leadEligible: row.is_department_lead === true,
     departmentId: row.department_id,
-    photo: row.photo_url || "",
+    departmentIds: row.department_id ? [row.department_id] : [],
+    photo: storagePhotoPath(photoRef) ? "" : photoRef,
+    photoRef,
     yearlyVacationDays: row.yearly_vacation_days,
     remainingVacationDays: row.remaining_vacation_days,
     userId: row.user_id
@@ -378,8 +568,10 @@ function toDbProfile(profile) {
     email: profile.email,
     full_name: profile.name,
     title: profile.title,
+    seniority_level: profile.seniorityLevel || "mid",
+    is_department_lead: profile.leadEligible === true,
     department_id: profile.departmentId || null,
-    photo_url: profile.photo || null,
+    photo_url: profile.photoRef || profile.photo || null,
     yearly_vacation_days: profile.yearlyVacationDays,
     remaining_vacation_days: profile.remainingVacationDays,
     user_id: profile.userId
@@ -424,6 +616,24 @@ function fromDbLead(row) {
 
 function toDbLead(lead) {
   return { id: lead.id, department_id: lead.departmentId, lead_date: lead.date, lead_profile_id: lead.profileId };
+}
+
+function fromDbLeadRotation(row) {
+  return {
+    id: row.id,
+    departmentId: row.department_id,
+    effectiveStart: row.effective_start,
+    pattern: Array.isArray(row.pattern) ? row.pattern : []
+  };
+}
+
+function toDbLeadRotation(rotation) {
+  return {
+    id: rotation.id,
+    department_id: rotation.departmentId,
+    effective_start: rotation.effectiveStart,
+    pattern: rotation.pattern
+  };
 }
 
 function fromDbVacationRequest(row) {

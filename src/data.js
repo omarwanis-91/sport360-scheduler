@@ -5,9 +5,9 @@ export const seedState = {
     { id: "night", label: "Night", color: "#5b45d8", kind: "working" },
     { id: "midday", label: "Mid-day", color: "#d97706", kind: "working" },
     { id: "weekend", label: "Weekend", color: "#64748b", kind: "off" },
-    { id: "vacation", label: "Vacation", color: "#059669", kind: "leave" },
+    { id: "vacation", label: "Vacation", color: "#0ea5e9", kind: "leave" },
     { id: "sick", label: "Sick", color: "#dc2626", kind: "leave" },
-    { id: "ground", label: "On Ground", color: "#0f766e", kind: "working" }
+    { id: "ground", label: "On Ground", color: "#14b8a6", kind: "working" }
   ],
   departments: [
     { id: "ops", name: "Operations" },
@@ -26,7 +26,10 @@ export const seedState = {
       email: "admin@company.test",
       name: "Omar Wanis",
       title: "Workforce Admin",
+      seniorityLevel: "manager",
+      leadEligible: true,
       departmentId: "ops",
+      departmentIds: ["ops"],
       photo: "",
       yearlyVacationDays: 24,
       remainingVacationDays: 22,
@@ -38,7 +41,10 @@ export const seedState = {
       email: "mona@company.test",
       name: "Mona Saleh",
       title: "Department Lead",
+      seniorityLevel: "lead",
+      leadEligible: true,
       departmentId: "ops",
+      departmentIds: ["ops"],
       photo: "",
       yearlyVacationDays: 24,
       remainingVacationDays: 19,
@@ -50,7 +56,10 @@ export const seedState = {
       email: "karim@company.test",
       name: "Karim Adel",
       title: "Scheduler",
+      seniorityLevel: "senior",
+      leadEligible: true,
       departmentId: "ops",
+      departmentIds: ["ops"],
       photo: "",
       yearlyVacationDays: 21,
       remainingVacationDays: 16,
@@ -62,7 +71,10 @@ export const seedState = {
       email: "youssef@company.test",
       name: "Youssef Nabil",
       title: "Agent",
+      seniorityLevel: "mid",
+      leadEligible: true,
       departmentId: "support",
+      departmentIds: ["support"],
       photo: "",
       yearlyVacationDays: 21,
       remainingVacationDays: 18,
@@ -74,7 +86,10 @@ export const seedState = {
       email: "layla@company.test",
       name: "Layla Hassan",
       title: "Field Specialist",
+      seniorityLevel: "senior",
+      leadEligible: true,
       departmentId: "field",
+      departmentIds: ["field"],
       photo: "",
       yearlyVacationDays: 21,
       remainingVacationDays: 21,
@@ -121,6 +136,26 @@ export const seedState = {
     { id: "lead-001", departmentId: "ops", date: "2026-05-16", profileId: "emp-002" },
     { id: "lead-002", departmentId: "support", date: "2026-05-16", profileId: "emp-004" },
     { id: "lead-003", departmentId: "field", date: "2026-05-16", profileId: "emp-005" }
+  ],
+  departmentLeadRotations: [
+    {
+      id: "lead-rot-001",
+      departmentId: "ops",
+      effectiveStart: "2026-05-01",
+      pattern: ["emp-002", "emp-002", "emp-002", "emp-002", "emp-002", "emp-003", "emp-003"]
+    },
+    {
+      id: "lead-rot-002",
+      departmentId: "support",
+      effectiveStart: "2026-05-01",
+      pattern: ["emp-004", "emp-004", "emp-004", "emp-004", "emp-004", "emp-004", "emp-004"]
+    },
+    {
+      id: "lead-rot-003",
+      departmentId: "field",
+      effectiveStart: "2026-05-01",
+      pattern: ["emp-005", "emp-005", "emp-005", "emp-005", "emp-005", "emp-005", "emp-005"]
+    }
   ],
   vacationRequests: [
     {
