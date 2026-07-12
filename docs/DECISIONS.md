@@ -229,3 +229,14 @@ Scheduler cells should use the vertical bar as the primary working versus non-wo
 While the production Supabase project remains on the Free plan, Phase 4 backup readiness uses manual logical exports stored off-site rather than Supabase managed daily backups.
 
 Before production release, migrations, bulk edits, or pilot launch, the team must create a manual export and rehearse restoring it into a non-production Supabase project. Managed dashboard backups become the preferred path only after upgrading to a plan that includes them.
+
+## D-034 - Online Preview Before Full Backup Gate
+
+**Date:** 2026-07-12
+**Status:** Accepted
+
+The app may be put online for internal preview through the connected static host before the full Phase 4 backup/restore gate is closed.
+
+This does not mark the project production-ready. The SQL backup helper is currently blocked on the local Windows Docker/WSL configuration required by Supabase CLI dumps. Until that is repaired, a Supabase dashboard CSV export stored outside the repository is the temporary safety net for preview use only.
+
+The full production-ready internal release still requires a verified logical export, restore rehearsal in a non-production Supabase project, browser health checks, live role/auth checks, rollback ownership, and pilot signoff.

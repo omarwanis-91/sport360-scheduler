@@ -7,7 +7,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 ## Status
 
 - Overall result: Pending
-- Rehearsal date: Pending
+- Rehearsal date: 2026-07-12
 - Operator: Pending
 - Reviewer: Pending
 - Release branch / commit: Pending
@@ -30,7 +30,8 @@ Do not record database passwords, connection strings, access tokens, private emp
 | GitHub PR checks | Pass | PR #7 checks are passing and merge state is clean. |
 | Netlify deploy preview status | Pass | Netlify status context is passing for PR #7. |
 | Browser check of deploy preview | Pending | Local shell HTTP and in-app browser navigation timed out; verify manually in Chrome/Edge or through Netlify browser session. |
-| Free-plan manual export | Pending | Requires production Supabase database connection string. |
+| Online internal preview | In progress | Proceeding through the connected static host before closing the full backup/restore gate. |
+| Free-plan manual export | Blocked | Supabase CLI reached the remote database but local Docker/WSL is unavailable; Docker reports WSL2 is not supported with the current machine configuration. |
 | Backup folder verification | Pending | Run `npm.cmd run backup:verify` after export. |
 | Restore rehearsal | Pending | Requires non-production Supabase restore-test project. |
 | Live role/auth checks | Pending | Must verify Admin, Department Lead, Employee, and unmatched account behavior against restored or production-like environment. |
@@ -42,7 +43,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Check | Result | Notes |
 | --- | --- | --- |
 | `npm.cmd run backup:check` passed | Pending |  |
-| `npm.cmd run backup:manual` completed | Pending |  |
+| `npm.cmd run backup:manual` completed | Blocked | Connection string was accepted, but Supabase CLI dump requires local Docker/WSL. Use dashboard CSV export as temporary preview-only fallback until Docker/WSL is repaired. |
 | `npm.cmd run backup:verify` passed | Pending |  |
 | Export folder stored outside repository | Pending |  |
 | Off-site private copy created | Pending |  |
@@ -110,7 +111,7 @@ Pending
 
 | Severity | Area | Description | Owner | Status |
 | --- | --- | --- | --- | --- |
-| Pending | Pending | Pending | Pending | Pending |
+| Medium | Backup | Full SQL export is blocked by local Docker/WSL. Online preview may proceed, but production-ready release cannot close until export and restore rehearsal pass. | Pending | Open |
 
 ## Signoff
 

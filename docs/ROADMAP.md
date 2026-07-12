@@ -4,7 +4,7 @@ This document is the durable phased plan for Sport360 Scheduler. It records what
 
 ## Current Position
 
-Phases 0-3 are complete. The project is entering Phase 4: Production-Ready Internal Release. Phases 5-6 remain intentionally non-blocking for the first production release.
+Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The immediate working step is to put an internal online preview live through the connected static host while keeping the full backup/restore gate open. Phases 5-6 remain intentionally non-blocking for the first production release.
 
 ## Phase 0 - Product Foundation
 
@@ -97,7 +97,9 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Extract pure schedule and permission logic sufficiently to support automated Node tests.
 - ✅ Add GitHub Actions for static checks, unit tests, the production build, and demo-mode Chromium smoke tests.
 - ✅ Support current Chrome and Edge at 1024px, 1280px, 1440px, and 1920px widths. Mobile remains best-effort.
+- ⏳ Deploy the reviewed app online for internal preview through the connected static host.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
+- ⏳ Repair or bypass the local Docker/WSL blocker so the Supabase Free-plan SQL export can be completed and restored in a test project.
 - ⬜ Pilot the production release with one department for five business days before expanding internally.
 
 ### Acceptance Gate

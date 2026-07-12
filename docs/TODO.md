@@ -4,10 +4,14 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [~] Complete external launch gates in one pass: manual Supabase export, backup verification, restore rehearsal, browser health checks, role/auth checks, rollback ownership, and pilot signoff.
+- [~] Put the reviewed app online for internal preview through the connected static host.
+- [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
+- [ ] Verify the online preview manually in Chrome and Edge: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and role boundaries.
 
 ## Next
 
+- [ ] Repair Docker/WSL or use another machine so `npm.cmd run backup:manual` can create a full Supabase SQL export.
+- [ ] Restore the verified export into a non-production Supabase project.
 - [ ] Pilot one department for five business days and record signoff.
 
 ## Later
@@ -22,6 +26,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Accepted online internal preview before the full production backup gate, while keeping production readiness blocked until export/restore is verified.
 - [x] Recorded passing local verification, passing GitHub checks, and Netlify deploy-preview status in the production rehearsal report.
 - [x] Added a one-command Phase 4 local verification runner for syntax, unit, build, and smoke checks.
 - [x] Added a production rehearsal report template for recording export, restore, health-check, monitoring, and rollback results.
