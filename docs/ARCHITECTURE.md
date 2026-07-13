@@ -16,7 +16,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `src/supabaseStore.js` | Supabase REST/Auth client and persistence adapter. |
 | `src/data.js` | Seed/demo state and initial domain data. |
 | `src/config.js` | Supabase and application configuration. |
-| `server.js` | Local static file server. |
+| `scripts/localServer.js` | Local static file server. |
 | `scripts/build.js` | Creates the deployable `dist/` directory. |
 | `scripts/freePlanBackup.js` | Runs the Supabase Free-plan manual export helper without storing database credentials. |
 | `scripts/verifyFreePlanBackup.js` | Verifies a manual export folder has the expected files before restore rehearsal. |

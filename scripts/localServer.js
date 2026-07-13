@@ -1,9 +1,9 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { loadRuntimeConfig, runtimeConfigSource } = require("./scripts/runtimeConfig");
+const { loadRuntimeConfig, runtimeConfigSource } = require("./runtimeConfig");
 
-const root = __dirname;
+const root = path.resolve(__dirname, "..");
 const port = Number(process.argv[2] || 4173);
 
 const mime = {
@@ -25,6 +25,7 @@ const server = http.createServer((req, res) => {
     res.end(runtimeConfigSource(loadRuntimeConfig(root)));
     return;
   }
+
   const requested = urlPath === "/" ? "/index.html" : urlPath;
   const filePath = path.normalize(path.join(root, requested));
 
