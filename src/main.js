@@ -1548,6 +1548,9 @@ function renderDepartmentFocusPanel(department, dates) {
   const stats = departmentStats(department, dates);
   const children = childDepartmentsOf(department.id);
   const parent = byId(state.departments, department.parentDepartmentId);
+  const sortedMembers = [...stats.members].sort((a, b) => a.name.localeCompare(b.name));
+  const visibleMembers = sortedMembers.slice(0, 12);
+  const hiddenMemberCount = Math.max(0, sortedMembers.length - visibleMembers.length);
   return `
     <article class="department-focus-panel">
       <header class="department-focus-head">
@@ -1561,14 +1564,14 @@ function renderDepartmentFocusPanel(department, dates) {
           ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
         </div>
       </header>
-      <div class="department-focus-stats">
-        <span><strong>${stats.members.length}</strong> members</span>
-        <span><strong>${stats.target}</strong> target</span>
-        <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
-        <span><strong>${stats.pendingRequests}</strong> pending</span>
-      </div>
       <div class="department-focus-body">
-        <section>
+        <section class="department-focus-main">
+          <div class="department-focus-stats">
+            <span><strong>${stats.members.length}</strong> members</span>
+            <span><strong>${stats.target}</strong> target</span>
+            <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
+            <span><strong>${stats.pendingRequests}</strong> pending</span>
+          </div>
           <div class="department-focus-section-title">
             <strong>Sub-departments</strong>
             <span>${children.length}</span>
@@ -1584,8 +1587,6 @@ function renderDepartmentFocusPanel(department, dates) {
               `;
             }).join("") : `<p>No child departments.</p>`}
           </div>
-        </section>
-        <section>
           <div class="department-focus-section-title">
             <strong>Current view</strong>
             <span>${dates.length} days</span>
@@ -1596,6 +1597,21 @@ function renderDepartmentFocusPanel(department, dates) {
             <span>${stats.members.length ? `${Math.round((stats.leadCount / dates.length) * 100)}% lead coverage` : "No members yet"}</span>
           </div>
         </section>
+        <aside class="department-focus-members">
+          <div class="department-focus-section-title">
+            <strong>People</strong>
+            <span>${stats.members.length}</span>
+          </div>
+          <div class="department-focus-member-list">
+            ${visibleMembers.length ? visibleMembers.map((profile) => `
+              <button type="button" data-open-drawer="person" data-profile-id="${profile.id}">
+                <div class="avatar">${avatar(profile)}</div>
+                <strong>${profile.name}</strong>
+              </button>
+            `).join("") : `<p>No people in this department.</p>`}
+          </div>
+          ${hiddenMemberCount ? `<p class="department-focus-more">+${hiddenMemberCount} more</p>` : ""}
+        </aside>
       </div>
     </article>
   `;

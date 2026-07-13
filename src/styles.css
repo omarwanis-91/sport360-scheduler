@@ -3070,24 +3070,26 @@ label {
 .department-focus-view {
   display: grid;
   gap: 12px;
+  max-width: 1180px;
 }
 
 .department-focus-picker {
   display: flex;
   gap: 8px;
   overflow-x: auto;
+  max-width: 760px;
   padding: 2px 2px 8px;
   scrollbar-width: thin;
 }
 
 .department-focus-tab {
   display: grid;
-  flex: 0 0 170px;
+  flex: 0 0 142px;
   gap: 3px;
-  min-height: 70px;
-  padding: 10px 12px;
+  min-height: 56px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(18, 18, 18, 0.86);
   color: inherit;
   text-align: left;
@@ -3108,9 +3110,9 @@ label {
 }
 
 .department-focus-tab.is-child {
-  flex-basis: 150px;
-  min-height: 58px;
-  margin-left: calc(var(--department-depth, 0) * 10px);
+  flex-basis: 132px;
+  min-height: 50px;
+  margin-left: calc(var(--department-depth, 0) * 6px);
   border-color: rgba(148, 163, 184, 0.18);
 }
 
@@ -3125,7 +3127,7 @@ label {
 .department-focus-tab strong {
   overflow: hidden;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3138,10 +3140,11 @@ label {
 
 .department-focus-panel {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+  max-width: 1120px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 16px;
+  padding: 0;
   background:
     radial-gradient(circle at 96% 0%, rgba(225, 29, 72, 0.035), transparent 28%),
     rgba(17, 17, 17, 0.88);
@@ -3149,11 +3152,15 @@ label {
 
 .department-focus-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 12px;
+  min-height: 116px;
+  padding: 18px 20px;
   border-bottom: 1px solid var(--line-soft);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.006)),
+    rgba(255, 255, 255, 0.012);
 }
 
 .department-focus-head div:first-child {
@@ -3164,7 +3171,7 @@ label {
 .department-focus-head h2 {
   margin: 0;
   color: var(--text);
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1.1;
 }
 
@@ -3180,22 +3187,23 @@ label {
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .department-focus-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  grid-template-columns: repeat(4, minmax(88px, 1fr));
   gap: 8px;
 }
 
 .department-focus-stats span {
   display: grid;
   gap: 2px;
-  min-height: 54px;
+  min-height: 48px;
   align-content: center;
   border: 1px solid var(--line-soft);
   border-radius: 10px;
-  padding: 9px 10px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.018);
   color: var(--muted);
   font-size: 11px;
@@ -3203,24 +3211,30 @@ label {
 
 .department-focus-stats strong {
   color: var(--text);
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .department-focus-body {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 12px;
+  padding: 14px;
 }
 
-.department-focus-body section {
+.department-focus-body section,
+.department-focus-members {
   display: grid;
   gap: 10px;
   align-content: start;
-  min-height: 120px;
+  min-height: 164px;
   border: 1px solid var(--line-soft);
   border-radius: 12px;
   padding: 12px;
   background: rgba(255, 255, 255, 0.014);
+}
+
+.department-focus-main {
+  grid-template-rows: auto auto 1fr auto auto;
 }
 
 .department-focus-section-title {
@@ -3248,17 +3262,17 @@ label {
 
 .department-focus-children {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: 8px;
 }
 
 .department-focus-children button {
   display: grid;
   gap: 3px;
-  min-height: 48px;
+  min-height: 42px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   background: rgba(16, 16, 16, 0.78);
   color: inherit;
   text-align: left;
@@ -3276,7 +3290,9 @@ label {
 
 .department-focus-children span,
 .department-focus-children p,
-.department-focus-summary span {
+.department-focus-summary span,
+.department-focus-member-list p,
+.department-focus-more {
   color: var(--muted);
   font-size: 11px;
 }
@@ -3289,6 +3305,48 @@ label {
 .department-focus-summary span {
   border-bottom: 1px solid var(--line-soft);
   padding-bottom: 8px;
+}
+
+.department-focus-member-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.department-focus-member-list button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 5px 9px 5px 5px;
+  background: rgba(255, 255, 255, 0.018);
+  color: inherit;
+}
+
+.department-focus-member-list button:hover {
+  border-color: rgba(244, 244, 245, 0.26);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.department-focus-member-list .avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+}
+
+.department-focus-member-list strong {
+  overflow: hidden;
+  max-width: 150px;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-focus-more {
+  margin: 0;
 }
 
 .department-card {
