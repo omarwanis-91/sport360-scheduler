@@ -1565,39 +1565,13 @@ function renderDepartmentFocusPanel(department, dates) {
         </div>
       </header>
       <div class="department-focus-body">
-        <section class="department-focus-main">
-          <div class="department-focus-stats">
-            <span><strong>${stats.members.length}</strong> members</span>
-            <span><strong>${stats.target}</strong> target</span>
-            <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
-            <span><strong>${stats.pendingRequests}</strong> pending</span>
-          </div>
-          <div class="department-focus-section-title">
-            <strong>Sub-departments</strong>
-            <span>${children.length}</span>
-          </div>
-          <div class="department-focus-children">
-            ${children.length ? children.map((child) => {
-              const childStats = departmentStats(child, dates);
-              return `
-                <button type="button" data-department-focus="${child.id}">
-                  <strong>${child.name}</strong>
-                  <span>${childStats.members.length} people</span>
-                </button>
-              `;
-            }).join("") : `<p>No child departments.</p>`}
-          </div>
-          <div class="department-focus-section-title">
-            <strong>Current view</strong>
-            <span>${dates.length} days</span>
-          </div>
-          <div class="department-focus-summary">
-            <span>${stats.unclaimed} unclaimed profiles</span>
-            <span>${stats.rotations} rotation versions</span>
-            <span>${stats.members.length ? `${Math.round((stats.leadCount / dates.length) * 100)}% lead coverage` : "No members yet"}</span>
-          </div>
-        </section>
-        <aside class="department-focus-members">
+        <div class="department-focus-stats">
+          <span><strong>${stats.members.length}</strong> members</span>
+          <span><strong>${stats.target}</strong> target</span>
+          <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
+          <span><strong>${stats.pendingRequests}</strong> pending</span>
+        </div>
+        <section class="department-focus-members">
           <div class="department-focus-section-title">
             <strong>People</strong>
             <span>${stats.members.length}</span>
@@ -1611,7 +1585,37 @@ function renderDepartmentFocusPanel(department, dates) {
             `).join("") : `<p>No people in this department.</p>`}
           </div>
           ${hiddenMemberCount ? `<p class="department-focus-more">+${hiddenMemberCount} more</p>` : ""}
-        </aside>
+        </section>
+        <div class="department-focus-lower">
+          <section>
+            <div class="department-focus-section-title">
+              <strong>Sub-departments</strong>
+              <span>${children.length}</span>
+            </div>
+            <div class="department-focus-children">
+              ${children.length ? children.map((child) => {
+                const childStats = departmentStats(child, dates);
+                return `
+                  <button type="button" data-department-focus="${child.id}">
+                    <strong>${child.name}</strong>
+                    <span>${childStats.members.length} people</span>
+                  </button>
+                `;
+              }).join("") : `<p>No child departments.</p>`}
+            </div>
+          </section>
+          <section>
+            <div class="department-focus-section-title">
+              <strong>Current view</strong>
+              <span>${dates.length} days</span>
+            </div>
+            <div class="department-focus-summary">
+              <span>${stats.unclaimed} unclaimed profiles</span>
+              <span>${stats.rotations} rotation versions</span>
+              <span>${stats.members.length ? `${Math.round((stats.leadCount / dates.length) * 100)}% lead coverage` : "No members yet"}</span>
+            </div>
+          </section>
+        </div>
       </div>
     </article>
   `;

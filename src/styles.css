@@ -3069,25 +3069,25 @@ label {
 
 .department-focus-view {
   display: grid;
-  gap: 12px;
-  max-width: 1180px;
+  gap: 10px;
+  max-width: 960px;
 }
 
 .department-focus-picker {
   display: flex;
-  gap: 8px;
+  gap: 7px;
   overflow-x: auto;
-  max-width: 760px;
+  max-width: 620px;
   padding: 2px 2px 8px;
   scrollbar-width: thin;
 }
 
 .department-focus-tab {
   display: grid;
-  flex: 0 0 142px;
+  flex: 0 0 128px;
   gap: 3px;
-  min-height: 56px;
-  padding: 8px 10px;
+  min-height: 50px;
+  padding: 7px 9px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(18, 18, 18, 0.86);
@@ -3110,8 +3110,8 @@ label {
 }
 
 .department-focus-tab.is-child {
-  flex-basis: 132px;
-  min-height: 50px;
+  flex-basis: 118px;
+  min-height: 46px;
   margin-left: calc(var(--department-depth, 0) * 6px);
   border-color: rgba(148, 163, 184, 0.18);
 }
@@ -3140,10 +3140,9 @@ label {
 
 .department-focus-panel {
   display: grid;
-  gap: 12px;
-  max-width: 1120px;
+  max-width: 920px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 0;
   background:
     radial-gradient(circle at 96% 0%, rgba(225, 29, 72, 0.035), transparent 28%),
@@ -3155,8 +3154,8 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 116px;
-  padding: 18px 20px;
+  min-height: 76px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--line-soft);
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.006)),
@@ -3171,7 +3170,7 @@ label {
 .department-focus-head h2 {
   margin: 0;
   color: var(--text);
-  font-size: 24px;
+  font-size: 21px;
   line-height: 1.1;
 }
 
@@ -3190,20 +3189,35 @@ label {
   margin-left: auto;
 }
 
+.department-focus-actions .ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 31px;
+  line-height: 1;
+}
+
+.department-focus-actions .ghost svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+}
+
 .department-focus-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(88px, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .department-focus-stats span {
   display: grid;
   gap: 2px;
-  min-height: 48px;
+  min-height: 40px;
   align-content: center;
   border: 1px solid var(--line-soft);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   background: rgba(255, 255, 255, 0.018);
   color: var(--muted);
   font-size: 11px;
@@ -3211,30 +3225,27 @@ label {
 
 .department-focus-stats strong {
   color: var(--text);
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .department-focus-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
 }
 
-.department-focus-body section,
-.department-focus-members {
+.department-focus-body section {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   align-content: start;
-  min-height: 164px;
   border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 10px;
   background: rgba(255, 255, 255, 0.014);
 }
 
-.department-focus-main {
-  grid-template-rows: auto auto 1fr auto auto;
+.department-focus-members {
+  min-height: 0;
 }
 
 .department-focus-section-title {
@@ -3262,14 +3273,16 @@ label {
 
 .department-focus-children {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 7px;
 }
 
 .department-focus-children button {
-  display: grid;
-  gap: 3px;
-  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 10px;
   padding: 7px 9px;
@@ -3298,19 +3311,22 @@ label {
 }
 
 .department-focus-summary {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
 }
 
 .department-focus-summary span {
-  border-bottom: 1px solid var(--line-soft);
-  padding-bottom: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.018);
 }
 
 .department-focus-member-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .department-focus-member-list button {
@@ -3320,7 +3336,7 @@ label {
   max-width: 100%;
   border: 1px solid var(--line-soft);
   border-radius: 999px;
-  padding: 5px 9px 5px 5px;
+  padding: 4px 8px 4px 4px;
   background: rgba(255, 255, 255, 0.018);
   color: inherit;
 }
@@ -3331,8 +3347,8 @@ label {
 }
 
 .department-focus-member-list .avatar {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   font-size: 10px;
 }
 
@@ -3343,6 +3359,12 @@ label {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.department-focus-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+  gap: 10px;
 }
 
 .department-focus-more {
