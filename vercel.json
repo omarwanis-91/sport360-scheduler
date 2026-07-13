@@ -1,13 +1,29 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
   "routes": [
     {
-      "handle": "filesystem"
+      "src": "/runtime-config.js",
+      "dest": "/runtime-config.js"
     },
     {
-      "src": "/.*",
+      "src": "/src/(.*)",
+      "dest": "/src/$1"
+    },
+    {
+      "src": "/(.*\\.(?:css|js|mjs|json|png|jpg|jpeg|svg|ico|webp|gif|txt|map))",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
