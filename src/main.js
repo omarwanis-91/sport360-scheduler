@@ -77,6 +77,7 @@ const ui = {
   peopleDepartmentId: "all",
   peopleView: "default",
   departmentView: "tiles",
+  departmentFocusId: state.departments[0]?.id,
   expandedDepartmentIds: [],
   rangeDays: appConfig.defaultScheduleDays,
   startDate: todayIso,
@@ -1470,16 +1471,17 @@ function renderPersonTile(profile) {
 function renderDepartments() {
   const dates = datesInRange();
   const ordered = orderedDepartments();
+  const focusedDepartment = departmentFocusDepartment(ordered);
   return `
     ${renderTopbar("Departments", "Create departments, review team size, and jump into each schedule.", canManageDepartments() ? `<button class="primary" data-open-drawer="department">${icons.plus} New Department</button>` : "")}
     <section class="control-row people-view-switch">
-      ${departmentViewButton("tiles", "Tiles")}
+      ${departmentViewButton("tiles", "Focus")}
       ${departmentViewButton("details", "Details")}
     </section>
-    <section class="${ui.departmentView === "details" ? "department-details-list" : "department-grid"}">
+    <section class="${ui.departmentView === "details" ? "department-details-list" : "department-focus-view"}">
       ${ui.departmentView === "details"
         ? ordered.map(({ department, depth }) => renderDepartmentDetailRow(department, dates, depth)).join("")
-        : ordered.map(({ department, depth }) => renderDepartmentCard(department, dates, depth)).join("")}
+        : renderDepartmentFocusView(ordered, focusedDepartment, dates)}
       <template>
       ${state.departments.map((department) => {
         const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
@@ -1497,6 +1499,14 @@ function renderDepartments() {
   `;
 }
 
+function departmentFocusDepartment(ordered = orderedDepartments()) {
+  const focused = byId(state.departments, ui.departmentFocusId);
+  if (focused) return focused;
+  const fallback = ordered[0]?.department || state.departments[0];
+  ui.departmentFocusId = fallback?.id || "";
+  return fallback;
+}
+
 function departmentStats(department, dates = datesInRange()) {
   const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
   const leadCount = dates.reduce((count, date) => count + departmentLeadsForDate(department.id, date).length, 0);
@@ -1507,6 +1517,88 @@ function departmentStats(department, dates = datesInRange()) {
   const rotations = state.rotationVersions.filter((rotation) => members.some((profile) => profile.id === rotation.profileId)).length;
   const unclaimed = members.filter((profile) => !profile.userId).length;
   return { members, leadCount, pendingRequests, rotations, unclaimed, target: coverageTargetForDepartment(department) };
+}
+
+function renderDepartmentFocusView(ordered, focusedDepartment, dates) {
+  if (!focusedDepartment) {
+    return `<div class="empty-state">No departments yet.</div>`;
+  }
+  return `
+    <div class="department-focus-picker" aria-label="Departments">
+      ${ordered.map(({ department, depth }) => renderDepartmentFocusTab(department, dates, depth)).join("")}
+    </div>
+    ${renderDepartmentFocusPanel(focusedDepartment, dates)}
+  `;
+}
+
+function renderDepartmentFocusTab(department, dates, depth = 0) {
+  const stats = departmentStats(department, dates);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  const active = department.id === ui.departmentFocusId;
+  return `
+    <button class="department-focus-tab ${active ? "active" : ""} ${parent ? "is-child" : ""}" style="--department-depth: ${depth}" data-department-focus="${department.id}">
+      <span>${parent ? "Sub-dept" : "Department"}</span>
+      <strong>${department.name}</strong>
+      <em>${stats.members.length} people</em>
+    </button>
+  `;
+}
+
+function renderDepartmentFocusPanel(department, dates) {
+  const stats = departmentStats(department, dates);
+  const children = childDepartmentsOf(department.id);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  return `
+    <article class="department-focus-panel">
+      <header class="department-focus-head">
+        <div>
+          <span class="department-kind">${parent ? "Sub-department" : "Department"}</span>
+          <h2>${department.name}</h2>
+          <p>${parent ? parent.name : children.length ? `${children.length} child ${children.length === 1 ? "department" : "departments"}` : "Top-level department"}</p>
+        </div>
+        <div class="department-focus-actions">
+          <button type="button" class="ghost" data-open-drawer="department-detail" data-department-id="${department.id}">Edit details</button>
+          ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
+        </div>
+      </header>
+      <div class="department-focus-stats">
+        <span><strong>${stats.members.length}</strong> members</span>
+        <span><strong>${stats.target}</strong> target</span>
+        <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
+        <span><strong>${stats.pendingRequests}</strong> pending</span>
+      </div>
+      <div class="department-focus-body">
+        <section>
+          <div class="department-focus-section-title">
+            <strong>Sub-departments</strong>
+            <span>${children.length}</span>
+          </div>
+          <div class="department-focus-children">
+            ${children.length ? children.map((child) => {
+              const childStats = departmentStats(child, dates);
+              return `
+                <button type="button" data-department-focus="${child.id}">
+                  <strong>${child.name}</strong>
+                  <span>${childStats.members.length} people</span>
+                </button>
+              `;
+            }).join("") : `<p>No child departments.</p>`}
+          </div>
+        </section>
+        <section>
+          <div class="department-focus-section-title">
+            <strong>Current view</strong>
+            <span>${dates.length} days</span>
+          </div>
+          <div class="department-focus-summary">
+            <span>${stats.unclaimed} unclaimed profiles</span>
+            <span>${stats.rotations} rotation versions</span>
+            <span>${stats.members.length ? `${Math.round((stats.leadCount / dates.length) * 100)}% lead coverage` : "No members yet"}</span>
+          </div>
+        </section>
+      </div>
+    </article>
+  `;
 }
 
 function renderDepartmentCard(department, dates, depth = 0) {
@@ -2902,6 +2994,13 @@ function bindEvents() {
   document.querySelectorAll("[data-department-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.departmentView = button.dataset.departmentView;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-department-focus]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.departmentFocusId = button.dataset.departmentFocus;
       render();
     });
   });
