@@ -3062,7 +3062,8 @@ label {
 
 .department-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-items: start;
   gap: 12px;
 }
 
@@ -3086,11 +3087,16 @@ label {
 }
 
 .sub-department-card {
-  border-left: 3px solid rgba(148, 163, 184, 0.34);
+  border-left: 2px solid rgba(148, 163, 184, 0.24);
 }
 
 .sub-department-card.is-compact {
+  max-width: 280px;
   align-self: start;
+  border-color: rgba(148, 163, 184, 0.16);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
+    rgba(16, 16, 16, 0.9);
 }
 
 .parent-department-card {
@@ -3110,9 +3116,9 @@ label {
   display: grid;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 12px;
   background:
-    radial-gradient(circle at 92% 10%, rgba(225, 29, 72, 0.055), transparent 28%),
+    radial-gradient(circle at 92% 10%, rgba(225, 29, 72, 0.035), transparent 26%),
     rgba(17, 17, 17, 0.86);
 }
 
@@ -3120,8 +3126,8 @@ label {
   display: grid;
   gap: 12px;
   width: 100%;
-  min-height: 172px;
-  padding: 15px;
+  min-height: 150px;
+  padding: 14px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -3131,8 +3137,8 @@ label {
 .sub-department-card.is-compact .department-card-main {
   grid-template-columns: 1fr auto;
   gap: 8px 10px;
-  min-height: 92px;
-  padding: 12px;
+  min-height: 72px;
+  padding: 10px 11px;
 }
 
 .department-card-head {
@@ -3148,10 +3154,10 @@ label {
   width: fit-content;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 999px;
-  padding: 3px 8px;
+  padding: 2px 7px;
   background: rgba(148, 163, 184, 0.08);
   color: #cbd5e1;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -3167,7 +3173,7 @@ label {
 }
 
 .sub-department-card.is-compact .department-card-head strong {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .department-card-head em {
@@ -3184,16 +3190,16 @@ label {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 5px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   white-space: nowrap;
 }
 
 .sub-department-card.is-compact .department-compact-line span {
   border: 1px solid var(--line-soft);
   border-radius: 999px;
-  padding: 4px 7px;
+  padding: 3px 6px;
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -3282,7 +3288,7 @@ label {
 .department-drawer-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+  gap: 6px;
 }
 
 .sub-department-card.is-compact .department-card-stats,
@@ -3294,11 +3300,11 @@ label {
 .department-drawer-summary span {
   display: grid;
   gap: 2px;
-  min-height: 48px;
+  min-height: 42px;
   align-content: center;
-  padding: 8px;
+  padding: 7px;
   border: 1px solid var(--line-soft);
-  border-radius: 10px;
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.024);
   color: var(--muted);
   font-size: 10px;
@@ -3307,7 +3313,7 @@ label {
 .department-card-stats strong,
 .department-drawer-summary strong {
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .department-card-main p {
@@ -3318,18 +3324,18 @@ label {
 
 .department-child-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 6px;
 }
 
 .department-child-strip span {
   display: grid;
   gap: 2px;
-  min-height: 42px;
+  min-height: 36px;
   align-content: center;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 10px;
-  padding: 7px 8px;
+  border-radius: 9px;
+  padding: 6px 7px;
   background:
     linear-gradient(90deg, rgba(34, 197, 94, 0.045), transparent 60%),
     rgba(255, 255, 255, 0.018);
@@ -3357,17 +3363,18 @@ label {
 }
 
 .department-card-actions {
-  padding: 10px;
+  padding: 9px 10px;
   border-top: 1px solid var(--line-soft);
   background: rgba(255, 255, 255, 0.018);
 }
 
 .sub-department-card.is-compact .department-card-actions {
-  padding: 8px 10px;
+  justify-content: space-between;
+  padding: 7px 9px;
 }
 
 .compact-toggle {
-  min-width: 82px;
+  min-width: 72px;
 }
 
 .department-card-actions .ghost,
@@ -3376,8 +3383,8 @@ label {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 30px;
-  padding: 6px 9px;
+  min-height: 28px;
+  padding: 5px 8px;
 }
 
 .department-drawer-actions {
