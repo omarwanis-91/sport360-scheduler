@@ -26,7 +26,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const requested = urlPath === "/" ? "/index.html" : urlPath;
+  const requested = urlPath === "/" ? "/index.html" : urlPath.replace(/^\/assets\//, "/src/");
   const filePath = path.normalize(path.join(root, requested));
 
   if (!filePath.startsWith(root)) {

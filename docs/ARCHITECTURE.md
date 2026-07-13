@@ -131,8 +131,9 @@ Employee profiles also carry `seniority_level`. Department lead scheduling uses 
 
 Runtime environment values are not committed in frontend modules. `index.html` loads `runtime-config.js` before the application module and `src/config.js` reads `window.__SPORT360_CONFIG__`.
 
-- Local development: `server.js` generates `/runtime-config.js` from ignored `.env.local`.
-- Static builds: `scripts/build.js` writes `dist/runtime-config.js` from deployment environment variables.
+- Local development: `scripts/localServer.js` generates `/runtime-config.js` from ignored `.env.local`.
+- Local development serves `/assets/*` from the source `src/` directory.
+- Static builds: `scripts/build.js` writes `dist/runtime-config.js` from deployment environment variables and publishes browser assets under `dist/assets/`.
 - Netlify builds require `SPORT360_SUPABASE_URL` and `SPORT360_SUPABASE_ANON_KEY`.
 - `SPORT360_ALLOW_SIGNUP=false` hides public account creation for the internal release.
 - `SPORT360_RELEASE` identifies the deployed release; Netlify falls back to `COMMIT_REF`.

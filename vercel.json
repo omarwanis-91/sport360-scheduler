@@ -15,10 +15,6 @@
       "dest": "/runtime-config.js"
     },
     {
-      "src": "/src/(.*)",
-      "dest": "/src/$1"
-    },
-    {
       "src": "/(.*\\.(?:css|js|mjs|json|png|jpg|jpeg|svg|ico|webp|gif|txt|map))",
       "dest": "/$1"
     },
