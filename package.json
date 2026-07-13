@@ -4,7 +4,7 @@
   "private": true,
   "description": "Sport360 department scheduler with profile claiming, rotations, vacation approvals, and Supabase schema.",
   "scripts": {
-    "start": "node scripts/localServer.js",
+    "dev": "node scripts/localServer.js",
     "build": "node scripts/build.js",
     "backup:check": "node scripts/freePlanBackup.js --check",
     "backup:manual": "node scripts/freePlanBackup.js",
