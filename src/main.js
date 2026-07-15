@@ -1519,6 +1519,24 @@ function departmentStats(department, dates = datesInRange()) {
   return { members, leadCount, pendingRequests, rotations, unclaimed, target: coverageTargetForDepartment(department) };
 }
 
+function departmentStructureSummary(members) {
+  const labels = {
+    manager: ["manager", "managers"],
+    lead: ["lead", "leads"],
+    senior: ["senior", "seniors"],
+    mid: ["mid-level", "mid-levels"],
+    junior: ["junior", "juniors"]
+  };
+  return [...seniorityLevels]
+    .reverse()
+    .map(([id]) => {
+      const count = members.filter((profile) => (profile.seniorityLevel || "mid") === id).length;
+      return count ? `${count} ${labels[id][count === 1 ? 0 : 1]}` : "";
+    })
+    .filter(Boolean)
+    .join(" · ") || "No structure";
+}
+
 function renderDepartmentFocusView(ordered, focusedDepartment, dates) {
   if (!focusedDepartment) {
     return `<div class="empty-state">No departments yet.</div>`;
@@ -1551,6 +1569,7 @@ function renderDepartmentFocusPanel(department, dates) {
   const sortedMembers = [...stats.members].sort((a, b) => a.name.localeCompare(b.name));
   const visibleMembers = sortedMembers.slice(0, 12);
   const hiddenMemberCount = Math.max(0, sortedMembers.length - visibleMembers.length);
+  const structure = departmentStructureSummary(stats.members);
   return `
     <article class="department-focus-panel">
       <header class="department-focus-head">
@@ -1568,7 +1587,7 @@ function renderDepartmentFocusPanel(department, dates) {
         <div class="department-focus-stats">
           <span><strong>${stats.members.length}</strong> members</span>
           <span><strong>${stats.target}</strong> target</span>
-          <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
+          <span class="structure"><strong>${structure}</strong> structure</span>
           <span><strong>${stats.pendingRequests}</strong> pending</span>
         </div>
         <section class="department-focus-members">
@@ -1581,6 +1600,7 @@ function renderDepartmentFocusPanel(department, dates) {
               <button type="button" data-open-drawer="person" data-profile-id="${profile.id}">
                 <div class="avatar">${avatar(profile)}</div>
                 <strong>${profile.name}</strong>
+                ${(profile.seniorityLevel || "mid") === "manager" ? `<span class="department-manager-icon" title="Manager">${icons.lead}</span>` : ""}
               </button>
             `).join("") : `<p>No people in this department.</p>`}
           </div>
@@ -1612,7 +1632,7 @@ function renderDepartmentFocusPanel(department, dates) {
             <div class="department-focus-summary">
               <span>${stats.unclaimed} unclaimed profiles</span>
               <span>${stats.rotations} rotation versions</span>
-              <span>${stats.members.length ? `${Math.round((stats.leadCount / dates.length) * 100)}% lead coverage` : "No members yet"}</span>
+              <span>${structure}</span>
             </div>
           </section>
         </div>

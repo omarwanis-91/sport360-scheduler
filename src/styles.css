@@ -3084,10 +3084,11 @@ label {
 
 .department-focus-tab {
   display: grid;
-  flex: 0 0 128px;
+  position: relative;
+  flex: 0 0 146px;
   gap: 3px;
-  min-height: 50px;
-  padding: 7px 9px;
+  min-height: 58px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(18, 18, 18, 0.86);
@@ -3110,10 +3111,26 @@ label {
 }
 
 .department-focus-tab.is-child {
-  flex-basis: 118px;
-  min-height: 46px;
-  margin-left: calc(var(--department-depth, 0) * 6px);
-  border-color: rgba(148, 163, 184, 0.18);
+  flex-basis: 108px;
+  min-height: 42px;
+  margin-left: calc(var(--department-depth, 0) * 10px);
+  border-color: rgba(148, 163, 184, 0.16);
+  border-left-color: rgba(148, 163, 184, 0.38);
+  border-left-width: 2px;
+  background:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.035), transparent 55%),
+    rgba(15, 15, 15, 0.82);
+  opacity: 0.88;
+}
+
+.department-focus-tab.is-child::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -10px;
+  width: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+  pointer-events: none;
 }
 
 .department-focus-tab span {
@@ -3130,6 +3147,10 @@ label {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.department-focus-tab:not(.is-child) strong {
+  font-size: 13px;
 }
 
 .department-focus-tab em {
@@ -3224,8 +3245,15 @@ label {
 }
 
 .department-focus-stats strong {
+  overflow: hidden;
   color: var(--text);
   font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-focus-stats .structure strong {
+  font-size: 12px;
 }
 
 .department-focus-body {
@@ -3359,6 +3387,24 @@ label {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.department-manager-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: -2px;
+  border: 1px solid rgba(74, 222, 128, 0.28);
+  border-radius: 999px;
+  background: rgba(22, 101, 52, 0.28);
+  color: #bbf7d0;
+}
+
+.department-manager-icon svg {
+  width: 11px;
+  height: 11px;
 }
 
 .department-focus-lower {

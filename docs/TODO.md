@@ -47,6 +47,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Simplified schedule visuals around working/non-working base states and made missing-lead assignment a focused centered modal.
 - [x] Made Sick red, strengthened On Ground, removed manual Vacation overrides, and added missing-lead alerts/replacement prompts.
 - [x] Made Vacation blue with a subtle beach/water treatment and gave On Ground a distinct teal terrain treatment across profiles and Scheduler.
+- [x] Updated Departments focus view to show seniority structure, clearer parent/sub-department tabs, and manager markers.
 - [x] Reworked Departments into a focused team-style overview with compact department switching and visible member chips.
 - [x] Improved Departments hierarchy display and added a Details view beside the tile view.
 - [x] Added Scheduler month-title arrows, month-start snapping, removed New Profile from Scheduler, and introduced parent/sub-department structure.
