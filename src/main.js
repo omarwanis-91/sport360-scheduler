@@ -1150,6 +1150,7 @@ function renderScheduler() {
       ${filterButton("unclaimed", "Unclaimed")}
       ${filterButton("vacation", "On vacation")}
     </section>
+    ${ui.schedulerEditMode ? renderSchedulerEditCommitBar() : ""}
     <section class="scheduler-shell">
       <div class="schedule-grid ${schedulerRangeClass()} ${ui.schedulerEditMode ? "is-editing" : ""}" style="--days: ${dates.length}">
         <div class="month-corner">
@@ -1188,6 +1189,22 @@ function renderScheduler() {
         ${dates.map((date) => renderDateHead(date)).join("")}
         ${renderCoverageRow(coverageProfiles, dates, department)}
         ${profiles.map((profile) => renderProfileRow(profile, dates)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderSchedulerEditCommitBar() {
+  const stagedChanges = ui.schedulerLeadDrafts.filter((item) => item.departmentId === ui.selectedDepartmentId).length;
+  return `
+    <section class="edit-commit-bar scheduler-edit-commit">
+      <div>
+        <span class="eyebrow">Schedule Edit Mode</span>
+        <strong>Changes are staged until saved</strong>
+        <p>Hover an available shift to assign that person as the day lead. Click shift cells to make daily schedule changes.</p>
+      </div>
+      <div class="edit-commit-actions">
+        <span>${stagedChanges} lead ${stagedChanges === 1 ? "change" : "changes"}</span>
       </div>
     </section>
   `;

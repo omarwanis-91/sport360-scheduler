@@ -109,6 +109,7 @@ Employee profiles also carry `seniority_level`. Department lead scheduling uses 
 - Dark charcoal and black surfaces.
 - Compact typography and restrained spacing.
 - Red reserved for brand actions, selection, warnings, and destructive states.
+- The app should feel like a polished operational tech workspace: subtle animated background lines, restrained glows, layered gradients, and satisfying hover feedback are preferred when they do not reduce scan speed or legibility.
 - Shift-specific colors communicate schedule state.
 - Unavailable states remain quieter than working states.
 - Scheduler cells use the vertical bar as the primary working/non-working signal; individual status type is secondary through icon, label, and subtle texture.

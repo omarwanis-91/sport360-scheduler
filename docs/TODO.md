@@ -26,6 +26,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added Scheduler/Rotations edit-mode staging, hover lead assignment, normal pointer cursor, and the first pass of futuristic UI polish.
 - [x] Accepted online internal preview before the full production backup gate, while keeping production readiness blocked until export/restore is verified.
 - [x] Recorded passing local verification, passing GitHub checks, and Netlify deploy-preview status in the production rehearsal report.
 - [x] Added a one-command Phase 4 local verification runner for syntax, unit, build, and smoke checks.
