@@ -240,3 +240,12 @@ The app may be put online for internal preview through the connected static host
 This does not mark the project production-ready. The SQL backup helper is currently blocked on the local Windows Docker/WSL configuration required by Supabase CLI dumps. Until that is repaired, a Supabase dashboard CSV export stored outside the repository is the temporary safety net for preview use only.
 
 The full production-ready internal release still requires a verified logical export, restore rehearsal in a non-production Supabase project, browser health checks, live role/auth checks, rollback ownership, and pilot signoff.
+
+## D-035 - Futuristic Operational UI Polish
+
+**Date:** 2026-07-15
+**Status:** Accepted
+
+The visual direction should move beyond a plain dark admin tool toward a polished Sport360 operational workspace with subtle animated background lines, layered gradients, restrained glows, and satisfying hover feedback.
+
+This polish must remain secondary to scan speed, schedule readability, and compact operational density. Animations should be slow, faint, and mostly interactive or ambient in the background; shift-state colors and lead/edit affordances must stay legible and purposeful.

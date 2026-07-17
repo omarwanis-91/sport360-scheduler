@@ -9,7 +9,7 @@ async function build() {
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
   await cp(path.join(root, "index.html"), path.join(output, "index.html"));
-  await cp(path.join(root, "src"), path.join(output, "src"), { recursive: true });
+  await cp(path.join(root, "src"), path.join(output, "assets"), { recursive: true });
   const runtimeConfig = loadRuntimeConfig(root);
   assertDeployConfig(runtimeConfig);
   await writeFile(path.join(output, "runtime-config.js"), runtimeConfigSource(runtimeConfig));

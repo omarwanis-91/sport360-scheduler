@@ -77,6 +77,7 @@ const ui = {
   peopleDepartmentId: "all",
   peopleView: "default",
   departmentView: "tiles",
+  departmentFocusId: state.departments[0]?.id,
   expandedDepartmentIds: [],
   rangeDays: appConfig.defaultScheduleDays,
   startDate: todayIso,
@@ -93,6 +94,10 @@ const ui = {
   rotationBulkEditing: false,
   rotationBulkPattern: [...defaultWeekPattern],
   rotationBulkEffectiveStart: todayIso,
+  rotationLeadDraftPattern: null,
+  rotationLeadEffectiveStart: todayIso,
+  schedulerEditMode: false,
+  schedulerLeadDrafts: [],
   pendingPhotoFile: null,
   pendingPhotoDataUrl: "",
   drawer: null,
@@ -275,6 +280,9 @@ function isWeekStart(date) {
 }
 
 function leadForWeekday(departmentId, weekday) {
+  if (ui.rotationDepartmentEdit && departmentId === ui.selectedDepartmentId) {
+    return byId(state.profiles, rotationLeadPatternDraft(departmentId)[weekday]);
+  }
   const rotation = latestLeadRotation(departmentId);
   return byId(state.profiles, rotation?.pattern?.[weekday]);
 }
@@ -494,7 +502,41 @@ function latestLeadRotation(departmentId) {
     .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
 }
 
+function currentLeadPattern(departmentId) {
+  const candidates = leadCandidates(departmentId);
+  const fallbackId = candidates[0]?.id || "";
+  const rotation = latestLeadRotation(departmentId);
+  return Array.from({ length: 7 }, (_, index) => rotation?.pattern?.[index] || fallbackId);
+}
+
+function rotationLeadPatternDraft(departmentId) {
+  if (!ui.rotationLeadDraftPattern) ui.rotationLeadDraftPattern = currentLeadPattern(departmentId);
+  return ui.rotationLeadDraftPattern;
+}
+
+function countRotationLeadDraftChanges(departmentId) {
+  const current = currentLeadPattern(departmentId);
+  const draft = rotationLeadPatternDraft(departmentId);
+  return draft.reduce((count, profileId, index) => count + (profileId !== current[index] ? 1 : 0), 0);
+}
+
+function schedulerLeadDraftForDate(dateIso) {
+  return ui.schedulerLeadDrafts.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === dateIso);
+}
+
 function departmentLeadForDate(departmentId, dateIso) {
+  const staged = ui.schedulerEditMode
+    ? ui.schedulerLeadDrafts.find((item) => item.departmentId === departmentId && item.date === dateIso)
+    : null;
+  if (staged) {
+    const profile = byId(state.profiles, staged.profileId);
+    return {
+      profile,
+      source: "Staged edit",
+      rotation: null,
+      override: staged
+    };
+  }
   return departmentLeadForDateLogic(state, departmentId, dateIso);
 }
 
@@ -1108,8 +1150,9 @@ function renderScheduler() {
       ${filterButton("unclaimed", "Unclaimed")}
       ${filterButton("vacation", "On vacation")}
     </section>
+    ${ui.schedulerEditMode ? renderSchedulerEditCommitBar() : ""}
     <section class="scheduler-shell">
-      <div class="schedule-grid ${schedulerRangeClass()}" style="--days: ${dates.length}">
+      <div class="schedule-grid ${schedulerRangeClass()} ${ui.schedulerEditMode ? "is-editing" : ""}" style="--days: ${dates.length}">
         <div class="month-corner">
           <select id="department-select" title="Department">
             ${departmentOptions(ui.selectedDepartmentId)}
@@ -1134,6 +1177,10 @@ function renderScheduler() {
           </select>
           <button class="ghost icon-button" id="zoom-out-range" title="Zoom out">${icons.minus}</button>
           <button class="ghost" id="today-range">Today</button>
+          ${canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
+            <button class="primary" id="save-scheduler-edit">${icons.lead} Save</button>
+            <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
+          ` : `<button class="primary" id="toggle-scheduler-edit">${icons.plus} Edit Schedule</button>` : ""}
         </div>
         <div class="employee-head">
           <span>People</span>
@@ -1142,6 +1189,22 @@ function renderScheduler() {
         ${dates.map((date) => renderDateHead(date)).join("")}
         ${renderCoverageRow(coverageProfiles, dates, department)}
         ${profiles.map((profile) => renderProfileRow(profile, dates)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderSchedulerEditCommitBar() {
+  const stagedChanges = ui.schedulerLeadDrafts.filter((item) => item.departmentId === ui.selectedDepartmentId).length;
+  return `
+    <section class="edit-commit-bar scheduler-edit-commit">
+      <div>
+        <span class="eyebrow">Schedule Edit Mode</span>
+        <strong>Changes are staged until saved</strong>
+        <p>Hover an available shift to assign that person as the day lead. Click shift cells to make daily schedule changes.</p>
+      </div>
+      <div class="edit-commit-actions">
+        <span>${stagedChanges} lead ${stagedChanges === 1 ? "change" : "changes"}</span>
       </div>
     </section>
   `;
@@ -1159,8 +1222,9 @@ function renderCoverageRow(profiles, dates, department) {
       const isLow = coverage.available < target;
       const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
       const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
+      const drawerType = ui.schedulerEditMode && leadInfo.missing ? "lead" : "coverage";
       return `
-        <button class="coverage-cell ${isLow ? "low" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${leadInfo.missing ? "lead" : "coverage"}" data-date="${date}" data-department-id="${leadDepartmentId}">
+        <button class="coverage-cell ${isLow ? "low" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}">
           <span class="coverage-count">${coverage.available}</span>
           <span class="coverage-meta">avail</span>
           <small>${leadInfo.missing ? leadInfo.label : `${coverage.unavailable} off - ${coverage.away} ground`}</small>
@@ -1211,7 +1275,7 @@ function renderDateHead(date) {
   const isToday = date === todayIso;
   const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
   const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
-  const drawerType = leadInfo.missing ? "lead" : "coverage";
+  const drawerType = ui.schedulerEditMode && leadInfo.missing ? "lead" : "coverage";
   const leadLabel = leads.length > 1
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
@@ -1242,6 +1306,7 @@ function renderShiftCell(profile, date) {
   const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
   const lead = leadForProfileDate(profile, ui.selectedDepartmentId, date);
   const isDayLead = lead?.profile?.id === profile.id;
+  const canAssignLead = ui.schedulerEditMode && canManageDepartment(ui.selectedDepartmentId) && isScheduleLeadAvailable(status);
   const icon = statusIcons[status.id] || icons.scheduler;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
@@ -1249,12 +1314,13 @@ function renderShiftCell(profile, date) {
     ? ui.scheduleStatusFilter === "all" ? "" : "filtered-match"
     : "filtered-out";
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="shift" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="${ui.schedulerEditMode ? "shift" : "calendar-day"}" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${status.label}">
       <span class="shift-icon">${icon}</span>
       ${isDayLead ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status.label}</span>
       <small>${status.source}</small>
       ${pendingVacation ? `<span class="cell-alert">Pending vacation</span>` : ""}
+      ${canAssignLead ? `<span class="assign-lead-action" data-assign-schedule-lead="${profile.id}" data-date="${date}">${icons.lead}<em>Lead</em></span>` : ""}
     </button>
   `;
 }
@@ -1470,16 +1536,17 @@ function renderPersonTile(profile) {
 function renderDepartments() {
   const dates = datesInRange();
   const ordered = orderedDepartments();
+  const focusedDepartment = departmentFocusDepartment(ordered);
   return `
     ${renderTopbar("Departments", "Create departments, review team size, and jump into each schedule.", canManageDepartments() ? `<button class="primary" data-open-drawer="department">${icons.plus} New Department</button>` : "")}
     <section class="control-row people-view-switch">
-      ${departmentViewButton("tiles", "Tiles")}
+      ${departmentViewButton("tiles", "Focus")}
       ${departmentViewButton("details", "Details")}
     </section>
-    <section class="${ui.departmentView === "details" ? "department-details-list" : "department-grid"}">
+    <section class="${ui.departmentView === "details" ? "department-details-list" : "department-focus-view"}">
       ${ui.departmentView === "details"
         ? ordered.map(({ department, depth }) => renderDepartmentDetailRow(department, dates, depth)).join("")
-        : ordered.map(({ department, depth }) => renderDepartmentCard(department, dates, depth)).join("")}
+        : renderDepartmentFocusView(ordered, focusedDepartment, dates)}
       <template>
       ${state.departments.map((department) => {
         const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
@@ -1497,6 +1564,14 @@ function renderDepartments() {
   `;
 }
 
+function departmentFocusDepartment(ordered = orderedDepartments()) {
+  const focused = byId(state.departments, ui.departmentFocusId);
+  if (focused) return focused;
+  const fallback = ordered[0]?.department || state.departments[0];
+  ui.departmentFocusId = fallback?.id || "";
+  return fallback;
+}
+
 function departmentStats(department, dates = datesInRange()) {
   const members = state.profiles.filter((profile) => profileBelongsToDepartment(profile, department.id));
   const leadCount = dates.reduce((count, date) => count + departmentLeadsForDate(department.id, date).length, 0);
@@ -1509,6 +1584,128 @@ function departmentStats(department, dates = datesInRange()) {
   return { members, leadCount, pendingRequests, rotations, unclaimed, target: coverageTargetForDepartment(department) };
 }
 
+function departmentStructureSummary(members) {
+  const labels = {
+    manager: ["manager", "managers"],
+    lead: ["lead", "leads"],
+    senior: ["senior", "seniors"],
+    mid: ["mid-level", "mid-levels"],
+    junior: ["junior", "juniors"]
+  };
+  return [...seniorityLevels]
+    .reverse()
+    .map(([id]) => {
+      const count = members.filter((profile) => (profile.seniorityLevel || "mid") === id).length;
+      return count ? `${count} ${labels[id][count === 1 ? 0 : 1]}` : "";
+    })
+    .filter(Boolean)
+    .join(" · ") || "No structure";
+}
+
+function renderDepartmentFocusView(ordered, focusedDepartment, dates) {
+  if (!focusedDepartment) {
+    return `<div class="empty-state">No departments yet.</div>`;
+  }
+  return `
+    <div class="department-focus-picker" aria-label="Departments">
+      ${ordered.map(({ department, depth }) => renderDepartmentFocusTab(department, dates, depth)).join("")}
+    </div>
+    ${renderDepartmentFocusPanel(focusedDepartment, dates)}
+  `;
+}
+
+function renderDepartmentFocusTab(department, dates, depth = 0) {
+  const stats = departmentStats(department, dates);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  const active = department.id === ui.departmentFocusId;
+  return `
+    <button class="department-focus-tab ${active ? "active" : ""} ${parent ? "is-child" : ""}" style="--department-depth: ${depth}" data-department-focus="${department.id}">
+      <span>${parent ? "Sub-dept" : "Department"}</span>
+      <strong>${department.name}</strong>
+      <em>${stats.members.length} people</em>
+    </button>
+  `;
+}
+
+function renderDepartmentFocusPanel(department, dates) {
+  const stats = departmentStats(department, dates);
+  const children = childDepartmentsOf(department.id);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  const sortedMembers = [...stats.members].sort((a, b) => a.name.localeCompare(b.name));
+  const visibleMembers = sortedMembers.slice(0, 12);
+  const hiddenMemberCount = Math.max(0, sortedMembers.length - visibleMembers.length);
+  const structure = departmentStructureSummary(stats.members);
+  return `
+    <article class="department-focus-panel">
+      <header class="department-focus-head">
+        <div>
+          <span class="department-kind">${parent ? "Sub-department" : "Department"}</span>
+          <h2>${department.name}</h2>
+          <p>${parent ? parent.name : children.length ? `${children.length} child ${children.length === 1 ? "department" : "departments"}` : "Top-level department"}</p>
+        </div>
+        <div class="department-focus-actions">
+          <button type="button" class="ghost" data-open-drawer="department-detail" data-department-id="${department.id}">Edit details</button>
+          ${canManageProfiles() ? `<button type="button" class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
+        </div>
+      </header>
+      <div class="department-focus-body">
+        <div class="department-focus-stats">
+          <span><strong>${stats.members.length}</strong> members</span>
+          <span><strong>${stats.target}</strong> target</span>
+          <span class="structure"><strong>${structure}</strong> structure</span>
+          <span><strong>${stats.pendingRequests}</strong> pending</span>
+        </div>
+        <section class="department-focus-members">
+          <div class="department-focus-section-title">
+            <strong>People</strong>
+            <span>${stats.members.length}</span>
+          </div>
+          <div class="department-focus-member-list">
+            ${visibleMembers.length ? visibleMembers.map((profile) => `
+              <button type="button" data-open-drawer="person" data-profile-id="${profile.id}">
+                <div class="avatar">${avatar(profile)}</div>
+                <strong>${profile.name}</strong>
+                ${(profile.seniorityLevel || "mid") === "manager" ? `<span class="department-manager-icon" title="Manager">${icons.lead}</span>` : ""}
+              </button>
+            `).join("") : `<p>No people in this department.</p>`}
+          </div>
+          ${hiddenMemberCount ? `<p class="department-focus-more">+${hiddenMemberCount} more</p>` : ""}
+        </section>
+        <div class="department-focus-lower">
+          <section>
+            <div class="department-focus-section-title">
+              <strong>Sub-departments</strong>
+              <span>${children.length}</span>
+            </div>
+            <div class="department-focus-children">
+              ${children.length ? children.map((child) => {
+                const childStats = departmentStats(child, dates);
+                return `
+                  <button type="button" data-department-focus="${child.id}">
+                    <strong>${child.name}</strong>
+                    <span>${childStats.members.length} people</span>
+                  </button>
+                `;
+              }).join("") : `<p>No child departments.</p>`}
+            </div>
+          </section>
+          <section>
+            <div class="department-focus-section-title">
+              <strong>Current view</strong>
+              <span>${dates.length} days</span>
+            </div>
+            <div class="department-focus-summary">
+              <span>${stats.unclaimed} unclaimed profiles</span>
+              <span>${stats.rotations} rotation versions</span>
+              <span>${structure}</span>
+            </div>
+          </section>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
 function renderDepartmentCard(department, dates, depth = 0) {
   const stats = departmentStats(department, dates);
   const children = childDepartmentsOf(department.id);
@@ -1516,23 +1713,30 @@ function renderDepartmentCard(department, dates, depth = 0) {
   const isSubDepartment = Boolean(parent);
   const isExpanded = ui.expandedDepartmentIds.includes(department.id);
   const compactClass = isSubDepartment && !isExpanded ? "is-compact" : "";
+  const compactSubDepartment = isSubDepartment && !isExpanded;
   return `
     <article class="department-card ${depth ? "sub-department-card" : children.length ? "parent-department-card" : ""} ${compactClass}" style="--department-depth: ${depth}">
       <button class="department-card-main" data-open-drawer="department-detail" data-department-id="${department.id}">
         <div class="department-card-head">
-          <span class="department-kind">${parent ? "Sub-department" : "Department"}</span>
+          <span class="department-kind">${parent ? "Sub-dept" : "Department"}</span>
           <strong>${department.name}</strong>
           ${parent ? `<em>${parent.name}</em>` : children.length ? `<em>${children.length} child ${children.length === 1 ? "department" : "departments"}</em>` : ""}
         </div>
-        ${isSubDepartment ? `<div class="department-compact-line"><span>${stats.members.length} members</span><span>${stats.leadCount}/${dates.length} leads</span></div>` : ""}
-        <div class="department-card-stats">
-          <span><strong>${stats.members.length}</strong> members</span>
-          <span><strong>${stats.target}</strong> target</span>
-          <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
-          <span><strong>${stats.pendingRequests}</strong> pending</span>
-        </div>
-        <p>${children.length ? `${children.length} sub-${children.length === 1 ? "department" : "departments"} - ` : ""}${stats.unclaimed} unclaimed profiles - ${stats.rotations} rotation versions</p>
-        ${children.length ? `
+        ${compactSubDepartment ? `
+          <div class="department-compact-line">
+            <span>${stats.members.length} people</span>
+            <span>${stats.target} target</span>
+          </div>
+        ` : `
+          <div class="department-card-stats">
+            <span><strong>${stats.members.length}</strong> members</span>
+            <span><strong>${stats.target}</strong> target</span>
+            <span><strong>${stats.leadCount}/${dates.length}</strong> leads</span>
+            <span><strong>${stats.pendingRequests}</strong> pending</span>
+          </div>
+          <p>${children.length ? `${children.length} sub-${children.length === 1 ? "department" : "departments"} - ` : ""}${stats.unclaimed} unclaimed profiles - ${stats.rotations} rotation versions</p>
+        `}
+        ${children.length && !compactSubDepartment ? `
           <div class="department-child-strip">
             ${children.map((child) => {
               const childStats = departmentStats(child, dates);
@@ -1580,12 +1784,11 @@ function renderRotations() {
     ${renderTopbar("Rotations", "Weekly rotation templates by department. Each column maps to a real weekday.", `
       <div class="top-actions">
         <select id="department-select">
-          ${departmentOptions(ui.selectedDepartmentId)}
-        </select>
-        ${canEditDepartmentRotations ? `
-          <button class="ghost" data-open-drawer="rotation">${icons.plus} New Rotation</button>
+        ${departmentOptions(ui.selectedDepartmentId)}
+      </select>
+      ${canEditDepartmentRotations ? `
           <button class="${ui.rotationDepartmentEdit ? "ghost" : "primary"}" id="toggle-department-rotation-edit">
-            ${ui.rotationDepartmentEdit ? `${icons.close} Cancel Edit` : `${icons.plus} Edit Department`}
+            ${ui.rotationDepartmentEdit ? `${icons.close} Cancel Edit` : `${icons.plus} Edit Rotation`}
           </button>
         ` : ""}
       </div>
@@ -1604,9 +1807,9 @@ function renderRotations() {
         <span><strong>${stats.nextEffective || "None"}</strong> next start</span>
       </div>
     </section>
-    ${renderLeadRotationPanel(department)}
+    ${ui.rotationDepartmentEdit ? renderRotationEditCommitBar(department) : renderLeadRotationPanel(department)}
     ${ui.rotationDepartmentEdit ? renderDepartmentRotationToolbar(profiles) : ""}
-    <section class="rotation-board">
+    <section class="rotation-board ${ui.rotationDepartmentEdit ? "is-editing" : ""}">
       <div class="rotation-grid">
         <div class="rotation-head">
           <span>People</span>
@@ -1662,7 +1865,7 @@ function renderRotationRow(profile) {
         ${personContent}
       </label>
     ` : `
-      <button class="employee-cell rotation-person${missingClass}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
+      <button class="employee-cell rotation-person${missingClass}" data-open-drawer="person" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
         ${personContent}
       </button>
     `}
@@ -1772,7 +1975,7 @@ function renderLeadRotationPanel(department) {
   const rotation = latestLeadRotation(department.id);
   const fallbackId = candidates[0]?.id || "";
   const pattern = Array.from({ length: 7 }, (_, index) => rotation?.pattern?.[index] || fallbackId);
-  const canEdit = canManageDepartment(department.id);
+  const canEdit = false;
   return `
     <form class="lead-rotation-panel" id="lead-rotation-form">
       <div class="lead-rotation-head">
@@ -1794,7 +1997,7 @@ function renderLeadRotationPanel(department) {
             </label>
           `).join("")}
         </div>
-        <button class="primary" ${canEdit ? "" : "disabled"}>Save Lead Rotation</button>
+        ${canEdit ? `<button class="primary">Save Lead Rotation</button>` : `<p class="hint">Use Edit Rotation to change weekly leads.</p>`}
       ` : `
         <div class="empty-state compact">
           <strong>No department members</strong>
@@ -1805,11 +2008,32 @@ function renderLeadRotationPanel(department) {
   `;
 }
 
+function renderRotationEditCommitBar(department) {
+  if (!department) return "";
+  const stagedChanges = countRotationLeadDraftChanges(department.id);
+  return `
+    <section class="edit-commit-bar rotation-edit-commit">
+      <div>
+        <span class="eyebrow">Rotation Edit Mode</span>
+        <strong>Changes are staged until saved</strong>
+        <p>Hover a rotation shift to assign that person as the weekday lead. Select people below to bulk-edit weekly shift patterns.</p>
+      </div>
+      <label>Effective start<input type="date" id="rotation-edit-effective-start" value="${ui.rotationLeadEffectiveStart || todayIso}"></label>
+      <div class="edit-commit-actions">
+        <button class="primary" id="save-rotation-edit">${icons.lead} Save</button>
+        <span>${stagedChanges} lead ${stagedChanges === 1 ? "change" : "changes"}</span>
+      </div>
+    </section>
+  `;
+}
+
 function renderRotationCell(profile, rotation, statusId, weekday = 0) {
   const isLeadSlot = leadForProfileWeekday(profile, ui.selectedDepartmentId, weekday)?.id === profile.id;
+  const canAssignLead = ui.rotationDepartmentEdit && rotation && canManageDepartment(ui.selectedDepartmentId);
+  const detailAttrs = ui.rotationDepartmentEdit ? `data-open-drawer="rotation-detail"` : "";
   if (!rotation) {
     return `
-      <button class="rotation-cell shift-cell state-off missing" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="">
+      <button class="rotation-cell shift-cell state-off missing" ${detailAttrs} data-profile-id="${profile.id}" data-rotation-id="">
         <span class="shift-icon">${icons.scheduler}</span>
         ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
         <span class="shift-label">No template</span>
@@ -1820,11 +2044,12 @@ function renderRotationCell(profile, rotation, statusId, weekday = 0) {
   const status = byId(state.statuses, statusId) || byId(state.statuses, "weekend");
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   return `
-    <button class="rotation-cell shift-cell ${availabilityState} ${status?.id || ""}" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
+    <button class="rotation-cell shift-cell ${availabilityState} ${status?.id || ""} ${canAssignLead ? "can-assign-lead" : ""}" ${detailAttrs} data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
       <span class="shift-icon">${statusIcons[status?.id] || icons.scheduler}</span>
       ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${status?.label || "Unassigned"}</span>
       <small>Template</small>
+      ${canAssignLead ? `<span class="assign-lead-action" data-assign-rotation-lead="${profile.id}" data-weekday="${weekday}">${icons.lead}<em>Lead</em></span>` : ""}
     </button>
   `;
 }
@@ -2603,7 +2828,7 @@ function leadDrawer() {
   const lead = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === ui.drawer.date);
   const resolvedLead = departmentLeadForDate(departmentId, ui.drawer.date);
   const candidates = availableLeadCandidates(departmentId, ui.drawer.date, resolvedLead.profile?.id);
-  const canEdit = canManageDepartment(departmentId) && editableDate(ui.drawer.date);
+  const canEdit = ui.schedulerEditMode && canManageDepartment(departmentId) && editableDate(ui.drawer.date);
   const department = byId(state.departments, departmentId);
   const leadHealth = leadAvailabilityForDepartmentDate(departmentId, ui.drawer.date);
   const activeLeadText = leadHealth.available
@@ -2674,7 +2899,7 @@ function rotationDrawer() {
   const departmentEditableProfiles = state.profiles.filter((profile) => canManageDepartment(profile.departmentId));
   const selectedProfileId = ui.drawer.profileId || rotation?.profileId || departmentEditableProfiles.find((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId))?.id || departmentEditableProfiles[0]?.id;
   const selectedProfile = byId(state.profiles, selectedProfileId);
-  const canEdit = canManageDepartment(selectedProfile?.departmentId || ui.selectedDepartmentId);
+  const canEdit = ui.rotationDepartmentEdit && canManageDepartment(selectedProfile?.departmentId || ui.selectedDepartmentId);
   const profiles = canEdit
     ? departmentEditableProfiles
     : [selectedProfile].filter(Boolean);
@@ -2821,6 +3046,9 @@ function bindEvents() {
     ui.rotationDepartmentEdit = false;
     ui.selectedRotationProfileIds = [];
     ui.rotationBulkEditing = false;
+    ui.rotationLeadDraftPattern = null;
+    ui.schedulerEditMode = false;
+    ui.schedulerLeadDrafts = [];
     render();
   });
 
@@ -2828,7 +3056,53 @@ function bindEvents() {
     ui.rotationDepartmentEdit = !ui.rotationDepartmentEdit;
     ui.selectedRotationProfileIds = [];
     ui.rotationBulkEditing = false;
+    ui.rotationLeadDraftPattern = ui.rotationDepartmentEdit ? currentLeadPattern(ui.selectedDepartmentId) : null;
+    ui.rotationLeadEffectiveStart = todayIso;
     render();
+  });
+
+  document.querySelector("#toggle-scheduler-edit")?.addEventListener("click", () => {
+    ui.schedulerEditMode = true;
+    ui.schedulerLeadDrafts = [];
+    render();
+  });
+
+  document.querySelector("#cancel-scheduler-edit")?.addEventListener("click", () => {
+    ui.schedulerEditMode = false;
+    ui.schedulerLeadDrafts = [];
+    render();
+  });
+
+  document.querySelector("#save-scheduler-edit")?.addEventListener("click", saveSchedulerLeadDrafts);
+
+  document.querySelector("#rotation-edit-effective-start")?.addEventListener("change", (event) => {
+    ui.rotationLeadEffectiveStart = event.target.value;
+  });
+
+  document.querySelector("#save-rotation-edit")?.addEventListener("click", saveRotationEditMode);
+
+  document.querySelectorAll("[data-assign-rotation-lead]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const weekday = Number(button.dataset.weekday);
+      const draft = [...rotationLeadPatternDraft(ui.selectedDepartmentId)];
+      draft[weekday] = button.dataset.assignRotationLead;
+      ui.rotationLeadDraftPattern = draft;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-assign-schedule-lead]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const date = button.dataset.date;
+      const profileId = button.dataset.assignScheduleLead;
+      ui.schedulerLeadDrafts = [
+        ...ui.schedulerLeadDrafts.filter((item) => !(item.departmentId === ui.selectedDepartmentId && item.date === date)),
+        { departmentId: ui.selectedDepartmentId, date, profileId }
+      ];
+      render();
+    });
   });
 
   document.querySelectorAll("[data-rotation-profile-select]").forEach((input) => {
@@ -2895,6 +3169,13 @@ function bindEvents() {
   document.querySelectorAll("[data-department-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.departmentView = button.dataset.departmentView;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-department-focus]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.departmentFocusId = button.dataset.departmentFocus;
       render();
     });
   });
@@ -3272,6 +3553,10 @@ async function signOut() {
 
 async function saveShiftOverride(event) {
   event.preventDefault();
+  if (!ui.schedulerEditMode) {
+    notify("Turn on Edit Schedule before changing shifts.", "error");
+    return;
+  }
   const form = new FormData(event.currentTarget);
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile || !canManageDepartment(profile.departmentId) || !editableDate(ui.drawer.date)) return;
@@ -3320,6 +3605,10 @@ async function saveShiftOverride(event) {
 }
 
 async function clearShiftOverride() {
+  if (!ui.schedulerEditMode) {
+    notify("Turn on Edit Schedule before changing shifts.", "error");
+    return;
+  }
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile || !canManageDepartment(profile.departmentId) || !editableDate(ui.drawer.date)) return;
   const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === ui.drawer.date);
@@ -3690,6 +3979,10 @@ async function decideRequest(requestId, decision) {
 
 async function saveLead(event) {
   event.preventDefault();
+  if (!ui.schedulerEditMode) {
+    notify("Turn on Edit Schedule before changing daily leads.", "error");
+    return;
+  }
   const departmentId = activeDrawerDepartmentId();
   if (!canManageDepartment(departmentId) || !editableDate(ui.drawer.date)) return;
   const form = new FormData(event.currentTarget);
@@ -3727,6 +4020,10 @@ async function saveLead(event) {
 
 async function saveLeadRotation(event) {
   event.preventDefault();
+  if (!ui.rotationDepartmentEdit) {
+    notify("Turn on Edit Rotation before changing weekly leads.", "error");
+    return;
+  }
   const departmentId = ui.selectedDepartmentId;
   if (!canManageDepartment(departmentId)) return;
   const form = new FormData(event.currentTarget);
@@ -3755,6 +4052,86 @@ async function saveLeadRotation(event) {
     else state.departmentLeadRotations.push(payload);
     audit("department.lead_rotation_saved", "department_lead_rotation", payload.id, `${effectiveStart} weekly lead pattern`);
     await saveState();
+    render();
+  });
+}
+
+async function saveRotationEditMode() {
+  if (!ui.rotationDepartmentEdit) {
+    notify("Turn on Edit Rotation before saving rotation changes.", "error");
+    return;
+  }
+  const departmentId = ui.selectedDepartmentId;
+  if (!canManageDepartment(departmentId)) return;
+  const effectiveStart = ui.rotationLeadEffectiveStart || todayIso;
+  if (!effectiveStart || (!editableDate(effectiveStart) && !isAdmin())) return;
+  const pattern = rotationLeadPatternDraft(departmentId);
+  const candidates = leadCandidates(departmentId);
+  if (!candidates.length) {
+    notify("Add people to this department before saving a lead rotation.", "error");
+    return;
+  }
+  if (pattern.some((profileId) => !candidates.some((profile) => profile.id === profileId))) {
+    notify("Every lead assignment must be a person from this department.", "error");
+    return;
+  }
+  const existing = (state.departmentLeadRotations || []).find((rotation) => rotation.departmentId === departmentId && rotation.effectiveStart === effectiveStart);
+  const payload = {
+    id: existing?.id || makeId("lead-rotation"),
+    departmentId,
+    effectiveStart,
+    pattern
+  };
+  await runMutation("rotation-edit-save", {
+    pending: "Saving rotation edits...",
+    success: "Rotation edits saved.",
+    failure: "The rotation edits could not be saved."
+  }, async () => {
+    await dataStore.upsertDepartmentLeadRotation(payload);
+    state.departmentLeadRotations ||= [];
+    if (existing) Object.assign(existing, payload);
+    else state.departmentLeadRotations.push(payload);
+    audit("department.lead_rotation_saved", "department_lead_rotation", payload.id, `${effectiveStart} weekly lead pattern`);
+    await saveState();
+    ui.rotationDepartmentEdit = false;
+    ui.rotationBulkEditing = false;
+    ui.selectedRotationProfileIds = [];
+    ui.rotationLeadDraftPattern = null;
+    render();
+  });
+}
+
+async function saveSchedulerLeadDrafts() {
+  if (!ui.schedulerEditMode) {
+    notify("Turn on Edit Schedule before saving scheduler changes.", "error");
+    return;
+  }
+  if (!canManageDepartment(ui.selectedDepartmentId)) return;
+  const drafts = [...ui.schedulerLeadDrafts];
+  await runMutation("scheduler-edit-save", {
+    pending: "Saving scheduler edits...",
+    success: drafts.length ? `Saved ${drafts.length} lead ${drafts.length === 1 ? "change" : "changes"}.` : "No staged scheduler changes.",
+    failure: "The scheduler edits could not be saved."
+  }, async () => {
+    for (const draft of drafts) {
+      if (!editableDate(draft.date) && !isAdmin()) continue;
+      const profile = byId(state.profiles, draft.profileId);
+      if (!profile || !isScheduleLeadAvailable(scheduleFor(profile.id, draft.date))) continue;
+      const existing = state.departmentLeads.find((item) => item.departmentId === draft.departmentId && item.date === draft.date);
+      const payload = {
+        id: existing?.id || makeId("lead"),
+        departmentId: draft.departmentId,
+        date: draft.date,
+        profileId: draft.profileId
+      };
+      if (existing) Object.assign(existing, payload);
+      else state.departmentLeads.push(payload);
+      await dataStore.upsertDailyLead(payload);
+      audit("department.lead_set", "department_lead", payload.id, `${payload.date} staged scheduler lead`);
+    }
+    await saveState();
+    ui.schedulerEditMode = false;
+    ui.schedulerLeadDrafts = [];
     render();
   });
 }
@@ -3790,6 +4167,10 @@ function bindDayEditorPreview() {
 
 async function saveDayBulkOverrides(event) {
   event.preventDefault();
+  if (!ui.schedulerEditMode) {
+    notify("Turn on Edit Schedule before changing daily schedules.", "error");
+    return;
+  }
   const date = ui.drawer.date;
   if (!canManageDepartment(ui.selectedDepartmentId) || !editableDate(date)) return;
   const form = new FormData(event.currentTarget);
@@ -3846,6 +4227,10 @@ async function saveDayBulkOverrides(event) {
 
 async function saveRotation(event) {
   event.preventDefault();
+  if (!ui.rotationDepartmentEdit) {
+    notify("Turn on Edit Rotation before changing rotations.", "error");
+    return;
+  }
   const form = new FormData(event.currentTarget);
   const profile = byId(state.profiles, form.get("profileId"));
   if (!profile || !canManageDepartment(profile.departmentId)) return;
@@ -3875,6 +4260,10 @@ async function saveRotation(event) {
 
 async function saveDepartmentRotations(event) {
   event.preventDefault();
+  if (!ui.rotationDepartmentEdit) {
+    notify("Turn on Edit Rotation before changing rotations.", "error");
+    return;
+  }
   if (!canManageDepartment(ui.selectedDepartmentId) || !ui.selectedRotationProfileIds.length) return;
   const form = new FormData(event.currentTarget);
   const effectiveStart = form.get("effectiveStart");

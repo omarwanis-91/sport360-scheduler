@@ -22,7 +22,7 @@ Create ignored `.env.local` using the variable names in `.env.example`. The loca
 
 ```powershell
 npm run check
-npm start
+npm run dev
 ```
 
 Open `http://127.0.0.1:4173`.
