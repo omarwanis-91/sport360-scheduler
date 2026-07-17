@@ -23,8 +23,13 @@ The existing Netlify project should deploy pull-request previews and production 
 
 ## Vercel
 
-`vercel.json` uses Vercel's static-build adapter to publish only `dist/`, plus explicit static asset and SPA fallback routes.
-The project intentionally does not define an `npm start` script so Vercel treats the app as static output from `dist/` rather than a Node server/function.
+`vercel.json` uses Vercel's native static output settings:
+
+- Build command: `npm run build`
+- Output directory: `dist`
+- SPA fallback: app routes return `index.html`
+
+Do not add serverless `builds` entries for `src/*.js`; browser modules under `dist/assets/` must be served as static files, not invoked as Node functions.
 
 ## Supabase Authentication URLs
 
