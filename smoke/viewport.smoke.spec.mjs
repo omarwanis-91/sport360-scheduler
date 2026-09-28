@@ -1,6 +1,19 @@
 import { expect, test } from "@playwright/test";
 
-const widths = [1024, 1280, 1440, 1920];
+test.beforeEach(async ({ page }) => {
+  await page.route("**/runtime-config.js", (route) => route.fulfill({
+    contentType: "text/javascript",
+    body: `window.__SPORT360_CONFIG__ = ${JSON.stringify({
+      supabaseUrl: "",
+      supabaseAnonKey: "",
+      allowSignup: false,
+      release: "smoke-demo",
+      demoMode: true
+    })};`
+  }));
+});
+
+const widths = [375, 768, 1024, 1280, 1440, 1920];
 const height = 900;
 
 async function expectShellWithinViewport(page) {
@@ -51,7 +64,7 @@ for (const width of widths) {
     await page.getByRole("button", { name: "Departments", exact: true }).click();
     await expectMainShellHealthy(page);
     await expect(page.getByRole("heading", { name: "Departments", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tiles", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Focus", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Details", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Rotations", exact: true }).click();
@@ -61,6 +74,6 @@ for (const width of widths) {
 
     await page.getByRole("button", { name: "Requests", exact: true }).click();
     await expectMainShellHealthy(page);
-    await expect(page.getByRole("heading", { name: "Vacation Requests", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Annual Requests", exact: true })).toBeVisible();
   });
 }

@@ -183,7 +183,7 @@ A legacy `department_id` value is still kept internally as a compatibility ancho
 ## D-028 - Seniority Hierarchy View
 
 **Date:** 2026-06-25
-**Status:** Accepted
+**Status:** Superseded by D-037
 
 The Hierarchy workspace lets the user select one or more departments, then groups visible employees from Manager through Department Lead, Senior, Mid-level, and Junior within each selected department. It is a people-structure view based on profile seniority, not a replacement for application access roles or daily lead scheduling.
 
@@ -249,3 +249,39 @@ The full production-ready internal release still requires a verified logical exp
 The visual direction should move beyond a plain dark admin tool toward a polished Sport360 operational workspace with subtle animated background lines, layered gradients, restrained glows, and satisfying hover feedback.
 
 This polish must remain secondary to scan speed, schedule readability, and compact operational density. Animations should be slow, faint, and mostly interactive or ambient in the background; shift-state colors and lead/edit affordances must stay legible and purposeful.
+
+## D-036 - Annual Leave Terminology
+
+**Date:** 2026-08-08
+**Status:** Accepted
+
+The user-facing product language should use **Annual** instead of Vacation for leave balances, requests, approvals, filters, and calendar/schedule labels.
+
+Existing Supabase table names, function names, status ids, and audit action ids may continue using `vacation` as legacy internal identifiers until a later database cleanup is worth the migration risk. The UI should translate those internal ids into Annual terminology.
+
+## D-037 - Simplified Hierarchy
+
+**Date:** 2026-08-08
+**Status:** Accepted
+
+The people hierarchy is now Manager, Lead, and Artist only. Artist covers operational creative titles such as Motion Graphics Artist and Video Editor; Senior, Mid-level, and Junior are not part of the hierarchy model.
+
+Daily lead assignment remains separate from hierarchy. Any department member can still be chosen as day lead when operations require coverage.
+
+## D-038 - Low Days And Events Are Workflows
+
+**Date:** 2026-08-08
+**Status:** Accepted
+
+Low Days are owed time-off credits created when someone works a day they should not have worked. They need a workflow with creation reason, approval/confirmation, balance tracking, replacement day selection, schedule impact, and audit history.
+
+Events are shared calendar items that can be assigned to people. When an event is assigned, the app should ask whether the assigned people should also become On Ground for the event dates instead of changing schedule state automatically.
+
+## D-039 - Self-Service Password Recovery
+
+**Date:** 2026-09-28
+**Status:** Accepted
+
+The production sign-in screen provides Supabase email-based password recovery while public account creation remains disabled. Recovery requests always use generic confirmation text so the interface does not disclose whether an account exists.
+
+Recovery tokens may authenticate only the password-update flow. A recovery-pending session must not load scheduler data, and the temporary session is cleared after the password changes so the user signs in again with the new password.

@@ -4,19 +4,22 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [~] Put the reviewed app online for internal preview through the connected static host.
+- [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
 - [ ] Verify the online preview manually in Chrome and Edge: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and role boundaries.
+- [ ] Verify Manager / Lead / Artist saves and parent/sub-department lead assignment against the live database after migrations 022 and 023.
 
 ## Next
 
+- [ ] Design and migrate Events: event dates, visibility, assigned people, optional On Ground prompt, calendar display, and audit trail.
+- [ ] Design and migrate Low Days: owed-day creation, approval/confirmation, replacement day selection, schedule impact, and audit trail.
 - [ ] Repair Docker/WSL or use another machine so `npm.cmd run backup:manual` can create a full Supabase SQL export.
 - [ ] Restore the verified export into a non-production Supabase project.
 - [ ] Pilot one department for five business days and record signoff.
 
 ## Later
 
-- [ ] Phase 5: add vacation cancellation, rejection comments, and richer request history.
+- [ ] Phase 5: add annual cancellation, rejection comments, and richer request history.
 - [ ] Phase 5: add Activity live search and employee, department, date, and action filters.
 - [ ] Phase 5: add notifications and advanced scheduler bulk tools.
 - [ ] Phase 5: complete mobile workflows if mobile becomes a supported target.
@@ -26,6 +29,13 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migrations 022 and 023 in Supabase for the simplified hierarchy and parent/sub-department lead scope.
+- [x] Published and verified the Vercel internal preview, including production runtime configuration and recovery assets.
+- [x] Added self-service Supabase password recovery with generic account-status messaging, a protected new-password screen, temporary-session cleanup, and regression coverage.
+- [x] Replaced duplicated, contradictory Supabase sign-in failures with one accurate recovery message and regression coverage.
+- [x] Completed the Phase 1 UI/UX audit fixes for compact text legibility, coverage-warning clarity, accessible control states, visible keyboard focus, and reduced motion.
+- [x] Switched user-facing leave language from Vacation to Annual, simplified hierarchy to Manager / Lead / Artist, and added the Supabase migration for durable Artist saves.
+- [x] Cleaned remaining Annual labels in profile/day drawers, dimmed My Profile off days, and added the parent/sub-department lead assignment migration.
 - [x] Added Scheduler/Rotations edit-mode staging, hover lead assignment, normal pointer cursor, and the first pass of futuristic UI polish.
 - [x] Accepted online internal preview before the full production backup gate, while keeping production readiness blocked until export/restore is verified.
 - [x] Recorded passing local verification, passing GitHub checks, and Netlify deploy-preview status in the production rehearsal report.

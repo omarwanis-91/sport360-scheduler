@@ -43,7 +43,7 @@ The application uses view-level render functions rather than routes. Primary vie
 
 - My Profile
 - Scheduler
-- Vacation Requests
+- Annual Requests
 - People
 - Hierarchy
 - Departments
@@ -66,7 +66,7 @@ Right-side drawers handle focused tasks such as shift edits, daily bulk editing,
 
 - Overrides belong to one profile and one date.
 - An override replaces the rotation-derived state for that date.
-- Vacation, Sick, and On Ground are daily exceptions.
+- Annual, Sick, and On Ground are daily exceptions.
 - Clearing an override returns the date to its rotation-derived state.
 - Approved vacation requests may materialize vacation days into schedule rows for resolution, but the UI treats them as request-sourced vacation rather than manual overrides.
 
@@ -93,7 +93,7 @@ For a person and date:
 - `department_lead_rotation_versions`: effective-dated Mon-Sun default lead patterns by department.
 - `user_roles`: application access roles.
 
-Employee profiles also carry `seniority_level`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; any current department member can be selected as a day lead. `user_roles.lead` remains the separate authorization role for application permissions.
+Employee profiles also carry `seniority_level`, now simplified to `manager`, `lead`, or `artist`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; any current department member can be selected as a day lead. `user_roles.lead` remains the separate authorization role for application permissions.
 - `audit_log`: important operational changes.
 
 ## Authorization Model
@@ -120,6 +120,7 @@ Employee profiles also carry `seniority_level`. Department lead scheduling uses 
 ## Persistence And Security
 
 - Supabase Auth provides user sessions.
+- Password recovery uses Supabase recovery emails and a public in-app password update screen. Recovery sessions are marked as pending, cannot load scheduler data, and are cleared after the password changes so the user signs in again normally.
 - Profiles may be created before auth users exist.
 - A matching email can claim an unassigned profile.
 - The browser uses the public Supabase anon key.
@@ -135,9 +136,9 @@ Runtime environment values are not committed in frontend modules. `index.html` l
 - Local development: `scripts/localServer.js` generates `/runtime-config.js` from ignored `.env.local`.
 - Local development serves `/assets/*` from the source `src/` directory.
 - Static builds: `scripts/build.js` writes `dist/runtime-config.js` from deployment environment variables and publishes browser assets under `dist/assets/`.
-- Netlify builds require `SPORT360_SUPABASE_URL` and `SPORT360_SUPABASE_ANON_KEY`.
+- Hosted Vercel and Netlify builds require `SPORT360_SUPABASE_URL` and `SPORT360_SUPABASE_ANON_KEY`.
 - `SPORT360_ALLOW_SIGNUP=false` hides public account creation for the internal release.
-- `SPORT360_RELEASE` identifies the deployed release; Netlify falls back to `COMMIT_REF`.
+- `SPORT360_RELEASE` identifies the deployed release; hosted builds fall back to `VERCEL_GIT_COMMIT_SHA` or `COMMIT_REF`.
 
 ## Profile Photo Storage
 

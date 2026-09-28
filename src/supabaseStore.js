@@ -27,6 +27,9 @@ function createLocalStore() {
     },
     async signIn() {},
     async signUp() {},
+    async requestPasswordReset() {},
+    async completePasswordRecovery() {},
+    async cancelPasswordRecovery() {},
     async signOut() {},
     async createProfile() {},
     async updateProfile() {},
@@ -66,9 +69,11 @@ function createRemoteStore(client) {
   return {
     mode: "supabase",
     client,
+    passwordRecovery: client.getPasswordRecovery(),
     session: null,
     async load() {
       this.session = client.getSession();
+      if (this.passwordRecovery?.status === "error" || this.session?.recovery_pending) return emptyState();
       if (!this.session) return emptyState();
 
       await claimProfileForSession(client, this.session);
@@ -90,6 +95,20 @@ function createRemoteStore(client) {
       this.session = client.getSession();
       return data;
     },
+    async requestPasswordReset(email, redirectTo) {
+      return client.requestPasswordReset(email, redirectTo);
+    },
+    async completePasswordRecovery(password) {
+      await client.updatePassword(password);
+      client.clearSession();
+      this.passwordRecovery = null;
+      this.session = null;
+    },
+    async cancelPasswordRecovery() {
+      client.clearSession();
+      this.passwordRecovery = null;
+      this.session = null;
+    },
     async signOut() {
       client.clearSession();
     },
@@ -104,7 +123,7 @@ function createRemoteStore(client) {
           p_email: profile.email,
           p_full_name: profile.name,
           p_title: profile.title,
-          p_seniority_level: profile.seniorityLevel || "mid",
+          p_seniority_level: profile.seniorityLevel || "artist",
           p_department_ids: profile.departmentIds || [],
           p_photo_url: profile.photoRef || profile.photo || null,
           p_yearly_vacation_days: profile.yearlyVacationDays,
@@ -120,7 +139,7 @@ function createRemoteStore(client) {
           p_email: profile.email,
           p_full_name: profile.name,
           p_title: profile.title,
-          p_seniority_level: profile.seniorityLevel || "mid",
+          p_seniority_level: profile.seniorityLevel || "artist",
           p_is_department_lead: false,
           p_department_id: profile.departmentId || null,
           p_photo_url: profile.photoRef || profile.photo || null,
@@ -225,6 +244,7 @@ function createRemoteStore(client) {
 function createRestClient() {
   const sessionKey = "sport360-supabase-session";
   const baseUrl = supabaseConfig.url.replace(/\/$/, "");
+  const passwordRecovery = capturePasswordRecovery();
 
   function getSession() {
     const stored = localStorage.getItem(sessionKey);
@@ -245,7 +265,7 @@ function createRestClient() {
       return await fetchJson(path, options, headers);
     } catch (error) {
       if (error?.message === "Failed to fetch") {
-        throw new Error("Failed to reach Supabase. Check that this browser can access your Supabase project and that no browser shield/ad blocker is blocking the request.");
+        throw new Error("Supabase did not respond to this request. Try again. If it keeps happening, check your network, DNS, browser privacy settings, and the configured Supabase project URL.");
       }
       throw error;
     }
@@ -300,10 +320,10 @@ function createRestClient() {
       clearStoredSession();
       throw new Error(body?.msg || body?.message || body?.error_description || "Session expired. Please sign in again.");
     }
-    storeSession(body);
+    storeSession(body, { recoveryPending: session.recovery_pending });
   }
 
-  function storeSession(data) {
+  function storeSession(data, options = {}) {
     const user = data.user || data.session?.user;
     const accessToken = data.access_token || data.session?.access_token;
     const refreshToken = data.refresh_token || data.session?.refresh_token;
@@ -313,7 +333,8 @@ function createRestClient() {
       access_token: accessToken,
       refresh_token: refreshToken,
       expires_at: Date.now() + expiresIn * 1000,
-      user
+      user,
+      recovery_pending: Boolean(options.recoveryPending)
     }));
   }
 
@@ -321,8 +342,39 @@ function createRestClient() {
     localStorage.removeItem(sessionKey);
   }
 
+  function capturePasswordRecovery() {
+    const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const isRecovery = hash.get("type") === "recovery" || hash.has("error_code") || hash.has("error_description");
+    if (!isRecovery) {
+      const session = getSession();
+      return session?.recovery_pending ? { status: "ready" } : null;
+    }
+
+    const cleanUrl = `${location.pathname}${location.search}`;
+    history.replaceState({}, document.title, cleanUrl);
+
+    const errorDescription = hash.get("error_description");
+    if (errorDescription || !hash.get("access_token")) {
+      clearStoredSession();
+      return {
+        status: "error",
+        message: "This password recovery link is invalid or has expired. Request a new link and use the latest email."
+      };
+    }
+
+    storeSession({
+      access_token: hash.get("access_token"),
+      refresh_token: hash.get("refresh_token"),
+      expires_in: Number(hash.get("expires_in")) || 3600
+    }, { recoveryPending: true });
+    return { status: "ready" };
+  }
+
   return {
     getSession,
+    getPasswordRecovery() {
+      return passwordRecovery;
+    },
     setSession(data) {
       storeSession(data);
     },
@@ -339,6 +391,19 @@ function createRestClient() {
       return request("/auth/v1/signup", {
         method: "POST",
         body: JSON.stringify({ email, password })
+      });
+    },
+    async requestPasswordReset(email, redirectTo) {
+      const redirectQuery = redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : "";
+      return request(`/auth/v1/recover${redirectQuery}`, {
+        method: "POST",
+        body: JSON.stringify({ email })
+      });
+    },
+    async updatePassword(password) {
+      return request("/auth/v1/user", {
+        method: "PUT",
+        body: JSON.stringify({ password })
       });
     },
     async rpc(name, payload = {}) {
@@ -549,7 +614,7 @@ function fromDbProfile(row) {
     email: row.email,
     name: row.full_name,
     title: row.title,
-    seniorityLevel: row.seniority_level || "mid",
+    seniorityLevel: row.seniority_level || "artist",
     leadEligible: row.is_department_lead === true,
     departmentId: row.department_id,
     departmentIds: row.department_id ? [row.department_id] : [],
@@ -568,7 +633,7 @@ function toDbProfile(profile) {
     email: profile.email,
     full_name: profile.name,
     title: profile.title,
-    seniority_level: profile.seniorityLevel || "mid",
+    seniority_level: profile.seniorityLevel || "artist",
     is_department_lead: profile.leadEligible === true,
     department_id: profile.departmentId || null,
     photo_url: profile.photoRef || profile.photo || null,

@@ -45,3 +45,11 @@ const server = http.createServer((request, response) => {
 server.listen(port, "127.0.0.1", () => {
   console.log(`Sport360 smoke server running at http://127.0.0.1:${port}`);
 });
+
+function shutdown() {
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 1_000).unref();
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
