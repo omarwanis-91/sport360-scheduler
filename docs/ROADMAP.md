@@ -4,7 +4,7 @@ This document is the durable phased plan for Sport360 Scheduler. It records what
 
 ## Current Position
 
-Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 and 023 have been applied. The immediate work is live browser and role verification while the full backup/restore gate remains open. Phases 5-6 remain intentionally non-blocking for the first production release.
+Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 and 023 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Live verification found that the parent-department lead trigger still uses the retired direct-membership validator; migration 024 is prepared and must be applied and retested. The full backup/restore gate also remains open. Phases 5-6 remain intentionally non-blocking for the first production release.
 
 ## Phase 0 - Product Foundation
 
@@ -97,9 +97,10 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Add consistent loading, disabled, success, retry, offline, and failure states to every Supabase mutation.
 - ✅ Extract pure schedule and permission logic sufficiently to support automated Node tests.
 - ✅ Add GitHub Actions for static checks, unit tests, the production build, and demo-mode Chromium smoke tests.
-- ✅ Support current Chrome and Edge at 1024px, 1280px, 1440px, and 1920px widths. Mobile remains best-effort.
+- ✅ Support current Chrome, Edge, and Firefox on desktop. Automated viewport coverage remains 1024px, 1280px, 1440px, and 1920px; mobile remains best-effort.
 - ✅ Deploy the reviewed app online for internal preview through Vercel.
 - ✅ Apply migrations 022 and 023 for the simplified hierarchy and parent/sub-department lead scope.
+- ⏳ Apply migration 024 and repeat the live parent-department lead assignment check.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
 - ⏳ Repair or bypass the local Docker/WSL blocker so the Supabase Free-plan SQL export can be completed and restored in a test project.
 - ⬜ Pilot the production release with one department for five business days before expanding internally.

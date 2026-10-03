@@ -6,8 +6,10 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
-- [ ] Verify the online preview manually in Chrome and Edge: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and role boundaries.
-- [ ] Verify Manager / Lead / Artist saves and parent/sub-department lead assignment against the live database after migrations 022 and 023.
+- [x] Verify the production Admin workflow in Chrome, Edge, and Firefox: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and startup console health.
+- [ ] Verify Department Lead, Employee, and unmatched-account production boundaries in Chrome, Edge, and Firefox.
+- [~] Verify Manager / Lead / Artist saves and parent/sub-department lead assignment against the live database: hierarchy saves and the sub-department lead round trip pass; the parent write exposed the stale validator fixed by migration 024.
+- [ ] Apply `024_fix_parent_department_lead_validation.sql`, run audit 012, and repeat the parent-department lead round trip in production.
 
 ## Next
 
@@ -29,6 +31,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Completed the production Admin read-only matrix in Chrome, Edge, and Firefox and verified harmless Manager / Lead / Artist saves plus a restored sub-department lead override.
 - [x] Applied migrations 022 and 023 in Supabase for the simplified hierarchy and parent/sub-department lead scope.
 - [x] Published and verified the Vercel internal preview, including production runtime configuration and recovery assets.
 - [x] Added self-service Supabase password recovery with generic account-status messaging, a protected new-password screen, temporary-session cleanup, and regression coverage.
