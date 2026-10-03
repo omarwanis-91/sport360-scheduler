@@ -7,30 +7,32 @@ Do not record database passwords, connection strings, access tokens, private emp
 ## Status
 
 - Overall result: Pending
-- Rehearsal date: 2026-07-12
+- Rehearsal date: 2026-09-28
 - Operator: Pending
 - Reviewer: Pending
-- Release branch / commit: Pending
-- PR: https://github.com/omarwanis-91/sport360-scheduler/pull/7
-- Deploy preview: https://deploy-preview-7--sport360scheduler.netlify.app
+- Release branch / commit: `codex/phase4-ui-auth-hardening` / pending commit
+- PR: Pending
+- Production preview: https://sport360-scheduler.vercel.app
+- Verified Vercel deployment: `dpl_5wUHmXHEfZC6S9Mg9uqxXeiFZjTY`
 
 ## Local Release Verification
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| `npm.cmd run phase4:local` passed | Pass | 2026-07-05 local run passed syntax, 7 unit tests, production build, and 13 demo smoke tests. |
-| GitHub checks passed | Pass | PR #7 is clean; `verify` passed; Netlify redirect/deploy-preview checks passed. |
-| Netlify deploy preview is healthy | Partial | GitHub/Netlify status reports deploy preview ready. Direct local shell HTTP checks and in-app browser navigation timed out; still needs manual Chrome/Edge confirmation. |
+| Local validation passed | Pass | 2026-09-28 run passed syntax checks, 7 unit tests, production build, 15 application smoke tests, and 6 viewport tests. |
+| GitHub checks passed | Pending | Run the new pull request checks after the Phase 4 branch is pushed. |
+| Vercel production preview is healthy | Pass | Stable URL and the deployed HTML, recovery assets, and runtime configuration returned HTTP 200. Manual Chrome/Edge workflow verification remains pending. |
 
 ## Launch Gate Matrix
 
 | Gate | Status | Notes |
 | --- | --- | --- |
-| Local release verification | Pass | `npm.cmd run phase4:local` passed on 2026-07-05. |
-| GitHub PR checks | Pass | PR #7 checks are passing and merge state is clean. |
-| Netlify deploy preview status | Pass | Netlify status context is passing for PR #7. |
-| Browser check of deploy preview | Pending | Local shell HTTP and in-app browser navigation timed out; verify manually in Chrome/Edge or through Netlify browser session. |
-| Online internal preview | In progress | Proceeding through the connected static host before closing the full backup/restore gate. |
+| Local release verification | Pass | Syntax, unit, build, app smoke, and viewport smoke checks passed on 2026-09-28. |
+| GitHub PR checks | Pending | Requires the current branch pull request. |
+| Vercel production preview status | Pass | `https://sport360-scheduler.vercel.app` is live with the expected Supabase runtime configuration. |
+| Browser check of production preview | Pending | Verify the complete workflow manually in current Chrome and Edge. |
+| Online internal preview | Pass | Vercel production preview is online; this does not close the backup/restore gate. |
+| Migrations 022 and 023 applied | Pass | Applied in Supabase on 2026-09-28; live hierarchy and parent/sub-department lead workflows still require browser verification. |
 | Free-plan manual export | Blocked | Supabase CLI reached the remote database but local Docker/WSL is unavailable; Docker reports WSL2 is not supported with the current machine configuration. |
 | Backup folder verification | Pending | Run `npm.cmd run backup:verify` after export. |
 | Restore rehearsal | Pending | Requires non-production Supabase restore-test project. |
@@ -82,7 +84,7 @@ Pending
 | Public account creation hidden | Pending | Pending |  |
 | Admin can open Scheduler, People, Departments, Rotations, Requests, Activity, Settings | Pending | Pending |  |
 | Department Lead can access allowed department workflows only | Pending | Pending |  |
-| Employee can open My Profile and request vacation | Pending | Pending |  |
+| Employee can open My Profile and request annual leave | Pending | Pending |  |
 | Unmatched account cannot read operational data | Pending | Pending |  |
 | No startup console errors | Pending | Pending |  |
 
@@ -93,7 +95,7 @@ Pending
 | Expected departments and sub-departments load | Pending |  |
 | Pilot department people load correctly | Pending |  |
 | Current-week rotations resolve | Pending |  |
-| Vacation balances display | Pending |  |
+| Annual balances display | Pending |  |
 | Daily lead assignments resolve | Pending |  |
 | Activity log records a harmless test change | Pending |  |
 
@@ -101,7 +103,7 @@ Pending
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| Last known good Netlify deploy identified | Pending |  |
+| Last known good Vercel deployment identified | Pending | Current deployment is recorded above; select and verify a previous rollback candidate before the pilot. |
 | Frontend rollback steps reviewed | Pending |  |
 | Database rollback decision tree reviewed | Pending |  |
 | Auth/access rollback path reviewed | Pending |  |

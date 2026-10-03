@@ -27,7 +27,7 @@ function loadRuntimeConfig(root, environment = process.env) {
     supabaseUrl: values.SPORT360_SUPABASE_URL || "",
     supabaseAnonKey: values.SPORT360_SUPABASE_ANON_KEY || "",
     allowSignup: asBoolean(values.SPORT360_ALLOW_SIGNUP),
-    release: values.SPORT360_RELEASE || values.COMMIT_REF || "local",
+    release: values.SPORT360_RELEASE || values.VERCEL_GIT_COMMIT_SHA || values.COMMIT_REF || "local",
     demoMode: asBoolean(values.SPORT360_DEMO_MODE)
   };
 }
@@ -37,8 +37,9 @@ function runtimeConfigSource(config) {
 }
 
 function assertDeployConfig(config, environment = process.env) {
-  if (environment.NETLIFY === "true" && (!config.supabaseUrl || !config.supabaseAnonKey)) {
-    throw new Error("Netlify requires SPORT360_SUPABASE_URL and SPORT360_SUPABASE_ANON_KEY.");
+  const isHostedBuild = environment.NETLIFY === "true" || environment.VERCEL === "1";
+  if (isHostedBuild && (!config.supabaseUrl || !config.supabaseAnonKey)) {
+    throw new Error("Hosted builds require SPORT360_SUPABASE_URL and SPORT360_SUPABASE_ANON_KEY.");
   }
 }
 

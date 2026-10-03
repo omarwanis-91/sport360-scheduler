@@ -15,7 +15,7 @@ Build a dark, compact, Supabase-backed workforce scheduler that supports:
 - Multiple departments with admins and department leads.
 - Weekly rotation patterns with effective dates and preserved history.
 - Daily schedule overrides and exceptions.
-- Vacation requests, approval, balance deduction, and schedule impact.
+- Annual requests, approval, balance deduction, and schedule impact.
 - Personal and employee calendar views.
 - Clear activity history for important operational changes.
 
@@ -31,12 +31,12 @@ Manages current and future schedules, rotations, and requests for assigned depar
 
 ### Employee
 
-Views a personal schedule and profile, requests vacation, and understands upcoming work or approved exceptions.
+Views a personal schedule and profile, requests annual leave, and understands upcoming work or approved exceptions.
 
 ## Product Principles
 
 1. **Scan before reading.** Color, symbols, hierarchy, and spacing should reveal the state before detailed text is needed.
-2. **Impact before confirmation.** Schedule and vacation changes should show coverage or balance consequences before saving.
+2. **Impact before confirmation.** Schedule and annual changes should show coverage or balance consequences before saving.
 3. **History must remain trustworthy.** Future rotation changes must not rewrite past schedules.
 4. **Operational density without clutter.** The interface should use space efficiently while remaining calm and legible.
 5. **One source of truth.** Production state belongs in Supabase, protected by RLS and server-authoritative functions where needed.
@@ -48,7 +48,7 @@ Views a personal schedule and profile, requests vacation, and understands upcomi
 - Department coverage targets and warnings.
 - Versioned weekly rotations.
 - Daily manual overrides and exceptions.
-- Vacation balances and approval workflows.
+- Annual balances and approval workflows.
 - Profile, department, role, and membership management.
 - Activity/audit visibility.
 - Desktop-first responsive web UI.
@@ -66,7 +66,7 @@ Views a personal schedule and profile, requests vacation, and understands upcomi
 
 - A manager can identify coverage risk in seconds.
 - A daily schedule adjustment takes only a few deliberate clicks.
-- Vacation approval clearly explains balance and coverage impact.
+- Annual approval clearly explains balance and coverage impact.
 - Employees can understand a month of work and exceptions without visual noise.
 - Important changes are attributable and reviewable.
 - New contributors or agents can understand the project without relying on chat history.

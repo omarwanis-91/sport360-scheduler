@@ -19,3 +19,4 @@ schema.sql
 data.sql
 migration_history_schema.sql
 migration_history_data.sql
+.vercel

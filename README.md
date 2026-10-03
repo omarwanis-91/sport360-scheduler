@@ -1,6 +1,6 @@
 # Sport360 Scheduler
 
-Dark desktop-first scheduling prototype for departments, profile claiming, shift-label rotations, daily leads, and vacation approvals.
+Dark desktop-first scheduling prototype for departments, profile claiming, shift-label rotations, daily leads, and annual approvals.
 
 ## Project Knowledge
 
@@ -22,30 +22,32 @@ Create ignored `.env.local` using the variable names in `.env.example`. The loca
 
 ```powershell
 npm run check
-npm start
+npm run dev
 ```
 
 Open `http://127.0.0.1:4173`.
 
-## Netlify Environment
+## Deployment Environment
 
-Configure these variables under **Site configuration → Environment variables** before deploying:
+The active internal preview is deployed through Vercel. Configure these variables in the hosting project's environment settings before building:
 
 - `SPORT360_SUPABASE_URL`
 - `SPORT360_SUPABASE_ANON_KEY`
 - `SPORT360_ALLOW_SIGNUP=false`
-- `SPORT360_RELEASE` is optional because Netlify uses the commit reference by default.
+- `SPORT360_RELEASE` is optional because the build uses the Vercel or Netlify commit reference when available.
+
+Production preview: https://sport360-scheduler.vercel.app
 
 ## What Is Implemented
 
 - Dark Sport360 UI with red brand accent and compact hybrid scheduler grid.
 - Rows are employee profiles; columns are schedule dates.
-- Full shift labels with themed icon blocks for Morning, Night, Mid-day, Weekend, Vacation, Sick, and On Ground.
-- Right-side drawer for shift overrides, people, vacation requests, rotations, statuses, and daily leads.
+- Full shift labels with themed icon blocks for Morning, Night, Mid-day, Weekend, Annual, Sick, and On Ground.
+- Right-side drawer for shift overrides, people, annual requests, rotations, statuses, and daily leads.
 - Demo role switcher for admin, lead, and employee behavior.
 - Per-person versioned rotation generation.
 - Manual overrides for specific days.
-- Vacation approval that deducts scheduled work days and writes Vacation overrides.
+- Annual approval that deducts scheduled work days and writes Annual request schedule changes.
 - Configurable status labels in the UI.
 - Initial Supabase schema and RLS policies in `supabase/migrations/001_initial_scheduler_schema.sql`.
 

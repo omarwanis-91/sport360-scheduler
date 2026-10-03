@@ -31,12 +31,12 @@ Production account creation is Admin-controlled. Public signup remains disabled 
 - **No matching profile:** verify the Auth email exactly matches an unclaimed employee profile email. Do not broaden read policies to work around a mismatch.
 - **Wrong employee linked:** unlink the profile through the Admin UI, correct the profile email, and repeat sign-in. Do not manually reuse one Auth identity across profiles.
 - **Wrong role:** correct the role from the claimed profile while signed in as Admin, then have the employee reload the application.
-- **Lost password:** use Supabase Auth's password-recovery or Admin reset process. Never store or send passwords through the scheduler database.
+- **Lost password:** use **Forgot password?** on the Scheduler sign-in screen. The recovery email returns to the public password-update screen, and the user signs in again after choosing a new password. Confirm the production origin is allowed under **Authentication → URL Configuration → Redirect URLs**. Admin reset remains the fallback. Never store or send passwords through the scheduler database.
 - **Departed employee:** unlink or deactivate access before reassigning the profile or department membership.
 
 ## Runtime Configuration
 
-Netlify provides:
+The active Vercel project provides:
 
 - `SPORT360_SUPABASE_URL`
 - `SPORT360_SUPABASE_ANON_KEY`
@@ -58,8 +58,8 @@ Use this checklist before promoting an internal release.
 1. Confirm the release branch is merged into `main`.
 2. Run `npm.cmd run phase4:local` and confirm local syntax, unit, build, and demo smoke checks pass.
 3. Confirm GitHub checks pass: static check, unit tests, build, and Chromium smoke tests.
-4. Confirm Netlify production deploy uses the expected commit.
-5. Confirm Netlify environment variables are present and production signup is disabled.
+4. Confirm the Vercel production deploy uses the expected commit.
+5. Confirm Vercel environment variables are present and production signup is disabled.
 6. Run the latest Supabase audit SQL files that match the migrations being released.
 7. On Supabase Free, create a fresh manual export and store it off-site. On paid plans, confirm the most recent managed backup is current.
 8. Export critical operational tables before the release if a full logical dump is not available.
@@ -70,7 +70,7 @@ Use this checklist before promoting an internal release.
 
 ## Backup And Export
 
-Supabase is the source of truth. Netlify can be redeployed, but production data must be protected before migrations or risky operational changes.
+Supabase is the source of truth. Vercel can be redeployed, but production data must be protected before migrations or risky operational changes.
 
 ### When To Back Up
 
@@ -135,7 +135,7 @@ npm.cmd run backup:manual
 Remove-Item Env:\SUPABASE_DB_URL
 ```
 
-Do not store the database connection string in `.env.local`, GitHub, Netlify, or the repository.
+Do not store the database connection string in `.env.local`, GitHub, Vercel, Netlify, or the repository.
 
 Manual Supabase CLI commands, if the helper is not used:
 
@@ -208,7 +208,7 @@ Perform the rehearsal in a non-production Supabase project, never in the product
 1. Create or choose a temporary restore-test Supabase project.
 2. Restore the selected managed backup or import the manual export into the restore-test project.
 3. Apply the same migrations that production is expected to run.
-4. Configure a local `.env.local` or Netlify deploy preview to point at the restore-test project.
+4. Configure a local `.env.local` or isolated deploy preview to point at the restore-test project.
 5. Sign in with test Admin, Lead, and Employee accounts.
 6. Confirm the app can load Scheduler, People, Departments, Rotations, Requests, and My Profile.
 7. Confirm profile photos either load through signed URLs or fall back safely.
@@ -223,6 +223,8 @@ Record each production database change here or in a linked issue/PR before relea
 
 | Date | Release / Commit | Migration or Action | Backup Timestamp | Audit / Verification | Operator | Result |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-09-28 | `codex/phase4-ui-auth-hardening` | `022_department_scope_lead_assignments.sql` | Not recorded | Live parent/sub-department lead verification pending | Project owner | Applied |
+| 2026-09-28 | `codex/phase4-ui-auth-hardening` | `023_simplify_profile_hierarchy.sql` | Not recorded | Live Manager / Lead / Artist persistence verification pending | Project owner | Applied |
 | Pending | Pending | Free-plan manual export and restore rehearsal | Pending | Pending | Pending | Pending |
 
 For each applied migration, record:
@@ -245,7 +247,7 @@ Run this after every production deploy and after every database migration.
 4. Confirm **Create Account** is hidden when `allowSignup` is false.
 5. Sign in as Admin and open Scheduler, People, Departments, Rotations, Requests, Activity, and Settings.
 6. Sign in as a Department Lead and confirm the Lead sees only allowed department workflows.
-7. Sign in as an Employee and confirm personal profile and vacation request flows work.
+7. Sign in as an Employee and confirm personal profile and annual request flows work.
 8. Sign in with an unmatched test account and confirm operational data is blocked.
 
 ### Data Checks
@@ -253,7 +255,7 @@ Run this after every production deploy and after every database migration.
 1. Confirm the expected departments and sub-departments load.
 2. Confirm the selected pilot department has the expected people.
 3. Confirm rotations resolve for the current week.
-4. Confirm vacation balances display for at least one pilot employee.
+4. Confirm annual balances display for at least one pilot employee.
 5. Confirm a profile photo loads from `profile-photos` or falls back cleanly.
 6. Confirm the Activity view records a harmless test change, then reverse the change if needed.
 
@@ -262,14 +264,14 @@ Run this after every production deploy and after every database migration.
 1. Open browser devtools and confirm there are no startup console errors.
 2. Confirm `runtime-config.js` points to the production Supabase URL and expected release value.
 3. Confirm network calls to Supabase return successful responses for the signed-in role.
-4. Confirm Netlify deploy logs show a successful build.
+4. Confirm Vercel deploy logs show a successful build.
 5. Run `npm.cmd run phase4:local` before merging the release branch.
 
 ## Monitoring During Pilot
 
 During the five-business-day pilot, check these at the start and end of each business day.
 
-- Netlify deploy status and error logs.
+- Vercel deployment status and logs.
 - Supabase API/database health.
 - Supabase Auth user issues.
 - Failed or unusual schedule, vacation, profile, and rotation writes.
@@ -296,9 +298,9 @@ Rollback should restore a usable production state quickly while preserving data.
 
 Use this when the issue is visual, navigation-related, runtime-config-related, or isolated to frontend behavior.
 
-1. Open Netlify **Deploys**.
-2. Select the last known good production deploy.
-3. Use **Publish deploy** to roll back the frontend.
+1. Open the Vercel project **Deployments** page.
+2. Select the last known good production deployment.
+3. Promote that deployment to production.
 4. Confirm the production URL loads.
 5. Run the health check again.
 6. Record the rollback in the migration log.
@@ -332,7 +334,7 @@ Fill this before pilot launch.
 
 | Area | Owner | Backup Owner | Where To Check |
 | --- | --- | --- | --- |
-| Netlify deploys | Pending | Pending | Netlify project deploys |
+| Vercel deployments | Pending | Pending | Vercel project deployments |
 | Supabase database | Pending | Pending | Supabase database dashboard |
 | Supabase Auth | Pending | Pending | Supabase Authentication |
 | Pilot department signoff | Pending | Pending | Pilot feedback log |
