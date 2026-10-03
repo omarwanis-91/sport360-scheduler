@@ -879,8 +879,9 @@ function renderAuth() {
             <p>Use a strong password you do not use for another account.</p>
           </div>
           ${feedback}
-          <label>New password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
-          <label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+          <label>New password<input name="password" type="password" autocomplete="new-password" minlength="8" data-password-field required></label>
+          <label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" data-password-field required></label>
+          <label class="password-visibility"><input type="checkbox" data-password-visibility><span>Show passwords</span></label>
           <button class="primary wide" name="intent" value="update-password">Update Password</button>
           <button class="ghost wide" type="button" id="cancel-password-recovery">Cancel and return to sign in</button>
           <p class="hint">Use at least 8 characters. You will sign in again after the password is updated.</p>
@@ -920,8 +921,11 @@ function renderAuth() {
         </div>
         ${feedback}
         <label>Email<input name="email" type="email" autocomplete="email" required></label>
-        <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-        <button class="auth-link" type="button" id="forgot-password">Forgot password?</button>
+        <label>Password<input name="password" type="password" autocomplete="current-password" data-password-field required></label>
+        <div class="auth-password-actions">
+          <label class="password-visibility"><input type="checkbox" data-password-visibility><span>Show password</span></label>
+          <button class="auth-link" type="button" id="forgot-password">Forgot password?</button>
+        </div>
         <button class="primary wide" name="intent" value="sign-in">Sign In</button>
         ${appConfig.allowSignup ? `<button class="ghost wide" name="intent" value="sign-up">Create Account</button>` : ""}
         <p class="hint">${appConfig.allowSignup ? "After sign-in, the app links your account to the unclaimed profile with the same email." : "If your access is not ready, contact your administrator instead of creating another account."}</p>
@@ -3593,6 +3597,15 @@ function handlePhotoFile(file) {
 }
 
 function bindAuthEvents() {
+  document.querySelectorAll("[data-password-visibility]").forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      const inputType = toggle.checked ? "text" : "password";
+      toggle.closest("form")?.querySelectorAll("[data-password-field]").forEach((input) => {
+        input.type = inputType;
+      });
+    });
+  });
+
   document.querySelector("#forgot-password")?.addEventListener("click", () => {
     ui.authMode = "forgot-password";
     ui.error = "";

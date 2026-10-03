@@ -39,7 +39,13 @@ test("authentication connection failures are accurate and shown once", async ({ 
   await page.goto("/");
 
   await page.getByRole("textbox", { name: "Email", exact: true }).fill("test@example.com");
-  await page.getByRole("textbox", { name: "Password", exact: true }).fill("not-a-real-password");
+  const passwordInput = page.getByLabel("Password", { exact: true });
+  await expect(passwordInput).toHaveAttribute("type", "password");
+  await page.getByLabel("Show password", { exact: true }).check();
+  await expect(passwordInput).toHaveAttribute("type", "text");
+  await page.getByLabel("Show password", { exact: true }).uncheck();
+  await expect(passwordInput).toHaveAttribute("type", "password");
+  await passwordInput.fill("not-a-real-password");
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
   await expect(page.locator(".form-error")).toHaveCount(1);
@@ -104,6 +110,10 @@ test("password recovery links require matching passwords and clear the temporary
 
   await expect(page).toHaveURL("http://127.0.0.1:4174/");
   await expect(page.getByRole("heading", { name: "Choose a new password", exact: true })).toBeVisible();
+  await page.getByLabel("Show passwords", { exact: true }).check();
+  await expect(page.getByLabel("New password", { exact: true })).toHaveAttribute("type", "text");
+  await expect(page.getByLabel("Confirm new password", { exact: true })).toHaveAttribute("type", "text");
+  await page.getByLabel("Show passwords", { exact: true }).uncheck();
   await page.getByLabel("New password", { exact: true }).fill("New-password-123");
   await page.getByLabel("Confirm new password", { exact: true }).fill("Different-password-456");
   await page.getByRole("button", { name: "Update Password", exact: true }).click();

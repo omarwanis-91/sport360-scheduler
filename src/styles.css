@@ -202,10 +202,44 @@ svg {
   padding: 0 0 14px;
 }
 
-.auth-link {
-  justify-self: end;
-  min-height: 30px;
+.auth-password-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: -6px;
+}
+
+.password-visibility {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.password-visibility input {
+  width: 15px;
+  min-height: 15px;
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
+  accent-color: var(--red);
+  box-shadow: none;
+}
+
+.password-visibility input:focus,
+.password-visibility input:focus-visible {
+  border-color: var(--red-border);
+  outline: 2px solid rgba(244, 244, 245, 0.82);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.auth-link {
+  min-height: 30px;
   border: 0;
   background: transparent;
   color: #fda4af;
@@ -466,6 +500,29 @@ input:focus,
 textarea:focus {
   border-color: var(--red-border);
   box-shadow:
+    0 0 0 3px var(--red-soft),
+    0 0 22px rgba(225, 29, 72, 0.12);
+}
+
+.auth-card input:-webkit-autofill,
+.auth-card input:-webkit-autofill:hover {
+  border-color: var(--line);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px #0d0d0d inset;
+  box-shadow: 0 0 0 1000px #0d0d0d inset;
+}
+
+.auth-card input:-webkit-autofill:focus {
+  border-color: var(--red-border);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  -webkit-box-shadow:
+    0 0 0 1000px #0d0d0d inset,
+    0 0 0 3px var(--red-soft),
+    0 0 22px rgba(225, 29, 72, 0.12);
+  box-shadow:
+    0 0 0 1000px #0d0d0d inset,
     0 0 0 3px var(--red-soft),
     0 0 22px rgba(225, 29, 72, 0.12);
 }
