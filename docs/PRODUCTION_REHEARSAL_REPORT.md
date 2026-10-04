@@ -7,11 +7,11 @@ Do not record database passwords, connection strings, access tokens, private emp
 ## Status
 
 - Overall result: Pending
-- Rehearsal date: 2026-10-03
+- Rehearsal date: 2026-10-03 to 2026-10-04
 - Operator: Omar Wanis / Codex
 - Reviewer: Pending
-- Release branch / commit: `codex/phase4-live-verification` / pending commit
-- PR: Pending
+- Release branch / commit: `codex/phase4-live-verification` / `0fa037b`
+- PR: https://github.com/omarwanis-91/sport360-scheduler/pull/11
 - Production preview: https://sport360-scheduler.vercel.app
 - Verified Vercel deployment: `dpl_5wUHmXHEfZC6S9Mg9uqxXeiFZjTY`
 
@@ -20,7 +20,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Check | Result | Notes |
 | --- | --- | --- |
 | Local validation passed | Pass with cleanup note | 2026-10-03 syntax checks, 7 unit tests, production build, 15 application smoke tests, and 6 viewport tests passed. All 21 Playwright cases completed successfully; the local wrapper did not exit after Playwright cleanup and was stopped manually. |
-| GitHub checks passed | Pass | Main run `37114013068` passed before this verification branch. The new pull request checks remain required. |
+| GitHub checks passed | Pass | PR #11 run `37141235283` passed, including GitHub verification, Vercel, Netlify deploy preview, and Netlify redirect checks. |
 | Vercel production preview is healthy | Pass | Stable URL and the deployed HTML, recovery assets, and runtime configuration returned HTTP 200. Admin production checks pass in Chrome, Edge, and Firefox. |
 
 ## Launch Gate Matrix
@@ -28,12 +28,12 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Gate | Status | Notes |
 | --- | --- | --- |
 | Local release verification | Pass | Syntax, unit, build, app smoke, and viewport smoke checks passed on 2026-09-28. |
-| GitHub PR checks | Pending | Requires the current branch pull request. |
+| GitHub PR checks | Pass | PR #11 checks passed for commit `0fa037b`. |
 | Vercel production preview status | Pass | `https://sport360-scheduler.vercel.app` is live with the expected Supabase runtime configuration. |
 | Browser check of production preview | Partial pass | Admin read-only coverage passes in Chrome, Edge, and Firefox. Department Lead, Employee, and unmatched-account checks remain pending. |
 | Online internal preview | Pass | Vercel production preview is online; this does not close the backup/restore gate. |
-| Migrations 022 and 023 applied | Pass | Live Manager, Lead, and Artist saves pass. The sub-department lead round trip passes and restores cleanly. Parent assignment is blocked by the stale trigger validator; migration 024 is prepared. |
-| Migration 024 applied and audited | Pending | Apply `024_fix_parent_department_lead_validation.sql`, run audit 012, and repeat the live parent assignment check. |
+| Migrations 022 and 023 applied | Pass | Live Manager, Lead, and Artist saves pass. The sub-department lead round trip passes and restores cleanly. |
+| Migration 024 applied and audited | Pass with cleanup note | Migration 024 was applied through the Supabase SQL Editor. Audit 012 returned three passes and the live parent assignment write succeeded. The temporary row was removed with an exact guarded query and a follow-up count returned zero. The Scheduler UI still needs a parent-override cleanup path. |
 | Free-plan manual export | Blocked | Supabase CLI reached the remote database but local Docker/WSL is unavailable; Docker reports WSL2 is not supported with the current machine configuration. |
 | Backup folder verification | Pending | Run `npm.cmd run backup:verify` after export. |
 | Restore rehearsal | Pending | Requires non-production Supabase restore-test project. |
@@ -97,7 +97,7 @@ Pending
 | Pilot department people load correctly | Pass | Video Edit loads eight profiles; Video Unit loads twelve scoped profiles. |
 | Current-week rotations resolve | Pass | Current schedule resolves weekly shifts and lead names. |
 | Annual balances display | Pass | Profile balances and approved requests load in production. |
-| Daily lead assignments resolve | Partial pass | Sub-department assignment saves and restores. Parent assignment is rejected until migration 024 replaces the stale validator. |
+| Daily lead assignments resolve | Partial pass | Sub-department assignment saves and restores. After migration 024, the parent assignment saves successfully and production returns to the original schedule after guarded SQL cleanup. The Scheduler cannot yet remove a stored parent override through its own lead drawer. |
 | Activity log records a harmless test change | Pass | Unchanged Manager, Lead, and Artist saves plus the restored sub-department lead check appear in Activity. |
 
 ## Rollback Rehearsal
@@ -114,7 +114,8 @@ Pending
 
 | Severity | Area | Description | Owner | Status |
 | --- | --- | --- | --- | --- |
-| High | Parent department leads | Production still executes the retired direct-membership/lead-eligibility trigger, rejecting a child-department member offered by the parent Scheduler. Migration 024 replaces daily and weekly validators with descendant-aware scope checks. | Omar Wanis | Fix prepared; apply and retest |
+| High | Parent department validator | The retired direct-membership validator rejected child-department members offered by the parent Scheduler. Migration 024 replaced both validators; audit 012 passed and the live parent write succeeded. | Omar Wanis | Resolved 2026-10-03 |
+| Medium | Parent lead override cleanup | A parent-department daily override can be saved, but the aggregate parent Scheduler resolves its lead drawer to a child department and cannot return the stored parent row to weekly rotation. The verification row required an exact guarded SQL cleanup, which was confirmed by a zero-row follow-up count. | Pending | Open |
 | Medium | Backup | Full SQL export is blocked by local Docker/WSL. Online preview may proceed, but production-ready release cannot close until export and restore rehearsal pass. | Pending | Open |
 
 ## Signoff
