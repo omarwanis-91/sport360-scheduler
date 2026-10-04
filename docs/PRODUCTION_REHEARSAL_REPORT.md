@@ -12,7 +12,8 @@ Do not record database passwords, connection strings, access tokens, private emp
 - Reviewer: Pending
 - Reviewed release commit: `main` / `c414d57`
 - Merged PR: https://github.com/omarwanis-91/sport360-scheduler/pull/11
-- Current verification branch: `codex/parent-lead-cleanup`
+- Current verification branch / commit: `codex/parent-lead-cleanup` / `a480d75`
+- Current verification PR: https://github.com/omarwanis-91/sport360-scheduler/pull/12
 - Production preview: https://sport360-scheduler.vercel.app
 - Verified Vercel deployment: `dpl_5wUHmXHEfZC6S9Mg9uqxXeiFZjTY`
 
@@ -21,7 +22,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Check | Result | Notes |
 | --- | --- | --- |
 | Local validation passed | Pass | 2026-10-04 syntax checks, 8 unit tests, production build, 16 application smoke tests, and 6 viewport tests passed. All 22 Playwright cases completed successfully, including the parent daily-lead cleanup round trip. |
-| GitHub checks passed | Pass | PR #11 run `37194315047` passed, including GitHub verification, Vercel, Netlify deploy preview, and Netlify redirect checks. Checks for the parent-cleanup branch remain pending until its pull request is created. |
+| GitHub checks passed | Pass | PR #12 run `37196133223` passed, including GitHub verification, Vercel, Netlify deploy preview, and Netlify redirect checks. PR #11 was merged into `main` as `c414d57`. |
 | Vercel production preview is healthy | Pass | Stable URL and the deployed HTML, recovery assets, and runtime configuration returned HTTP 200. Admin production checks pass in Chrome, Edge, and Firefox. |
 
 ## Launch Gate Matrix
@@ -29,7 +30,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Gate | Status | Notes |
 | --- | --- | --- |
 | Local release verification | Pass | Syntax, unit, build, app smoke, and viewport smoke checks passed on 2026-09-28. |
-| GitHub PR checks | Pass | PR #11 checks passed for commit `0fa037b`. |
+| GitHub PR checks | Pass | PR #12 checks passed for parent-cleanup commit `a480d75`; PR #11 is merged in `main`. |
 | Vercel production preview status | Pass | `https://sport360-scheduler.vercel.app` is live with the expected Supabase runtime configuration. |
 | Browser check of production preview | Partial pass | Admin read-only coverage passes in Chrome, Edge, and Firefox. Department Lead, Employee, and unmatched-account checks remain pending. |
 | Online internal preview | Pass | Vercel production preview is online; this does not close the backup/restore gate. |
@@ -116,7 +117,7 @@ Pending
 | Severity | Area | Description | Owner | Status |
 | --- | --- | --- | --- | --- |
 | High | Parent department validator | The retired direct-membership validator rejected child-department members offered by the parent Scheduler. Migration 024 replaced both validators; audit 012 passed and the live parent write succeeded. | Omar Wanis | Resolved 2026-10-03 |
-| Medium | Parent lead override cleanup | The browser now resolves descendant members for parent leads and routes an existing parent override back to the parent lead editor. Unit and local browser round-trip coverage pass; deploy-preview and production verification remain. | Omar Wanis / Codex | Fix pending review |
+| Medium | Parent lead override cleanup | The browser now resolves descendant members for parent leads and routes an existing parent override back to the parent lead editor. Unit and local browser round-trip coverage pass, and PR #12 deployment checks are green; production verification remains. | Omar Wanis / Codex | PR #12 ready |
 | Medium | Backup | Full SQL export is blocked by local Docker/WSL. Online preview may proceed, but production-ready release cannot close until export and restore rehearsal pass. | Pending | Open |
 
 ## Signoff

@@ -8,9 +8,9 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
 - [x] Verify the production Admin workflow in Chrome, Edge, and Firefox: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and startup console health.
 - [ ] Verify Department Lead, Employee, and unmatched-account production boundaries in Chrome, Edge, and Firefox.
-- [~] Verify Manager / Lead / Artist saves and parent/sub-department lead assignment against the live database: hierarchy saves, the sub-department round trip, and the migration 024 parent write pass; the parent cleanup implementation still needs deploy-preview and production verification.
+- [~] Verify Manager / Lead / Artist saves and parent/sub-department lead assignment against the live database: hierarchy saves, the sub-department round trip, and the migration 024 parent write pass; PR #12 checks pass and the parent cleanup still needs production verification.
 - [x] Apply `024_fix_parent_department_lead_validation.sql`, run audit 012, verify the parent-department write in production, and remove the temporary verification row.
-- [~] Expose parent-department daily-lead cleanup in the Scheduler so an override can return to weekly rotation without direct SQL: implementation, unit coverage, and the local browser round trip pass; deploy-preview and production verification remain.
+- [~] Expose parent-department daily-lead cleanup in the Scheduler so an override can return to weekly rotation without direct SQL: implementation, unit coverage, local browser round trip, and PR #12 deployment checks pass; production verification remains.
 
 ## Next
 
