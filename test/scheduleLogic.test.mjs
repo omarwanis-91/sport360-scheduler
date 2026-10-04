@@ -25,6 +25,10 @@ function testState() {
       { id: "vacation", label: "Vacation", kind: "leave" },
       { id: "ground", label: "On Ground", kind: "working" }
     ],
+    departments: [
+      { id: "ops", name: "Operations" },
+      { id: "ops-edit", name: "Editing", parentDepartmentId: "ops" }
+    ],
     users: [
       { id: "user-lead", role: "lead" },
       { id: "user-fallback", role: "employee" }
@@ -109,4 +113,21 @@ test("any department member can be assigned as day lead", () => {
 
   assert.equal(departmentLeadForDate(state, "ops", "2026-05-25").profile.id, "not-eligible");
   assert.equal(departmentLeadForDate(state, "ops", "2026-05-26").profile.id, "hybrid-member");
+});
+
+test("parent department leads accept members assigned to descendant departments", () => {
+  const state = testState();
+  state.profiles.push({ id: "child-member", departmentId: "ops-edit", departmentIds: ["ops-edit"] });
+  state.departmentLeads.push({ id: "parent-daily", departmentId: "ops", date: "2026-05-27", profileId: "child-member" });
+  state.departmentLeadRotations.push({
+    id: "parent-rotation",
+    departmentId: "ops",
+    effectiveStart: "2026-05-27",
+    pattern: Array(7).fill("child-member")
+  });
+
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-27").profile.id, "child-member");
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-27").source, "Daily override");
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-28").profile.id, "child-member");
+  assert.equal(departmentLeadForDate(state, "ops", "2026-05-28").source, "Lead rotation");
 });

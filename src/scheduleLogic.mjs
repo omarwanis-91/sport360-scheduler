@@ -74,10 +74,25 @@ function profileDepartmentIds(profile) {
     : [profile?.departmentId].filter(Boolean);
 }
 
+function departmentScopeIds(state, departmentId) {
+  const scope = new Set([departmentId].filter(Boolean));
+  const visit = (parentId) => {
+    (state.departments || [])
+      .filter((department) => department.parentDepartmentId === parentId && !scope.has(department.id))
+      .forEach((department) => {
+        scope.add(department.id);
+        visit(department.id);
+      });
+  };
+  visit(departmentId);
+  return scope;
+}
+
 export function departmentLeadForDate(state, departmentId, dateIso) {
+  const departmentScope = departmentScopeIds(state, departmentId);
   const validProfile = (profileId) => {
     const profile = byId(state.profiles, profileId);
-    return profileDepartmentIds(profile).includes(departmentId) ? profile : null;
+    return profileDepartmentIds(profile).some((id) => departmentScope.has(id)) ? profile : null;
   };
   const override = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === dateIso);
   const overrideProfile = validProfile(override?.profileId);
