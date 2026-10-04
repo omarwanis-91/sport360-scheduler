@@ -10,10 +10,8 @@ Do not record database passwords, connection strings, access tokens, private emp
 - Rehearsal date: 2026-10-03 to 2026-10-04
 - Operator: Omar Wanis / Codex
 - Reviewer: Pending
-- Reviewed release commit: `main` / `c414d57`
-- Merged PR: https://github.com/omarwanis-91/sport360-scheduler/pull/11
-- Current verification branch / commit: `codex/parent-lead-cleanup` / `a480d75`
-- Current verification PR: https://github.com/omarwanis-91/sport360-scheduler/pull/12
+- Reviewed release commit: `main` / `8bc2cc6`
+- Merged PRs: https://github.com/omarwanis-91/sport360-scheduler/pull/11 and https://github.com/omarwanis-91/sport360-scheduler/pull/12
 - Production preview: https://sport360-scheduler.vercel.app
 - Verified Vercel deployment: `dpl_5wUHmXHEfZC6S9Mg9uqxXeiFZjTY`
 
@@ -35,7 +33,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Browser check of production preview | Partial pass | Admin read-only coverage passes in Chrome, Edge, and Firefox. Department Lead, Employee, and unmatched-account checks remain pending. |
 | Online internal preview | Pass | Vercel production preview is online; this does not close the backup/restore gate. |
 | Migrations 022 and 023 applied | Pass | Live Manager, Lead, and Artist saves pass. The sub-department lead round trip passes and restores cleanly. |
-| Migration 024 applied and audited | Pass with cleanup note | Migration 024 was applied through the Supabase SQL Editor. Audit 012 returned three passes and the live parent assignment write succeeded. The temporary row was removed with an exact guarded query and a follow-up count returned zero. The Scheduler parent-override cleanup path now passes locally and awaits deploy-preview and production verification. |
+| Migration 024 applied and audited | Pass | Migration 024 was applied through the Supabase SQL Editor. Audit 012 returned three passes, the live parent assignment write succeeded, and the merged Scheduler cleanup path completed the production create-and-clear round trip without SQL. |
 | Free-plan manual export | Blocked | Supabase CLI reached the remote database but local Docker/WSL is unavailable; Docker reports WSL2 is not supported with the current machine configuration. |
 | Backup folder verification | Pending | Run `npm.cmd run backup:verify` after export. |
 | Restore rehearsal | Pending | Requires non-production Supabase restore-test project. |
@@ -99,7 +97,7 @@ Pending
 | Pilot department people load correctly | Pass | Video Edit loads eight profiles; Video Unit loads twelve scoped profiles. |
 | Current-week rotations resolve | Pass | Current schedule resolves weekly shifts and lead names. |
 | Annual balances display | Pass | Profile balances and approved requests load in production. |
-| Daily lead assignments resolve | Partial pass | Sub-department assignment saves and restores. After migration 024, the parent assignment saves successfully. The Scheduler cleanup fix resolves descendant members, reopens an existing parent override, and deletes it through the normal lead form in local browser coverage; deploy-preview and production round-trip verification remain. |
+| Daily lead assignments resolve | Pass | Sub-department assignment saves and restores. The production parent override appeared as an additional scoped lead, reopened in the Video Unit lead editor with Omar selected, returned to weekly rotation through the normal form, and remained cleared after reload. |
 | Activity log records a harmless test change | Pass | Unchanged Manager, Lead, and Artist saves plus the restored sub-department lead check appear in Activity. |
 
 ## Rollback Rehearsal
@@ -117,7 +115,7 @@ Pending
 | Severity | Area | Description | Owner | Status |
 | --- | --- | --- | --- | --- |
 | High | Parent department validator | The retired direct-membership validator rejected child-department members offered by the parent Scheduler. Migration 024 replaced both validators; audit 012 passed and the live parent write succeeded. | Omar Wanis | Resolved 2026-10-03 |
-| Medium | Parent lead override cleanup | The browser now resolves descendant members for parent leads and routes an existing parent override back to the parent lead editor. Unit and local browser round-trip coverage pass, and PR #12 deployment checks are green; production verification remains. | Omar Wanis / Codex | PR #12 ready |
+| Medium | Parent lead override cleanup | The browser resolves descendant members for parent leads and routes an existing parent override back to the parent lead editor. Unit, local browser, deployment, and production round-trip checks pass. | Omar Wanis / Codex | Resolved 2026-10-04 |
 | Medium | Backup | Full SQL export is blocked by local Docker/WSL. Online preview may proceed, but production-ready release cannot close until export and restore rehearsal pass. | Pending | Open |
 
 ## Signoff
