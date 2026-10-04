@@ -285,3 +285,12 @@ Events are shared calendar items that can be assigned to people. When an event i
 The production sign-in screen provides Supabase email-based password recovery while public account creation remains disabled. Recovery requests always use generic confirmation text so the interface does not disclose whether an account exists.
 
 Recovery tokens may authenticate only the password-update flow. A recovery-pending session must not load scheduler data, and the temporary session is cleared after the password changes so the user signs in again with the new password.
+
+## D-040 - Desktop Browser Parity
+
+**Date:** 2026-10-03
+**Status:** Accepted
+
+Production verification covers current Chrome, Edge, and Firefox. A workflow accepted for the internal release must behave consistently in all three browsers; browser-specific gaps remain release issues until resolved or explicitly removed from the support scope.
+
+Automated viewport checks continue to cover the Chromium implementation at the supported desktop widths. Manual production checks provide Edge and Firefox parity evidence until the automated matrix expands.
