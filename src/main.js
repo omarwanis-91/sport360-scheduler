@@ -573,6 +573,10 @@ function departmentLeadForDate(departmentId, dateIso) {
   return departmentLeadForDateLogic(state, departmentId, dateIso);
 }
 
+function dailyLeadOverrideForDate(departmentId, dateIso) {
+  return state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === dateIso);
+}
+
 function isScheduleLeadAvailable(schedule) {
   return schedule?.kind === "working" && schedule.id !== "ground";
 }
@@ -592,8 +596,12 @@ function leadAvailabilityForDepartmentDate(departmentId, dateIso) {
 
 function leadAvailabilityForScopeDate(departmentId, dateIso) {
   return departmentScopeIds(departmentId)
-    .filter((id) => childDepartmentsOf(id).length === 0 || state.profiles.some((profile) => profileDepartmentIds(profile).includes(id)))
-    .map((id) => leadAvailabilityForDepartmentDate(id, dateIso));
+    .map((id) => leadAvailabilityForDepartmentDate(id, dateIso))
+    .filter((lead) =>
+      childDepartmentsOf(lead.department?.id).length === 0
+      || state.profiles.some((profile) => profileDepartmentIds(profile).includes(lead.department?.id))
+      || Boolean(lead.override || lead.rotation)
+    );
 }
 
 function unavailableLeadAssignmentsForProfile(profileId, dates) {
@@ -1313,8 +1321,9 @@ function renderCoverageRow(profiles, dates, department) {
       const coverage = coverageForDate(profiles, date);
       const isLow = coverage.available < target;
       const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
-      const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
-      const drawerType = ui.schedulerEditMode && leadInfo.missing ? "lead" : "coverage";
+      const selectedOverride = dailyLeadOverrideForDate(ui.selectedDepartmentId, date);
+      const leadDepartmentId = selectedOverride ? ui.selectedDepartmentId : leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
+      const drawerType = ui.schedulerEditMode && (selectedOverride || leadInfo.missing) ? "lead" : "coverage";
       return `
         <button class="coverage-cell ${isLow ? "low" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}">
           <span class="coverage-count">${coverage.available}</span>
@@ -1370,8 +1379,9 @@ function renderDateHead(date) {
   const leads = departmentLeadsForDate(ui.selectedDepartmentId, date);
   const isToday = date === todayIso;
   const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
-  const leadDepartmentId = leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
-  const drawerType = ui.schedulerEditMode && leadInfo.missing ? "lead" : "coverage";
+  const selectedOverride = dailyLeadOverrideForDate(ui.selectedDepartmentId, date);
+  const leadDepartmentId = selectedOverride ? ui.selectedDepartmentId : leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
+  const drawerType = ui.schedulerEditMode && (selectedOverride || leadInfo.missing) ? "lead" : "coverage";
   const leadLabel = leads.length > 1
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
@@ -2917,9 +2927,9 @@ function bulkRotationDay(statusId, index) {
 
 function leadDrawer() {
   const departmentId = activeDrawerDepartmentId();
-  const lead = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === ui.drawer.date);
+  const lead = dailyLeadOverrideForDate(departmentId, ui.drawer.date);
   const resolvedLead = departmentLeadForDate(departmentId, ui.drawer.date);
-  const candidates = availableLeadCandidates(departmentId, ui.drawer.date, resolvedLead.profile?.id);
+  const candidates = availableLeadCandidates(departmentId, ui.drawer.date);
   const canEdit = ui.schedulerEditMode && canManageDepartment(departmentId) && editableDate(ui.drawer.date);
   const department = byId(state.departments, departmentId);
   const leadHealth = leadAvailabilityForDepartmentDate(departmentId, ui.drawer.date);
@@ -4155,7 +4165,7 @@ async function saveLead(event) {
   const departmentId = activeDrawerDepartmentId();
   if (!canManageDepartment(departmentId) || !editableDate(ui.drawer.date)) return;
   const form = new FormData(event.currentTarget);
-  const existing = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === ui.drawer.date);
+  const existing = dailyLeadOverrideForDate(departmentId, ui.drawer.date);
   const profileId = form.get("profileId");
   const selectedProfile = byId(state.profiles, profileId);
   if (profileId && (!selectedProfile || !profileBelongsToDepartment(selectedProfile, departmentId))) {

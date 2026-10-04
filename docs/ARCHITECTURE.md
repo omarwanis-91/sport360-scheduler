@@ -92,9 +92,11 @@ For a person and date:
 - `department_leads`: daily lead assignments.
 - `department_lead_rotation_versions`: effective-dated Mon-Sun default lead patterns by department.
 - `user_roles`: application access roles.
+- `audit_log`: important operational changes.
 
 Employee profiles also carry `seniority_level`, now simplified to `manager`, `lead`, or `artist`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; any current department member can be selected as a day lead. `user_roles.lead` remains the separate authorization role for application permissions.
-- `audit_log`: important operational changes.
+
+Parent-department lead assignments use the full descendant department scope. A daily override or weekly lead rotation stored on a parent can therefore resolve to a profile assigned to one of its sub-departments. In Scheduler edit mode, an existing parent daily override reopens the parent lead editor so it can be returned to the weekly rotation without direct database cleanup.
 
 ## Authorization Model
 

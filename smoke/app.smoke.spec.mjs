@@ -312,6 +312,49 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
   }
 });
 
+test("parent department daily lead overrides can return to weekly rotation", async ({ page }) => {
+  const today = localIso();
+  await page.goto("/");
+  await page.evaluate(async (date) => {
+    const { seedState } = await import("/assets/data.js");
+    const storedState = structuredClone(seedState);
+    storedState.departments.push({ id: "ops-edit", name: "Editing", parentDepartmentId: "ops" });
+    storedState.profiles
+      .filter((profile) => profile.departmentId === "ops")
+      .forEach((profile) => {
+        profile.departmentId = "ops-edit";
+        profile.departmentIds = ["ops-edit"];
+      });
+    storedState.rotationVersions
+      .filter((rotation) => rotation.profileId === "emp-002")
+      .forEach((rotation) => {
+        rotation.pattern = Array(7).fill("morning");
+      });
+    storedState.departmentLeads.push({
+      id: "parent-daily-lead",
+      departmentId: "ops",
+      date,
+      profileId: "emp-002"
+    });
+    localStorage.setItem("sport360-scheduler-state", JSON.stringify(storedState));
+  }, today);
+  await page.reload();
+
+  await page.getByRole("button", { name: "Edit Schedule", exact: true }).click();
+  await page.locator(`.date-head[data-date="${today}"]`).click();
+
+  const dailyLeadSelect = page.getByRole("combobox", { name: "Daily lead override", exact: true });
+  await expect(dailyLeadSelect).toHaveValue("emp-002");
+  await dailyLeadSelect.selectOption("");
+  await page.getByRole("button", { name: "Save Lead", exact: true }).click();
+
+  await expect(page.getByText("Daily lead returned to weekly rotation.", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate((date) => {
+    const storedState = JSON.parse(localStorage.getItem("sport360-scheduler-state"));
+    return storedState.departmentLeads.some((lead) => lead.departmentId === "ops" && lead.date === date);
+  }, today)).toBe(false);
+});
+
 test("scheduler zoom switches week, two-week, and month density", async ({ page }) => {
   await page.goto("/");
 

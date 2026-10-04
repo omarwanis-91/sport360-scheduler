@@ -4,7 +4,7 @@ This document is the durable phased plan for Sport360 Scheduler. It records what
 
 ## Current Position
 
-Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 024 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 024 passed audit 012 and the live parent-department assignment write now succeeds. Live verification also found that the Scheduler cannot return a stored parent-department override to weekly rotation, so that UI cleanup path remains open. The full backup/restore gate also remains open. Phases 5-6 remain intentionally non-blocking for the first production release.
+Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 024 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 024 passed audit 012 and the live parent-department assignment write now succeeds. The Scheduler cleanup path for returning a stored parent override to weekly rotation passes its local browser round trip and PR #12 deployment checks; production verification remains open. The full backup/restore gate also remains open. Phases 5-6 remain intentionally non-blocking for the first production release.
 
 ## Phase 0 - Product Foundation
 
@@ -101,7 +101,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Deploy the reviewed app online for internal preview through Vercel.
 - ✅ Apply migrations 022 and 023 for the simplified hierarchy and parent/sub-department lead scope.
 - ✅ Apply migration 024, pass audit 012, and verify the live parent-department lead assignment write.
-- ⏳ Expose parent-department daily-lead cleanup in the Scheduler and complete the UI round trip without direct SQL.
+- ⏳ Expose parent-department daily-lead cleanup in the Scheduler and complete the UI round trip without direct SQL. The implementation, automated local round trip, and PR #12 deployment checks pass; production verification remains.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
 - ⏳ Repair or bypass the local Docker/WSL blocker so the Supabase Free-plan SQL export can be completed and restored in a test project.
 - ⬜ Pilot the production release with one department for five business days before expanding internally.
