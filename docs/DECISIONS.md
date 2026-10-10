@@ -303,3 +303,12 @@ Automated viewport checks continue to cover the Chromium implementation at the s
 Before the scheduler opens to employees, public account creation may run in a controlled prelaunch mode. A newly authenticated account reserves the employee profile with the same work email but does not populate `employee_profiles.user_id` or create an application role.
 
 This reservation keeps the account outside the existing claimed-user RLS boundary. Non-Admin users see only a profile confirmation page, while existing Admins retain the full scheduler for setup work. When prelaunch mode is disabled, the normal claim RPC promotes the matching reservation into an active profile link and removes the reservation.
+
+## D-042 - Admin-Approved Self-Service Onboarding
+
+**Date:** 2026-10-10
+**Status:** Accepted; supersedes D-007 and D-041 for account onboarding
+
+Employees create their own Auth accounts and submit only a name and optional profile photo. The submission is stored separately from operational employee profiles and grants no scheduler access.
+
+An Admin reviews each submission and either links it to an existing unclaimed employee profile or creates a new unassigned employee profile. The Admin then manages departments, title, hierarchy, application role, leave balances, rotations, and scheduling. Email matching must not automatically reserve or claim an employee profile.

@@ -5,6 +5,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 ## Now
 
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
+- [ ] Apply `026_self_service_profile_onboarding.sql`, run audit 014, deploy the reviewed onboarding UI, then enable prelaunch signup and verify user/Admin isolation in Chrome, Edge, and Firefox.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
 - [x] Verify the production Admin workflow in Chrome, Edge, and Firefox: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and startup console health.
 - [~] Verify Department Lead, Employee, and unmatched-account production boundaries in Chrome, Edge, and Firefox. The reusable three-browser live verifier is ready; production currently has only the Admin profile claimed, so claimed Lead and Employee accounts plus an unmatched test account are still required.
@@ -31,6 +32,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Replaced email-matched reservations with isolated name/photo onboarding submissions and an explicit Admin link-or-create workflow; public signup remains paused until migration 026 is applied.
 - [x] Applied migration 025, completed audit 013, enabled the production prelaunch flags, and verified the public claim page in fresh Chrome and Edge sessions without exposing the scheduler shell.
 - [x] Added a prelaunch account flow that reserves email-matched employee profiles without granting scheduler access, while preserving full access for the existing Admin account.
 - [x] Merged PR #12, loaded asset version `phase4-parent-lead-cleanup-v1` in production, created a parent Video Unit override, reopened it with Omar selected, returned it to weekly rotation, and confirmed the cleared state survived reload.

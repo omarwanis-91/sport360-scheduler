@@ -2,6 +2,7 @@ import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
 
 const profilePhotoPrefix = "storage:profile-photos/";
+const onboardingPhotoPrefix = "storage:profile-onboarding-photos/";
 
 export function shouldUseSupabase() {
   return Boolean(!appConfig.demoMode && supabaseConfig.url && supabaseConfig.anonKey);
@@ -60,7 +61,13 @@ function createLocalStore() {
     async uploadProfilePhoto(profileId, file, dataUrl) {
       return { reference: dataUrl, url: dataUrl };
     },
+    async uploadOnboardingPhoto(userId, file, dataUrl) {
+      return { reference: dataUrl, url: dataUrl };
+    },
     async deleteProfilePhoto() {},
+    async deleteOnboardingPhoto() {},
+    async saveMyOnboarding() {},
+    async approveOnboarding() {},
     async insertAudit() {}
   };
 }
@@ -71,11 +78,11 @@ function createRemoteStore(client) {
     client,
     passwordRecovery: client.getPasswordRecovery(),
     session: null,
-    prelaunchReservation: null,
+    onboardingSubmission: null,
     prelaunchRestricted: false,
     async load() {
       this.session = client.getSession();
-      this.prelaunchReservation = null;
+      this.onboardingSubmission = null;
       this.prelaunchRestricted = false;
       if (this.passwordRecovery?.status === "error" || this.session?.recovery_pending) return emptyState();
       if (!this.session) return emptyState();
@@ -84,8 +91,9 @@ function createRemoteStore(client) {
         const role = await client.rpc("current_role");
         if (role !== "admin") {
           this.prelaunchRestricted = true;
-          this.prelaunchReservation = normalizePrelaunchReservation(
-            await client.rpc("reserve_profile_for_current_user")
+          this.onboardingSubmission = await hydrateOnboardingPhoto(
+            client,
+            normalizeOnboardingSubmission(await client.rpc("get_my_profile_onboarding"))
           );
           return emptyState();
         }
@@ -127,7 +135,7 @@ function createRemoteStore(client) {
     async signOut() {
       client.clearSession();
       this.session = null;
-      this.prelaunchReservation = null;
+      this.onboardingSubmission = null;
       this.prelaunchRestricted = false;
     },
     async createProfile(profile) {
@@ -250,8 +258,39 @@ function createRemoteStore(client) {
       }
     },
     async deleteProfilePhoto(reference) {
-      const path = storagePhotoPath(reference);
-      if (path) await client.deleteObject("profile-photos", path);
+      const stored = storagePhotoReference(reference);
+      if (stored) await client.deleteObject(stored.bucket, stored.path);
+    },
+    async uploadOnboardingPhoto(userId, file) {
+      const extension = photoExtension(file.type);
+      const path = `${userId}/${crypto.randomUUID()}.${extension}`;
+      await client.uploadObject("profile-onboarding-photos", path, file);
+      try {
+        const url = await client.signObject("profile-onboarding-photos", path, 3600);
+        return { reference: `${onboardingPhotoPrefix}${path}`, url };
+      } catch (error) {
+        await client.deleteObject("profile-onboarding-photos", path).catch(() => {});
+        throw error;
+      }
+    },
+    async deleteOnboardingPhoto(reference) {
+      const stored = storagePhotoReference(reference);
+      if (stored?.bucket === "profile-onboarding-photos") await client.deleteObject(stored.bucket, stored.path);
+    },
+    async saveMyOnboarding(fullName, photoReference) {
+      const result = normalizeOnboardingSubmission(await client.rpc("save_my_profile_onboarding", {
+        p_full_name: fullName,
+        p_photo_url: photoReference || null
+      }));
+      this.onboardingSubmission = await hydrateOnboardingPhoto(client, result);
+      return this.onboardingSubmission;
+    },
+    async approveOnboarding(userId, profileId = null) {
+      const row = await client.rpc("approve_profile_onboarding", {
+        p_user_id: userId,
+        p_profile_id: profileId || null
+      });
+      return row ? fromDbProfile(Array.isArray(row) ? row[0] : row) : null;
     },
     async insertAudit(entry) {
       await client.insert("audit_log", toDbAudit(entry));
@@ -518,8 +557,13 @@ function photoExtension(contentType) {
   return ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" })[contentType] || "jpg";
 }
 
+function storagePhotoReference(reference = "") {
+  const match = /^storage:([^/]+)\/(.+)$/.exec(reference);
+  return match ? { bucket: match[1], path: match[2] } : null;
+}
+
 function storagePhotoPath(reference = "") {
-  return reference.startsWith(profilePhotoPrefix) ? reference.slice(profilePhotoPrefix.length) : "";
+  return storagePhotoReference(reference)?.path || "";
 }
 
 function emptyState() {
@@ -535,6 +579,7 @@ function emptyState() {
     departmentLeadRotations: [],
     vacationRequests: [],
     userRoles: [],
+    onboardingSubmissions: [],
     auditLog: []
   };
 }
@@ -559,10 +604,10 @@ async function loadRemoteState(client, session) {
       profile.departmentId,
       ...profileDepartments.filter((membership) => membership.profile_id === profile.id).map((membership) => membership.department_id)
     ].filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index);
-    const photoPath = storagePhotoPath(profile.photoRef);
-    if (photoPath) {
+    const storedPhoto = storagePhotoReference(profile.photoRef);
+    if (storedPhoto) {
       try {
-        profile.photo = await client.signObject("profile-photos", photoPath, 3600);
+        profile.photo = await client.signObject(storedPhoto.bucket, storedPhoto.path, 3600);
       } catch {
         profile.photo = "";
       }
@@ -572,12 +617,16 @@ async function loadRemoteState(client, session) {
   const currentProfile = mappedProfiles.find((profile) => profile.userId === session.user.id);
   const currentRole = roles.find((role) => role.user_id === session.user.id);
   const auditLog = currentRole?.role === "admin" ? await safeAuditLoad(client) : [];
+  const onboardingSubmissions = currentRole?.role === "admin"
+    ? await loadOnboardingSubmissions(client)
+    : [];
 
   return {
     currentUserId: session.user.id,
     users: [{ id: session.user.id, email: session.user.email, role: currentRole?.role || "employee", profileId: currentProfile?.id }],
     departments: departments.map(fromDbDepartment),
     userRoles: roles.map(fromDbUserRole),
+    onboardingSubmissions,
     profiles: mappedProfiles,
     statuses: statuses.map(fromDbStatus),
     rotationVersions: rotations.map(fromDbRotation),
@@ -611,16 +660,45 @@ async function claimProfileForSession(client, session) {
   await client.rpc("claim_profile_for_current_user");
 }
 
-function normalizePrelaunchReservation(result) {
+function normalizeOnboardingSubmission(result) {
   const row = Array.isArray(result) ? result[0] : result;
-  if (!row?.profile_id) throw new Error("Your employee profile could not be reserved.");
+  if (!row?.user_id || !row?.status) return null;
   return {
-    profileId: row.profile_id,
-    name: row.full_name || "Sport360 team member",
+    userId: row.user_id,
+    name: row.full_name || "",
     email: row.email || "",
-    title: row.title || "",
-    reservedAt: row.reserved_at || ""
+    photoRef: row.photo_url || "",
+    photo: "",
+    status: row.status || "",
+    linkedProfileId: row.linked_profile_id || null,
+    createdAt: row.created_at || "",
+    updatedAt: row.updated_at || ""
   };
+}
+
+async function hydrateOnboardingPhoto(client, submission) {
+  if (!submission) return null;
+  const stored = storagePhotoReference(submission.photoRef);
+  if (!stored) {
+    submission.photo = submission.photoRef;
+    return submission;
+  }
+  try {
+    submission.photo = await client.signObject(stored.bucket, stored.path, 3600);
+  } catch {
+    submission.photo = "";
+  }
+  return submission;
+}
+
+async function loadOnboardingSubmissions(client) {
+  try {
+    const rows = await client.rpc("list_profile_onboarding");
+    return Promise.all((rows || []).map(async (row) => hydrateOnboardingPhoto(client, normalizeOnboardingSubmission(row))));
+  } catch (error) {
+    if (/schema cache|Could not find the function|list_profile_onboarding/i.test(error.message || "")) return [];
+    throw error;
+  }
 }
 
 function fromDbDepartment(row) {
