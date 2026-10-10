@@ -251,6 +251,23 @@ Run this after every production deploy and after every database migration.
 7. Sign in as an Employee and confirm personal profile and annual request flows work.
 8. Sign in with an unmatched test account and confirm operational data is blocked.
 
+The repeatable live role verifier covers this matrix in Chrome, Edge, and Firefox. It performs read-only navigation and permission checks; it does not create, update, or delete production data. Provide credentials through transient environment variables in a trusted local shell, run the verifier, then clear the variables:
+
+```powershell
+$env:SPORT360_ADMIN_EMAIL="<admin email>"
+$env:SPORT360_ADMIN_PASSWORD="<admin password>"
+$env:SPORT360_LEAD_EMAIL="<claimed lead email>"
+$env:SPORT360_LEAD_PASSWORD="<lead password>"
+$env:SPORT360_EMPLOYEE_EMAIL="<claimed employee email>"
+$env:SPORT360_EMPLOYEE_PASSWORD="<employee password>"
+$env:SPORT360_UNMATCHED_EMAIL="<unmatched auth email>"
+$env:SPORT360_UNMATCHED_PASSWORD="<unmatched password>"
+npm.cmd run test:live-roles
+Remove-Item Env:\SPORT360_ADMIN_EMAIL, Env:\SPORT360_ADMIN_PASSWORD, Env:\SPORT360_LEAD_EMAIL, Env:\SPORT360_LEAD_PASSWORD, Env:\SPORT360_EMPLOYEE_EMAIL, Env:\SPORT360_EMPLOYEE_PASSWORD, Env:\SPORT360_UNMATCHED_EMAIL, Env:\SPORT360_UNMATCHED_PASSWORD
+```
+
+Do not save these credentials in `.env.local`, documentation, test artifacts, command files, GitHub, or deployment settings. A successful run requires all four accounts so a missing role cannot be mistaken for a pass.
+
 ### Data Checks
 
 1. Confirm the expected departments and sub-departments load.

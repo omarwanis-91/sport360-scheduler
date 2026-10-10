@@ -19,6 +19,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `scripts/localServer.js` | Local static file server. |
 | `scripts/build.js` | Creates the deployable `dist/` directory. |
 | `scripts/freePlanBackup.js` | Runs the Supabase Free-plan manual export helper without storing database credentials. |
+| `playwright.live.config.mjs` and `live/phase4-role-boundaries.spec.mjs` | Run credential-injected, read-only production role checks in Chrome, Edge, and Firefox without storing passwords in the repository. |
 | `scripts/verifyFreePlanBackup.js` | Verifies a manual export folder has the expected files before restore rehearsal. |
 | `scripts/phase4LocalVerify.js` | Runs local Phase 4 release checks: syntax, unit tests, build, and demo smoke tests. |
 | `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
