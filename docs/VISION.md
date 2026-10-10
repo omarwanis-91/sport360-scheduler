@@ -11,7 +11,7 @@ The product should feel fast and calm under operational pressure. A manager shou
 Build a dark, compact, Supabase-backed workforce scheduler that supports:
 
 - Employee profiles that can exist before users create accounts.
-- Secure profile claiming through a matching email address.
+- Self-service account profiles that remain isolated until an Admin links or creates the operational employee profile.
 - Multiple departments with admins and department leads.
 - Weekly rotation patterns with effective dates and preserved history.
 - Daily schedule overrides and exceptions.

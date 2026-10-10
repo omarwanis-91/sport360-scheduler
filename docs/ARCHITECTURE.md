@@ -33,9 +33,9 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 
 1. `src/main.js` initializes the data store.
 2. `src/supabaseStore.js` uses Supabase when configured and available.
-3. Authentication state determines whether the sign-in, prelaunch reservation, or application shell is rendered.
-4. In prelaunch mode, non-Admin accounts reserve the unclaimed employee profile matching their Auth email through a guarded RPC. The profile is not linked to the Auth user yet, so claimed-user RLS continues to block operational data.
-5. Existing Admin accounts bypass the prelaunch holding page and continue into the scheduler.
+3. Authentication state determines whether the sign-in, self-service onboarding, or application shell is rendered.
+4. In prelaunch mode, non-Admin accounts may submit only their name and optional photo to `profile_onboarding_submissions`. This table is separate from `employee_profiles`, so onboarding cannot grant operational access.
+5. Admins review pending submissions in People, then explicitly link one to an existing unclaimed employee profile or create a new unassigned employee profile. Existing Admin accounts bypass the holding page and continue into the scheduler.
 6. Application state is rendered into `#app` using template functions.
 7. Event listeners call workflow functions and persistence methods.
 8. Successful writes update Supabase and then refresh or persist local state.
@@ -127,7 +127,7 @@ Parent-department lead assignments use the full descendant department scope. A d
 - Supabase Auth provides user sessions.
 - Password recovery uses Supabase recovery emails and a public in-app password update screen. Recovery sessions are marked as pending, cannot load scheduler data, and are cleared after the password changes so the user signs in again normally.
 - Profiles may be created before auth users exist.
-- A matching email can claim an unassigned profile.
+- Email matching does not claim profiles. An Admin must approve each self-service submission and choose the employee profile relationship.
 - The browser uses the public Supabase anon key.
 - RLS policies and RPC functions protect privileged operations.
 - Service-role keys and private credentials must never enter the frontend repository.
@@ -143,7 +143,7 @@ Runtime environment values are not committed in frontend modules. `index.html` l
 - Static builds: `scripts/build.js` writes `dist/runtime-config.js` from deployment environment variables and publishes browser assets under `dist/assets/`.
 - Hosted Vercel and Netlify builds require `SPORT360_SUPABASE_URL` and `SPORT360_SUPABASE_ANON_KEY`.
 - `SPORT360_ALLOW_SIGNUP=false` hides public account creation for the internal release.
-- `SPORT360_PRELAUNCH_MODE=true` routes non-Admin accounts to the profile-reservation holding page.
+- `SPORT360_PRELAUNCH_MODE=true` routes non-Admin accounts to self-service profile setup and its holding state.
 - `SPORT360_RELEASE` identifies the deployed release; hosted builds fall back to `VERCEL_GIT_COMMIT_SHA` or `COMMIT_REF`.
 
 ## Profile Photo Storage
@@ -153,6 +153,7 @@ Runtime environment values are not committed in frontend modules. `index.html` l
 - Claimed users receive short-lived signed read URLs when application state loads.
 - Admins may write any profile folder; other users may write only the folder matching their claimed profile ID.
 - Existing data URLs and external photo URLs remain readable as legacy fallback until each image is replaced.
+- Prelaunch submissions use the separate private `profile-onboarding-photos` bucket. Users may write only inside their Auth user folder; approved photos remain readable through the linked employee profile.
 
 ## Known Architectural Limits
 

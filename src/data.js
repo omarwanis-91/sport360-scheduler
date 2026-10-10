@@ -1,5 +1,6 @@
 export const seedState = {
   currentUserId: "user-admin",
+  onboardingSubmissions: [],
   statuses: [
     { id: "morning", label: "Morning", color: "#2f80ed", kind: "working" },
     { id: "night", label: "Night", color: "#5b45d8", kind: "working" },

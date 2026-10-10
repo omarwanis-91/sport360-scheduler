@@ -102,6 +102,8 @@ const ui = {
   schedulerLeadDrafts: [],
   pendingPhotoFile: null,
   pendingPhotoDataUrl: "",
+  pendingOnboardingPhotoFile: null,
+  pendingOnboardingPhotoDataUrl: "",
   drawer: null,
   loading: true,
   authMode: "sign-in",
@@ -166,6 +168,7 @@ function displayScheduleNote(note = "") {
 }
 
 function normalizeStateForUi() {
+  state.onboardingSubmissions ||= [];
   const annualStatus = byId(state.statuses, "vacation");
   if (annualStatus) annualStatus.label = "Annual";
 }
@@ -728,8 +731,9 @@ function audit(action, entityType, entityId, detail) {
 
 function avatar(profile) {
   if (!profile) return "<span>?</span>";
-  if (profile.photo) return `<img src="${profile.photo}" alt="">`;
-  return `<span>${profile.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>`;
+  if (profile.photo) return `<img src="${escapeHtml(profile.photo)}" alt="">`;
+  const initials = String(profile.name || "?").split(" ").map((part) => part[0]).slice(0, 2).join("");
+  return `<span>${escapeHtml(initials)}</span>`;
 }
 
 function escapeHtml(value = "") {
@@ -762,7 +766,9 @@ function render() {
 
   if (appConfig.prelaunchMode && dataStore?.mode === "supabase" && dataStore.session && dataStore.prelaunchRestricted) {
     app.innerHTML = renderPrelaunchStatus();
-    document.querySelector("#retry-profile-reservation")?.addEventListener("click", reloadState);
+    document.querySelector("#retry-profile-onboarding")?.addEventListener("click", reloadState);
+    document.querySelector("#onboarding-form")?.addEventListener("submit", saveOnboardingProfile);
+    bindOnboardingPhotoUploader();
     document.querySelector("#sign-out")?.addEventListener("click", signOut);
     applyMutationPendingUi();
     return;
@@ -940,9 +946,9 @@ function renderAuth() {
       <form class="auth-card" id="auth-form">
         ${brand}
         <div>
-          <span class="eyebrow">${appConfig.prelaunchMode ? "Team Profile Access" : "Supabase Sign In"}</span>
-          <h1>${appConfig.prelaunchMode ? "Claim your Sport360 profile" : appConfig.allowSignup ? "Claim your schedule profile" : "Sign in to your schedule"}</h1>
-          <p>${appConfig.prelaunchMode ? "Create your account with the work email already assigned to your employee profile." : appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
+          <span class="eyebrow">${appConfig.prelaunchMode ? "Team Profile Setup" : "Supabase Sign In"}</span>
+          <h1>${appConfig.prelaunchMode ? "Create your Sport360 account" : appConfig.allowSignup ? "Claim your schedule profile" : "Sign in to your schedule"}</h1>
+          <p>${appConfig.prelaunchMode ? "Register with your email, then add your name and optional profile photo." : appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
         </div>
         ${feedback}
         <label>Email<input name="email" type="email" autocomplete="email" required></label>
@@ -956,17 +962,17 @@ function renderAuth() {
              <button class="ghost wide" name="intent" value="sign-in">Sign In</button>`
           : `<button class="primary wide" name="intent" value="sign-in">Sign In</button>
              ${appConfig.allowSignup ? `<button class="ghost wide" name="intent" value="sign-up">Create Account</button>` : ""}`}
-        <p class="hint">${appConfig.prelaunchMode ? "Your account will reserve the matching profile. Scheduler access stays closed while Sport360 is being prepared." : appConfig.allowSignup ? "After sign-in, the app links your account to the unclaimed profile with the same email." : "If your access is not ready, contact your administrator instead of creating another account."}</p>
+        <p class="hint">${appConfig.prelaunchMode ? "Submitting your basic profile does not open the scheduler. An administrator will review and link your account later." : appConfig.allowSignup ? "After sign-in, the app links your account to the unclaimed profile with the same email." : "If your access is not ready, contact your administrator instead of creating another account."}</p>
       </form>
     </main>
   `;
 }
 
 function renderPrelaunchStatus() {
-  const reservation = dataStore.prelaunchReservation;
-  const accountEmail = reservation?.email || dataStore.session?.user?.email || "";
+  const submission = dataStore.onboardingSubmission;
+  const accountEmail = submission?.email || dataStore.session?.user?.email || "";
 
-  if (!reservation) {
+  if (ui.error && !submission) {
     return `
       <main class="auth-shell prelaunch-shell">
         <section class="auth-card prelaunch-card" aria-labelledby="prelaunch-error-title">
@@ -975,15 +981,56 @@ function renderPrelaunchStatus() {
             <div><strong>Sport360</strong><span>Scheduler</span></div>
           </div>
           <div>
-            <span class="eyebrow">Profile Match Needed</span>
-            <h1 id="prelaunch-error-title">We could not reserve your profile</h1>
-            <p>Sign in with the exact work email assigned to your Sport360 employee profile.</p>
+            <span class="eyebrow">Profile Setup</span>
+            <h1 id="prelaunch-error-title">Profile setup could not load</h1>
+            <p>Your scheduler access remains closed. Retry the secure profile setup request.</p>
           </div>
-          <p class="form-error" role="alert">${escapeHtml(ui.error || "No employee profile matches this work email.")}</p>
-          <button class="primary wide" id="retry-profile-reservation">Try Again</button>
+          <p class="form-error" role="alert">${escapeHtml(ui.error)}</p>
+          <button class="primary wide" id="retry-profile-onboarding">Try Again</button>
           <button class="ghost wide" id="sign-out">Use Another Account</button>
-          <p class="hint">If your work email is correct, ask the Sport360 administrator to check your profile before retrying.</p>
         </section>
+      </main>
+    `;
+  }
+
+  if (!submission || submission.status === "pending") {
+    const photo = ui.pendingOnboardingPhotoDataUrl || submission?.photo || "";
+    const profile = { name: submission?.name || "?", photo };
+    return `
+      <main class="auth-shell prelaunch-shell">
+        <form class="auth-card prelaunch-card" id="onboarding-form" aria-labelledby="prelaunch-title">
+          <div class="brand auth-brand">
+            <div class="brand-mark">S</div>
+            <div><strong>Sport360</strong><span>Scheduler</span></div>
+          </div>
+          ${submission ? `
+            <div class="prelaunch-status" role="status">
+              <span class="prelaunch-status-mark" aria-hidden="true"></span>
+              <span>Waiting for Admin setup</span>
+            </div>
+          ` : ""}
+          <div>
+            <span class="eyebrow">${submission ? "Profile Submitted" : "Basic Profile"}</span>
+            <h1 id="prelaunch-title">${submission ? "Your details are saved" : "Tell us who you are"}</h1>
+            <p>${submission ? "You can correct your name or photo while an administrator prepares your access." : "Add your name and an optional photo. Your administrator will handle departments, roles, and scheduler access."}</p>
+          </div>
+          <label>Email<input type="email" value="${escapeHtml(accountEmail)}" readonly aria-readonly="true"></label>
+          <label>Name<input name="name" type="text" autocomplete="name" minlength="2" maxlength="120" required value="${escapeHtml(submission?.name || "")}" placeholder="Your full name"></label>
+          <div class="photo-uploader" id="onboarding-photo-dropzone">
+            <div class="avatar large" id="onboarding-photo-preview">${avatar(profile)}</div>
+            <div>
+              <strong>${photo ? "Change photo" : "Add a photo (optional)"}</strong>
+              <span>JPG, PNG, WebP, or GIF under 750 KB.</span>
+            </div>
+            <input id="onboarding-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Choose profile photo">
+          </div>
+          <div class="prelaunch-note">
+            <strong>No scheduler access yet</strong>
+            <span>Your submission contains only your account email, name, and optional photo.</span>
+          </div>
+          <button class="primary wide">${submission ? "Save Changes" : "Submit Profile"}</button>
+          <button class="ghost wide" type="button" id="sign-out">Sign Out</button>
+        </form>
       </main>
     `;
   }
@@ -997,17 +1044,16 @@ function renderPrelaunchStatus() {
         </div>
         <div class="prelaunch-status" role="status">
           <span class="prelaunch-status-mark" aria-hidden="true"></span>
-          <span>Profile reserved</span>
+          <span>Profile linked</span>
         </div>
         <div>
           <span class="eyebrow">Welcome to Sport360</span>
-          <h1 id="prelaunch-title">Your profile is ready for launch</h1>
-          <p>Your account is connected. The scheduler is still being prepared, so access will open later.</p>
+          <h1 id="prelaunch-title">Your account is ready</h1>
+          <p>An administrator linked your profile. The scheduler is still being prepared, so access will open later.</p>
         </div>
         <dl class="prelaunch-profile">
-          <div><dt>Name</dt><dd>${escapeHtml(reservation.name)}</dd></div>
-          ${reservation.title ? `<div><dt>Role</dt><dd>${escapeHtml(reservation.title)}</dd></div>` : ""}
-          <div><dt>Work email</dt><dd>${escapeHtml(accountEmail)}</dd></div>
+          <div><dt>Name</dt><dd>${escapeHtml(submission.name)}</dd></div>
+          <div><dt>Email</dt><dd>${escapeHtml(accountEmail)}</dd></div>
         </dl>
         <div class="prelaunch-note">
           <strong>No action needed</strong>
@@ -1566,8 +1612,39 @@ function renderPeople() {
     </div>
   `;
   return `
-    ${renderTopbar("People", "Profiles exist before accounts. Matching verified emails claim created profiles.", action)}
+    ${renderTopbar("People", "Review new account profiles, then link them to an existing employee or create an unassigned profile.", action)}
+    ${renderPendingOnboarding()}
     ${renderPeopleView(profiles)}
+  `;
+}
+
+function renderPendingOnboarding() {
+  if (!canManageProfiles()) return "";
+  const submissions = (state.onboardingSubmissions || []).filter((submission) => submission.status === "pending");
+  if (!submissions.length) return "";
+  return `
+    <section class="onboarding-queue" aria-labelledby="onboarding-queue-title">
+      <div class="onboarding-queue-head">
+        <div>
+          <span class="eyebrow">Account Setup</span>
+          <h2 id="onboarding-queue-title">Pending profiles</h2>
+        </div>
+        <mark>${submissions.length}</mark>
+      </div>
+      <div class="onboarding-queue-list">
+        ${submissions.map((submission) => `
+          <article class="onboarding-row">
+            <div class="avatar">${avatar(submission)}</div>
+            <div class="onboarding-row-identity">
+              <strong>${escapeHtml(submission.name)}</strong>
+              <span>${escapeHtml(submission.email)}</span>
+            </div>
+            <span class="onboarding-row-date">Submitted ${formatDateTime(submission.createdAt)}</span>
+            <button class="ghost" data-open-drawer="onboarding" data-onboarding-user-id="${submission.userId}">Review</button>
+          </article>
+        `).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -2437,6 +2514,7 @@ function renderDrawer() {
   const titleMap = {
     shift: "Shift Override",
     person: "Employee Profile",
+    onboarding: "Review New Account",
     profile: ui.drawer.profileId ? "Edit Profile" : "New Profile",
     request: "New Annual",
     "request-detail": "Annual Request",
@@ -2475,6 +2553,7 @@ function isCreationDrawer() {
 function drawerBody() {
   if (ui.drawer.type === "shift") return shiftDrawer();
   if (ui.drawer.type === "person") return personDrawer();
+  if (ui.drawer.type === "onboarding") return onboardingDrawer();
   if (ui.drawer.type === "profile") return profileDrawer();
   if (ui.drawer.type === "request") return requestDrawer();
   if (ui.drawer.type === "request-detail") return requestDetailDrawer();
@@ -2601,10 +2680,10 @@ function personDrawer() {
       <div class="detail-line"><span>Hierarchy role</span><strong>${hierarchyLevelLabel(profile.seniorityLevel)}</strong></div>
       <div class="detail-line"><span>Role</span><strong>${profile.userId ? roleForProfile(profile) : "Unclaimed"}</strong></div>
       <div class="detail-line"><span>Annual</span><strong>${profile.remainingVacationDays} / ${profile.yearlyVacationDays}</strong></div>
-      <div class="detail-line"><span>Claiming</span><strong>${profile.userId ? "Account linked" : "Waiting for matching sign-in"}</strong></div>
+      <div class="detail-line"><span>Account</span><strong>${profile.userId ? "Linked" : "Not linked"}</strong></div>
       <div class="claim-panel ${profile.userId ? "claimed" : "unclaimed"}">
-        <strong>${profile.userId ? "Claimed profile" : "Unclaimed profile"}</strong>
-        <span>${profile.userId ? "This employee has linked a sign-in account." : "This profile can be claimed by signing in with its email."}</span>
+        <strong>${profile.userId ? "Linked profile" : "Available for linking"}</strong>
+        <span>${profile.userId ? "This employee profile is connected to a sign-in account." : "An administrator can link this profile while reviewing a pending account."}</span>
       </div>
       <button class="primary wide" data-open-profile-page="${profile.id}">Open Full Profile</button>
       ${canEditProfile(profile) ? `<button class="primary wide" data-open-drawer="profile" data-profile-id="${profile.id}">${canManageProfiles() ? "Edit Profile" : "Edit My Profile"}</button>` : ""}
@@ -2623,6 +2702,32 @@ function personDrawer() {
       </div>
       ${renderMiniActivity(history)}
     </div>
+  `;
+}
+
+function onboardingDrawer() {
+  const submission = (state.onboardingSubmissions || []).find((item) => item.userId === ui.drawer.onboardingUserId);
+  if (!submission) return `<div class="drawer-stack"><p class="hint">This onboarding submission is no longer pending.</p></div>`;
+  const availableProfiles = state.profiles.filter((profile) => !profile.userId);
+  return `
+    <form id="onboarding-approval-form" class="drawer-form">
+      <div class="person-summary">
+        <div class="avatar large">${avatar(submission)}</div>
+        <div><strong>${escapeHtml(submission.name)}</strong><span>${escapeHtml(submission.email)}</span></div>
+      </div>
+      <div class="prelaunch-note">
+        <strong>User-provided identity</strong>
+        <span>Approval copies this name, email, and photo to the linked employee profile.</span>
+      </div>
+      <label>Employee profile
+        <select name="profileId">
+          <option value="">Create a new unassigned profile</option>
+          ${availableProfiles.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.name)} · ${escapeHtml(profile.employeeId)} · ${escapeHtml(profile.email)}</option>`).join("")}
+        </select>
+      </label>
+      <p class="hint">Linking preserves the selected profile's departments, title, schedule history, balances, and employee ID. A new profile starts unassigned with Employee access and can be edited afterward.</p>
+      <button class="primary wide">Approve Profile</button>
+    </form>
   `;
 }
 
@@ -3511,6 +3616,7 @@ function bindEvents() {
   document.querySelector("#delete-profile")?.addEventListener("click", deleteProfile);
   document.querySelector("#remove-department")?.addEventListener("click", removeProfileDepartment);
   document.querySelector("#profile-form")?.addEventListener("submit", saveProfile);
+  document.querySelector("#onboarding-approval-form")?.addEventListener("submit", approveOnboardingProfile);
   bindPhotoUploader();
   document.querySelector("#request-form")?.addEventListener("submit", saveVacationRequest);
   document.querySelector("#lead-form")?.addEventListener("submit", saveLead);
@@ -3683,6 +3789,50 @@ function handlePhotoFile(file) {
   reader.readAsDataURL(file);
 }
 
+function bindOnboardingPhotoUploader() {
+  const dropzone = document.querySelector("#onboarding-photo-dropzone");
+  const input = document.querySelector("#onboarding-photo-input");
+  if (!dropzone || !input) return;
+
+  dropzone.addEventListener("click", (event) => {
+    if (event.target !== input) input.click();
+  });
+  input.addEventListener("change", () => handleOnboardingPhotoFile(input.files?.[0]));
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add("dragging");
+    });
+  });
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.remove("dragging");
+    });
+  });
+  dropzone.addEventListener("drop", (event) => handleOnboardingPhotoFile(event.dataTransfer?.files?.[0]));
+}
+
+function handleOnboardingPhotoFile(file) {
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!file || !allowedTypes.includes(file.type)) {
+    notify("Choose a JPG, PNG, WebP, or GIF image.");
+    return;
+  }
+  if (file.size > 750000) {
+    notify("Please choose an image under 750 KB for now.");
+    return;
+  }
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    ui.pendingOnboardingPhotoFile = file;
+    ui.pendingOnboardingPhotoDataUrl = reader.result;
+    const preview = document.querySelector("#onboarding-photo-preview");
+    if (preview) preview.innerHTML = `<img src="${reader.result}" alt="">`;
+  });
+  reader.readAsDataURL(file);
+}
+
 function bindAuthEvents() {
   document.querySelectorAll("[data-password-visibility]").forEach((toggle) => {
     toggle.addEventListener("change", () => {
@@ -3807,6 +3957,8 @@ async function signOut() {
     failure: "Unable to sign out."
   }, async () => {
     await dataStore.signOut();
+    ui.pendingOnboardingPhotoFile = null;
+    ui.pendingOnboardingPhotoDataUrl = "";
     ui.authMode = "sign-in";
     await reloadState();
   });
@@ -3962,6 +4114,59 @@ async function saveProfile(event) {
     await saveState();
     ui.drawer = { type: "person", profileId: profile.id };
     render();
+  });
+}
+
+async function saveOnboardingProfile(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const fullName = String(form.get("name") || "").trim();
+  const previousPhotoRef = dataStore.onboardingSubmission?.photoRef || "";
+  let uploadedPhoto = null;
+
+  await runMutation("onboarding-save", {
+    pending: ui.pendingOnboardingPhotoFile ? "Uploading photo and saving profile..." : "Saving profile...",
+    success: "Your profile was submitted for Admin setup.",
+    failure: "Your profile could not be submitted."
+  }, async () => {
+    try {
+      if (ui.pendingOnboardingPhotoFile) {
+        uploadedPhoto = await dataStore.uploadOnboardingPhoto(
+          dataStore.session.user.id,
+          ui.pendingOnboardingPhotoFile,
+          ui.pendingOnboardingPhotoDataUrl
+        );
+      }
+      await dataStore.saveMyOnboarding(fullName, uploadedPhoto?.reference || previousPhotoRef || null);
+    } catch (error) {
+      if (uploadedPhoto) await dataStore.deleteOnboardingPhoto(uploadedPhoto.reference).catch(() => {});
+      throw error;
+    }
+
+    if (uploadedPhoto && previousPhotoRef && previousPhotoRef !== uploadedPhoto.reference) {
+      await dataStore.deleteOnboardingPhoto(previousPhotoRef).catch(() => {});
+    }
+    ui.pendingOnboardingPhotoFile = null;
+    ui.pendingOnboardingPhotoDataUrl = "";
+  });
+}
+
+async function approveOnboardingProfile(event) {
+  event.preventDefault();
+  if (!canManageProfiles()) return;
+  const submission = (state.onboardingSubmissions || []).find((item) => item.userId === ui.drawer.onboardingUserId);
+  if (!submission) return;
+  const profileId = String(new FormData(event.currentTarget).get("profileId") || "") || null;
+
+  await runMutation("onboarding-approve", {
+    pending: profileId ? "Linking account to profile..." : "Creating unassigned employee profile...",
+    success: profileId ? "Account linked to the employee profile." : "Unassigned employee profile created.",
+    failure: "The onboarding profile could not be approved."
+  }, async () => {
+    const linkedProfile = await dataStore.approveOnboarding(submission.userId, profileId);
+    state = await dataStore.load();
+    normalizeStateForUi();
+    ui.drawer = linkedProfile?.id ? { type: "person", profileId: linkedProfile.id } : null;
   });
 }
 
