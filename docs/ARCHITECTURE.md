@@ -33,10 +33,12 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 
 1. `src/main.js` initializes the data store.
 2. `src/supabaseStore.js` uses Supabase when configured and available.
-3. Authentication state determines whether the sign-in or application shell is rendered.
-4. Application state is rendered into `#app` using template functions.
-5. Event listeners call workflow functions and persistence methods.
-6. Successful writes update Supabase and then refresh or persist local state.
+3. Authentication state determines whether the sign-in, prelaunch reservation, or application shell is rendered.
+4. In prelaunch mode, non-Admin accounts reserve the unclaimed employee profile matching their Auth email through a guarded RPC. The profile is not linked to the Auth user yet, so claimed-user RLS continues to block operational data.
+5. Existing Admin accounts bypass the prelaunch holding page and continue into the scheduler.
+6. Application state is rendered into `#app` using template functions.
+7. Event listeners call workflow functions and persistence methods.
+8. Successful writes update Supabase and then refresh or persist local state.
 
 ## UI Structure
 
@@ -141,6 +143,7 @@ Runtime environment values are not committed in frontend modules. `index.html` l
 - Static builds: `scripts/build.js` writes `dist/runtime-config.js` from deployment environment variables and publishes browser assets under `dist/assets/`.
 - Hosted Vercel and Netlify builds require `SPORT360_SUPABASE_URL` and `SPORT360_SUPABASE_ANON_KEY`.
 - `SPORT360_ALLOW_SIGNUP=false` hides public account creation for the internal release.
+- `SPORT360_PRELAUNCH_MODE=true` routes non-Admin accounts to the profile-reservation holding page.
 - `SPORT360_RELEASE` identifies the deployed release; hosted builds fall back to `VERCEL_GIT_COMMIT_SHA` or `COMMIT_REF`.
 
 ## Profile Photo Storage

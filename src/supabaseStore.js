@@ -71,10 +71,25 @@ function createRemoteStore(client) {
     client,
     passwordRecovery: client.getPasswordRecovery(),
     session: null,
+    prelaunchReservation: null,
+    prelaunchRestricted: false,
     async load() {
       this.session = client.getSession();
+      this.prelaunchReservation = null;
+      this.prelaunchRestricted = false;
       if (this.passwordRecovery?.status === "error" || this.session?.recovery_pending) return emptyState();
       if (!this.session) return emptyState();
+
+      if (appConfig.prelaunchMode) {
+        const role = await client.rpc("current_role");
+        if (role !== "admin") {
+          this.prelaunchRestricted = true;
+          this.prelaunchReservation = normalizePrelaunchReservation(
+            await client.rpc("reserve_profile_for_current_user")
+          );
+          return emptyState();
+        }
+      }
 
       await claimProfileForSession(client, this.session);
       return loadRemoteState(client, this.session);
@@ -111,6 +126,9 @@ function createRemoteStore(client) {
     },
     async signOut() {
       client.clearSession();
+      this.session = null;
+      this.prelaunchReservation = null;
+      this.prelaunchRestricted = false;
     },
     async createProfile(profile) {
       await client.insert("employee_profiles", toDbProfile(profile));
@@ -591,6 +609,18 @@ async function safeSelect(client, table, orderColumn, ascending = true) {
 async function claimProfileForSession(client, session) {
   if (!session?.user?.email) return;
   await client.rpc("claim_profile_for_current_user");
+}
+
+function normalizePrelaunchReservation(result) {
+  const row = Array.isArray(result) ? result[0] : result;
+  if (!row?.profile_id) throw new Error("Your employee profile could not be reserved.");
+  return {
+    profileId: row.profile_id,
+    name: row.full_name || "Sport360 team member",
+    email: row.email || "",
+    title: row.title || "",
+    reservedAt: row.reserved_at || ""
+  };
 }
 
 function fromDbDepartment(row) {

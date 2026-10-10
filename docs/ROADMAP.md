@@ -4,7 +4,7 @@ This document is the durable phased plan for Sport360 Scheduler. It records what
 
 ## Current Position
 
-Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 024 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 024 passed audit 012, the live parent-department assignment write succeeds, and the Scheduler can now return a parent daily override to weekly rotation without SQL. A credential-injected, read-only three-browser role verifier is ready; the full backup/restore gate and production execution for non-Admin roles remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
+Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 024 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 024 passed audit 012, the live parent-department assignment write succeeds, and the Scheduler can now return a parent daily override to weekly rotation without SQL. A controlled prelaunch profile-reservation flow is implemented in migration 025 and awaits production migration/configuration. A credential-injected, read-only three-browser role verifier is ready; the full backup/restore gate and production execution for non-Admin roles remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
 
 ## Phase 0 - Product Foundation
 
@@ -89,7 +89,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 ### Scope
 
 - ✅ Replace committed environment details with generated runtime configuration:
-  `window.__SPORT360_CONFIG__ = { supabaseUrl, supabaseAnonKey, allowSignup, release }`.
+  `window.__SPORT360_CONFIG__ = { supabaseUrl, supabaseAnonKey, allowSignup, prelaunchMode, release }`.
 - ✅ Generate production configuration from hosted environment variables and local configuration from ignored `.env.local`.
 - ✅ Use Admin-created or invited accounts and hide public account creation when `allowSignup` is false.
 - ✅ Provide self-service password recovery without exposing account existence or allowing recovery sessions to load scheduler data.
@@ -102,6 +102,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Apply migrations 022 and 023 for the simplified hierarchy and parent/sub-department lead scope.
 - ✅ Apply migration 024, pass audit 012, and verify the live parent-department lead assignment write.
 - ✅ Expose parent-department daily-lead cleanup in the Scheduler and complete the production UI round trip without direct SQL.
+- ⏳ Apply migration 025 and enable the controlled prelaunch profile-reservation page so employees can register without gaining scheduler access.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
 - ⏳ Repair or bypass the local Docker/WSL blocker so the Supabase Free-plan SQL export can be completed and restored in a test project.
 - ⬜ Pilot the production release with one department for five business days before expanding internally.

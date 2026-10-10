@@ -198,6 +198,90 @@ svg {
   line-height: 1.35;
 }
 
+.prelaunch-card {
+  gap: 18px;
+}
+
+.prelaunch-status {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.08);
+  color: #bbf7d0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prelaunch-status-mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.46);
+}
+
+.prelaunch-profile {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.prelaunch-profile div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.prelaunch-profile div + div {
+  border-top: 1px solid var(--line-soft);
+}
+
+.prelaunch-profile dt,
+.prelaunch-profile dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.prelaunch-profile dt {
+  color: var(--dim);
+}
+
+.prelaunch-profile dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.prelaunch-note {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border-left: 2px solid var(--red);
+  border-radius: 0 8px 8px 0;
+  background: rgba(225, 29, 72, 0.055);
+}
+
+.prelaunch-note strong {
+  font-size: 12px;
+}
+
+.prelaunch-note span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .auth-brand {
   padding: 0 0 14px;
 }

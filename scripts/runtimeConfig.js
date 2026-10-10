@@ -27,6 +27,7 @@ function loadRuntimeConfig(root, environment = process.env) {
     supabaseUrl: values.SPORT360_SUPABASE_URL || "",
     supabaseAnonKey: values.SPORT360_SUPABASE_ANON_KEY || "",
     allowSignup: asBoolean(values.SPORT360_ALLOW_SIGNUP),
+    prelaunchMode: asBoolean(values.SPORT360_PRELAUNCH_MODE),
     release: values.SPORT360_RELEASE || values.VERCEL_GIT_COMMIT_SHA || values.COMMIT_REF || "local",
     demoMode: asBoolean(values.SPORT360_DEMO_MODE)
   };

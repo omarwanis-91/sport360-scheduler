@@ -294,3 +294,12 @@ Recovery tokens may authenticate only the password-update flow. A recovery-pendi
 Production verification covers current Chrome, Edge, and Firefox. A workflow accepted for the internal release must behave consistently in all three browsers; browser-specific gaps remain release issues until resolved or explicitly removed from the support scope.
 
 Automated viewport checks continue to cover the Chromium implementation at the supported desktop widths. Manual production checks provide Edge and Firefox parity evidence until the automated matrix expands.
+
+## D-041 - Prelaunch Profile Reservations
+
+**Date:** 2026-10-10
+**Status:** Accepted
+
+Before the scheduler opens to employees, public account creation may run in a controlled prelaunch mode. A newly authenticated account reserves the employee profile with the same work email but does not populate `employee_profiles.user_id` or create an application role.
+
+This reservation keeps the account outside the existing claimed-user RLS boundary. Non-Admin users see only a profile confirmation page, while existing Admins retain the full scheduler for setup work. When prelaunch mode is disabled, the normal claim RPC promotes the matching reservation into an active profile link and removes the reservation.

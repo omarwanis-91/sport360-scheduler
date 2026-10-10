@@ -8,6 +8,20 @@ Record rehearsal results in `docs/PRODUCTION_REHEARSAL_REPORT.md`. Keep this run
 
 Production account creation is Admin-controlled. Public signup remains disabled through `SPORT360_ALLOW_SIGNUP=false`.
 
+### Prelaunch Profile Reservation
+
+Use this temporary mode while employees are being invited but the scheduler is not open to them.
+
+1. Create each employee profile first with the employee's exact work email.
+2. Apply `025_prelaunch_profile_reservations.sql` in Supabase.
+3. Run `013_prelaunch_profile_reservation_audit.sql` and confirm all checks pass.
+4. Set `SPORT360_ALLOW_SIGNUP=true` and `SPORT360_PRELAUNCH_MODE=true` in Vercel, then redeploy.
+5. Employees create accounts with their assigned work emails. The app reserves matching profiles but does not link `employee_profiles.user_id` or create `user_roles` rows.
+6. Confirm employees see **Profile reserved** and cannot see navigation or scheduler data. Existing Admins should still enter the full application.
+7. At launch, set `SPORT360_PRELAUNCH_MODE=false` and redeploy. On the employee's next sign-in, the normal claim RPC activates the reserved profile and removes its reservation.
+
+Never enable prelaunch mode before migration 025 is applied. Keep signup disabled if the reservation RPC is unavailable.
+
 ### Create An Employee Account
 
 1. In Sport360 Scheduler, open **People** and create the employee profile first.
@@ -41,6 +55,9 @@ The active Vercel project provides:
 - `SPORT360_SUPABASE_URL`
 - `SPORT360_SUPABASE_ANON_KEY`
 - `SPORT360_ALLOW_SIGNUP=false`
+- `SPORT360_PRELAUNCH_MODE=false`
+
+For the temporary reservation landing page, set both flags to `true` only after migration 025 and audit 013 pass.
 
 Local development uses the same variable names in ignored `.env.local`.
 
@@ -168,6 +185,7 @@ If the CLI path is not available, use Supabase Table Editor exports for the crit
 - `departments`
 - `employee_profiles`
 - `employee_profile_departments`
+- `profile_claim_reservations`
 - `user_roles`
 - `shift_statuses`
 - `rotation_versions`
@@ -226,6 +244,7 @@ Record each production database change here or in a linked issue/PR before relea
 | 2026-09-28 | `codex/phase4-ui-auth-hardening` | `022_department_scope_lead_assignments.sql` | Not recorded | Live parent/sub-department lead verification pending | Project owner | Applied |
 | 2026-09-28 | `codex/phase4-ui-auth-hardening` | `023_simplify_profile_hierarchy.sql` | Not recorded | Live Manager / Lead / Artist persistence verification pending | Project owner | Applied |
 | 2026-10-03 | `codex/phase4-live-verification` / PR #11 | `024_fix_parent_department_lead_validation.sql` | Not recorded | Audit 012 passed 3/3; parent write passed; temporary row removed and verified absent | Omar Wanis / Codex | Applied |
+| Pending | `codex/prelaunch-profile-claim` | `025_prelaunch_profile_reservations.sql` | Pending | Run audit 013 before enabling prelaunch runtime flags | Pending | Pending |
 | Pending | Pending | Free-plan manual export and restore rehearsal | Pending | Pending | Pending | Pending |
 
 For each applied migration, record:

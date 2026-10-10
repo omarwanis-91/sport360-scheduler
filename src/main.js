@@ -732,6 +732,15 @@ function avatar(profile) {
   return `<span>${profile.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>`;
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function render() {
   const app = document.querySelector("#app");
   if (ui.loading) {
@@ -747,6 +756,14 @@ function render() {
   if (authVisible) {
     app.innerHTML = renderAuth();
     bindAuthEvents();
+    applyMutationPendingUi();
+    return;
+  }
+
+  if (appConfig.prelaunchMode && dataStore?.mode === "supabase" && dataStore.session && dataStore.prelaunchRestricted) {
+    app.innerHTML = renderPrelaunchStatus();
+    document.querySelector("#retry-profile-reservation")?.addEventListener("click", reloadState);
+    document.querySelector("#sign-out")?.addEventListener("click", signOut);
     applyMutationPendingUi();
     return;
   }
@@ -923,9 +940,9 @@ function renderAuth() {
       <form class="auth-card" id="auth-form">
         ${brand}
         <div>
-          <span class="eyebrow">Supabase Sign In</span>
-          <h1>${appConfig.allowSignup ? "Claim your schedule profile" : "Sign in to your schedule"}</h1>
-          <p>${appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
+          <span class="eyebrow">${appConfig.prelaunchMode ? "Team Profile Access" : "Supabase Sign In"}</span>
+          <h1>${appConfig.prelaunchMode ? "Claim your Sport360 profile" : appConfig.allowSignup ? "Claim your schedule profile" : "Sign in to your schedule"}</h1>
+          <p>${appConfig.prelaunchMode ? "Create your account with the work email already assigned to your employee profile." : appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
         </div>
         ${feedback}
         <label>Email<input name="email" type="email" autocomplete="email" required></label>
@@ -934,10 +951,70 @@ function renderAuth() {
           <label class="password-visibility"><input type="checkbox" data-password-visibility><span>Show password</span></label>
           <button class="auth-link" type="button" id="forgot-password">Forgot password?</button>
         </div>
-        <button class="primary wide" name="intent" value="sign-in">Sign In</button>
-        ${appConfig.allowSignup ? `<button class="ghost wide" name="intent" value="sign-up">Create Account</button>` : ""}
-        <p class="hint">${appConfig.allowSignup ? "After sign-in, the app links your account to the unclaimed profile with the same email." : "If your access is not ready, contact your administrator instead of creating another account."}</p>
+        ${appConfig.prelaunchMode && appConfig.allowSignup
+          ? `<button class="primary wide" name="intent" value="sign-up">Create Account</button>
+             <button class="ghost wide" name="intent" value="sign-in">Sign In</button>`
+          : `<button class="primary wide" name="intent" value="sign-in">Sign In</button>
+             ${appConfig.allowSignup ? `<button class="ghost wide" name="intent" value="sign-up">Create Account</button>` : ""}`}
+        <p class="hint">${appConfig.prelaunchMode ? "Your account will reserve the matching profile. Scheduler access stays closed while Sport360 is being prepared." : appConfig.allowSignup ? "After sign-in, the app links your account to the unclaimed profile with the same email." : "If your access is not ready, contact your administrator instead of creating another account."}</p>
       </form>
+    </main>
+  `;
+}
+
+function renderPrelaunchStatus() {
+  const reservation = dataStore.prelaunchReservation;
+  const accountEmail = reservation?.email || dataStore.session?.user?.email || "";
+
+  if (!reservation) {
+    return `
+      <main class="auth-shell prelaunch-shell">
+        <section class="auth-card prelaunch-card" aria-labelledby="prelaunch-error-title">
+          <div class="brand auth-brand">
+            <div class="brand-mark">S</div>
+            <div><strong>Sport360</strong><span>Scheduler</span></div>
+          </div>
+          <div>
+            <span class="eyebrow">Profile Match Needed</span>
+            <h1 id="prelaunch-error-title">We could not reserve your profile</h1>
+            <p>Sign in with the exact work email assigned to your Sport360 employee profile.</p>
+          </div>
+          <p class="form-error" role="alert">${escapeHtml(ui.error || "No employee profile matches this work email.")}</p>
+          <button class="primary wide" id="retry-profile-reservation">Try Again</button>
+          <button class="ghost wide" id="sign-out">Use Another Account</button>
+          <p class="hint">If your work email is correct, ask the Sport360 administrator to check your profile before retrying.</p>
+        </section>
+      </main>
+    `;
+  }
+
+  return `
+    <main class="auth-shell prelaunch-shell">
+      <section class="auth-card prelaunch-card" aria-labelledby="prelaunch-title">
+        <div class="brand auth-brand">
+          <div class="brand-mark">S</div>
+          <div><strong>Sport360</strong><span>Scheduler</span></div>
+        </div>
+        <div class="prelaunch-status" role="status">
+          <span class="prelaunch-status-mark" aria-hidden="true"></span>
+          <span>Profile reserved</span>
+        </div>
+        <div>
+          <span class="eyebrow">Welcome to Sport360</span>
+          <h1 id="prelaunch-title">Your profile is ready for launch</h1>
+          <p>Your account is connected. The scheduler is still being prepared, so access will open later.</p>
+        </div>
+        <dl class="prelaunch-profile">
+          <div><dt>Name</dt><dd>${escapeHtml(reservation.name)}</dd></div>
+          ${reservation.title ? `<div><dt>Role</dt><dd>${escapeHtml(reservation.title)}</dd></div>` : ""}
+          <div><dt>Work email</dt><dd>${escapeHtml(accountEmail)}</dd></div>
+        </dl>
+        <div class="prelaunch-note">
+          <strong>No action needed</strong>
+          <span>Return here when Sport360 announces that scheduler access is open.</span>
+        </div>
+        <button class="ghost wide" id="sign-out">Sign Out</button>
+      </section>
     </main>
   `;
 }
@@ -3691,6 +3768,7 @@ function bindAuthEvents() {
     const password = form.get("password");
     ui.error = "";
     ui.notice = "";
+    let signupNeedsConfirmation = false;
     const result = await runMutation("auth", {
       pending: intent === "sign-up" ? "Creating account..." : "Signing in...",
       success: intent === "sign-up" ? "Account is ready." : "Signed in.",
@@ -3698,18 +3776,22 @@ function bindAuthEvents() {
     }, async () => {
       if (intent === "sign-up") {
         if (!appConfig.allowSignup) throw new Error("Account creation is disabled. Ask an Admin for an invitation.");
-        const result = await dataStore.signUp(email, password);
-        if (!result?.session) {
-          ui.notice = "Account created. Check your email if confirmation is enabled, then sign in here.";
-          ui.noticeKind = "success";
-          render();
+        await dataStore.signUp(email, password);
+        if (!dataStore.session) {
+          signupNeedsConfirmation = true;
           return;
         }
       } else {
         await dataStore.signIn(email, password);
       }
       await reloadState();
+      if (ui.error) throw new Error(ui.error);
     });
+    if (result.ok && signupNeedsConfirmation) {
+      ui.notice = "Account created. Check your email if confirmation is enabled, then sign in here.";
+      ui.noticeKind = "success";
+      render();
+    }
     if (!result.ok) {
       ui.error = result.error?.message || "Unable to authenticate.";
       ui.notice = "";
