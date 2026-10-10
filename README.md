@@ -34,6 +34,7 @@ The active internal preview is deployed through Vercel. Configure these variable
 - `SPORT360_SUPABASE_URL`
 - `SPORT360_SUPABASE_ANON_KEY`
 - `SPORT360_ALLOW_SIGNUP=false`
+- `SPORT360_PRELAUNCH_MODE=false`
 - `SPORT360_RELEASE` is optional because the build uses the Vercel or Netlify commit reference when available.
 
 Production preview: https://sport360-scheduler.vercel.app
@@ -50,6 +51,7 @@ Production preview: https://sport360-scheduler.vercel.app
 - Annual approval that deducts scheduled work days and writes Annual request schedule changes.
 - Configurable status labels in the UI.
 - Initial Supabase schema and RLS policies in `supabase/migrations/001_initial_scheduler_schema.sql`.
+- Optional prelaunch profile reservation that lets email-matched employees register without receiving scheduler access.
 
 ## Supabase Notes
 
