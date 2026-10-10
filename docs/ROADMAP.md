@@ -4,7 +4,7 @@ This document is the durable phased plan for Sport360 Scheduler. It records what
 
 ## Current Position
 
-Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 024 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 024 passed audit 012, the live parent-department assignment write succeeds, and the Scheduler can now return a parent daily override to weekly rotation without SQL. The full backup/restore gate and non-Admin production role checks remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
+Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 024 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 024 passed audit 012, the live parent-department assignment write succeeds, and the Scheduler can now return a parent daily override to weekly rotation without SQL. A credential-injected, read-only three-browser role verifier is ready; the full backup/restore gate and production execution for non-Admin roles remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
 
 ## Phase 0 - Product Foundation
 

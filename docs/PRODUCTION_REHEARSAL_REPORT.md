@@ -37,7 +37,7 @@ Do not record database passwords, connection strings, access tokens, private emp
 | Free-plan manual export | Blocked | Supabase CLI reached the remote database but local Docker/WSL is unavailable; Docker reports WSL2 is not supported with the current machine configuration. |
 | Backup folder verification | Pending | Run `npm.cmd run backup:verify` after export. |
 | Restore rehearsal | Pending | Requires non-production Supabase restore-test project. |
-| Live role/auth checks | Pending | Must verify Admin, Department Lead, Employee, and unmatched account behavior against restored or production-like environment. |
+| Live role/auth checks | Pending | A read-only 12-case Chrome, Edge, and Firefox verifier is ready. Production currently has only the Admin profile claimed; claimed Lead and Employee accounts plus an unmatched test account are still required. |
 | Rollback owner/signoff | Pending | Fill ownership rows before pilot. |
 | Pilot department signoff | Pending | Requires five business days of monitored use. |
 
@@ -84,9 +84,9 @@ Pending
 | Sign-in screen loads | Pass | Pass | Pass | Chrome automated; Edge and Firefox confirmed manually. |
 | Public account creation hidden | Pass | Pass | Pass | Production signup is hidden. |
 | Admin can open Scheduler, People, Departments, Rotations, Requests, Activity, Settings | Pass | Pass | Pass | Chrome exercised every navigation target; Edge and Firefox parity confirmed manually. |
-| Department Lead can access allowed department workflows only | Pending | Pending | Pending | Requires a claimed Department Lead account. |
-| Employee can open My Profile and request annual leave | Pending | Pending | Pending | Requires a claimed Employee account. |
-| Unmatched account cannot read operational data | Pending | Pending | Pending | Requires an unmatched test account. |
+| Department Lead can access allowed department workflows only | Pending | Pending | Pending | Automated coverage is ready; requires a claimed Department Lead account. |
+| Employee can open My Profile and request annual leave | Pending | Pending | Pending | Automated coverage is ready; requires a claimed Employee account. |
+| Unmatched account cannot read operational data | Pending | Pending | Pending | Automated coverage is ready; requires an unmatched test account. |
 | No startup console errors | Pass | Pass | Pass | Chrome console was empty; Edge and Firefox confirmed manually. |
 
 ## Data Health Check

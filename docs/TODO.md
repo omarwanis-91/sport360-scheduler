@@ -7,7 +7,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
 - [x] Verify the production Admin workflow in Chrome, Edge, and Firefox: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and startup console health.
-- [ ] Verify Department Lead, Employee, and unmatched-account production boundaries in Chrome, Edge, and Firefox.
+- [~] Verify Department Lead, Employee, and unmatched-account production boundaries in Chrome, Edge, and Firefox. The reusable three-browser live verifier is ready; production currently has only the Admin profile claimed, so claimed Lead and Employee accounts plus an unmatched test account are still required.
 - [x] Verify Manager / Lead / Artist saves and parent/sub-department lead assignment against the live database, including returning a parent daily override to weekly rotation through the Scheduler.
 - [x] Apply `024_fix_parent_department_lead_validation.sql`, run audit 012, verify the parent-department write in production, and remove the temporary verification row.
 
