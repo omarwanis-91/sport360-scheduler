@@ -4,7 +4,6 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [~] Apply migration 025, run audit 013, then set `SPORT360_ALLOW_SIGNUP=true` and `SPORT360_PRELAUNCH_MODE=true` for the employee profile-reservation landing page.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
 - [x] Verify the production Admin workflow in Chrome, Edge, and Firefox: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and startup console health.
@@ -32,6 +31,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migration 025, completed audit 013, enabled the production prelaunch flags, and verified the public claim page in fresh Chrome and Edge sessions without exposing the scheduler shell.
 - [x] Added a prelaunch account flow that reserves email-matched employee profiles without granting scheduler access, while preserving full access for the existing Admin account.
 - [x] Merged PR #12, loaded asset version `phase4-parent-lead-cleanup-v1` in production, created a parent Video Unit override, reopened it with Omar selected, returned it to weekly rotation, and confirmed the cleared state survived reload.
 - [x] Merged PR #11 into `main` after migration 024, audit 012, production parent-write verification, cleanup, and all review checks passed.

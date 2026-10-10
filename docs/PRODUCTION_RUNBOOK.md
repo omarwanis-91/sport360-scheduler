@@ -244,7 +244,7 @@ Record each production database change here or in a linked issue/PR before relea
 | 2026-09-28 | `codex/phase4-ui-auth-hardening` | `022_department_scope_lead_assignments.sql` | Not recorded | Live parent/sub-department lead verification pending | Project owner | Applied |
 | 2026-09-28 | `codex/phase4-ui-auth-hardening` | `023_simplify_profile_hierarchy.sql` | Not recorded | Live Manager / Lead / Artist persistence verification pending | Project owner | Applied |
 | 2026-10-03 | `codex/phase4-live-verification` / PR #11 | `024_fix_parent_department_lead_validation.sql` | Not recorded | Audit 012 passed 3/3; parent write passed; temporary row removed and verified absent | Omar Wanis / Codex | Applied |
-| Pending | `codex/prelaunch-profile-claim` | `025_prelaunch_profile_reservations.sql` | Pending | Run audit 013 before enabling prelaunch runtime flags | Pending | Pending |
+| 2026-10-10 | `9070d49` / PR #15 | `025_prelaunch_profile_reservations.sql`; enabled prelaunch signup runtime flags | Not recorded | Project owner confirmed audit 013; fresh production Chrome and Edge claim-page checks passed | Omar Wanis / Codex | Applied |
 | Pending | Pending | Free-plan manual export and restore rehearsal | Pending | Pending | Pending | Pending |
 
 For each applied migration, record:
