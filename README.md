@@ -34,6 +34,7 @@ The active internal preview is deployed through Vercel. Configure these variable
 - `SPORT360_SUPABASE_URL`
 - `SPORT360_SUPABASE_ANON_KEY`
 - `SPORT360_ALLOW_SIGNUP=false`
+- `SPORT360_GOOGLE_AUTH_ENABLED=false`
 - `SPORT360_PRELAUNCH_MODE=false`
 - `SPORT360_RELEASE` is optional because the build uses the Vercel or Netlify commit reference when available.
 

@@ -89,7 +89,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 ### Scope
 
 - ✅ Replace committed environment details with generated runtime configuration:
-  `window.__SPORT360_CONFIG__ = { supabaseUrl, supabaseAnonKey, allowSignup, prelaunchMode, release }`.
+  `window.__SPORT360_CONFIG__ = { supabaseUrl, supabaseAnonKey, allowSignup, googleAuthEnabled, prelaunchMode, release }`.
 - ✅ Generate production configuration from hosted environment variables and local configuration from ignored `.env.local`.
 - ✅ Use Admin-created or invited accounts and hide public account creation when `allowSignup` is false.
 - ✅ Provide self-service password recovery without exposing account existence or allowing recovery sessions to load scheduler data.

@@ -41,7 +41,8 @@ const icons = {
   chevron: '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
-  lead: '<svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88Z"/></svg>'
+  lead: '<svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88Z"/></svg>',
+  google: '<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.8 3-4.3 3-7.3Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.5L15.4 17c-.9.6-2 1-3.4 1a5.8 5.8 0 0 1-5.5-4H3.2v2.6A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.5 14a6 6 0 0 1 0-4V7.4H3.2a10 10 0 0 0 0 9.2L6.5 14Z"/><path fill="#EA4335" d="M12 6c1.6 0 3 .5 4.1 1.6L19 4.7A9.7 9.7 0 0 0 3.2 7.4L6.5 10A5.8 5.8 0 0 1 12 6Z"/></svg>'
 };
 
 for (const key of Object.keys(icons)) {
@@ -971,6 +972,13 @@ function renderAuth() {
           <p>${appConfig.prelaunchMode ? "Register with your email, then add your name and optional profile photo." : appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
         </div>
         ${feedback}
+        ${appConfig.googleAuthEnabled ? `
+          <button class="ghost wide google-auth-button" type="button" id="google-sign-in">
+            <span class="google-auth-mark">${icons.google}</span>
+            <span>Continue with Google</span>
+          </button>
+          <div class="auth-divider" aria-hidden="true"><span>or use email</span></div>
+        ` : ""}
         <label>Email<input name="email" type="email" autocomplete="email" required value="${escapeHtml(ui.pendingSignupEmail)}"></label>
         <label>Password<input name="password" type="password" autocomplete="current-password" data-password-field required></label>
         <div class="auth-password-actions">
@@ -3870,6 +3878,15 @@ function bindAuthEvents() {
     render();
   });
 
+  document.querySelector("#google-sign-in")?.addEventListener("click", () => {
+    ui.error = "";
+    ui.notice = "Opening Google sign-in...";
+    ui.noticeKind = "info";
+    ui.mutation = { key: "google-auth", status: "pending", message: ui.notice };
+    render();
+    dataStore.signInWithGoogle(authRedirectUrl());
+  });
+
   document.querySelector("#continue-to-sign-in")?.addEventListener("click", () => {
     ui.authMode = "sign-in";
     ui.error = "";
@@ -4558,6 +4575,10 @@ async function saveLeadRotation(event) {
 }
 
 function passwordRecoveryRedirectUrl() {
+  return authRedirectUrl();
+}
+
+function authRedirectUrl() {
   const url = new URL(location.href);
   url.search = "";
   url.hash = "";
@@ -4859,6 +4880,9 @@ async function boot() {
     } else if (dataStore.passwordRecovery?.status === "error") {
       ui.authMode = "forgot-password";
       ui.error = dataStore.passwordRecovery.message;
+    } else if (dataStore.oauthCallback?.status === "error") {
+      ui.authMode = "sign-in";
+      ui.error = dataStore.oauthCallback.message;
     }
     state = await dataStore.load();
     normalizeStateForUi();

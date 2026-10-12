@@ -9,7 +9,10 @@ export function shouldUseSupabase() {
 }
 
 export async function createSupabaseStore() {
-  return shouldUseSupabase() ? createRemoteStore(createRestClient()) : createLocalStore();
+  if (!shouldUseSupabase()) return createLocalStore();
+  const client = createRestClient();
+  await client.completeOAuthCallback();
+  return createRemoteStore(client);
 }
 
 function createLocalStore() {
@@ -27,6 +30,7 @@ function createLocalStore() {
       localStorage.removeItem(storageKey);
     },
     async signIn() {},
+    async signInWithGoogle() {},
     async signUp() {},
     async requestPasswordReset() {},
     async completePasswordRecovery() {},
@@ -77,6 +81,7 @@ function createRemoteStore(client) {
     mode: "supabase",
     client,
     passwordRecovery: client.getPasswordRecovery(),
+    oauthCallback: client.getOAuthCallback(),
     session: null,
     onboardingSubmission: null,
     prelaunchRestricted: false,
@@ -111,6 +116,9 @@ function createRemoteStore(client) {
       client.setSession(data);
       this.session = client.getSession();
       return data;
+    },
+    async signInWithGoogle(redirectTo) {
+      client.signInWithOAuth("google", redirectTo);
     },
     async signUp(email, password) {
       const data = await client.signUp(email, password);
@@ -300,8 +308,10 @@ function createRemoteStore(client) {
 
 function createRestClient() {
   const sessionKey = "sport360-supabase-session";
+  const oauthStateKey = "sport360-oauth-provider";
   const baseUrl = supabaseConfig.url.replace(/\/$/, "");
-  const passwordRecovery = capturePasswordRecovery();
+  let oauthCallback = captureOAuthCallback();
+  const passwordRecovery = oauthCallback ? null : capturePasswordRecovery();
 
   function getSession() {
     const stored = localStorage.getItem(sessionKey);
@@ -399,6 +409,68 @@ function createRestClient() {
     localStorage.removeItem(sessionKey);
   }
 
+  function captureOAuthCallback() {
+    const provider = sessionStorage.getItem(oauthStateKey);
+    if (!provider) return null;
+    const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const hasCallback = hash.has("access_token") || hash.has("error") || hash.has("error_code") || hash.has("error_description");
+    if (!hasCallback) {
+      sessionStorage.removeItem(oauthStateKey);
+      return null;
+    }
+
+    sessionStorage.removeItem(oauthStateKey);
+    history.replaceState({}, document.title, `${location.pathname}${location.search}`);
+    const errorDescription = hash.get("error_description") || hash.get("error");
+    if (errorDescription || !hash.get("access_token")) {
+      clearStoredSession();
+      return {
+        status: "error",
+        provider,
+        message: provider === "google"
+          ? "Google sign-in was not completed. Try again or use your email and password."
+          : "Social sign-in was not completed. Try again."
+      };
+    }
+
+    storeSession({
+      access_token: hash.get("access_token"),
+      refresh_token: hash.get("refresh_token"),
+      expires_in: Number(hash.get("expires_in")) || 3600
+    });
+    return { status: "ready", provider };
+  }
+
+  async function completeOAuthCallback() {
+    if (oauthCallback?.status !== "ready") return;
+    try {
+      const user = await request("/auth/v1/user", { method: "GET" });
+      const session = getSession();
+      const remainingSeconds = Math.max(1, Math.round((session.expires_at - Date.now()) / 1000));
+      storeSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_in: remainingSeconds,
+        user
+      });
+    } catch {
+      clearStoredSession();
+      oauthCallback = {
+        status: "error",
+        provider: oauthCallback.provider,
+        message: "Google sign-in could not be completed. Try again or use your email and password."
+      };
+    }
+  }
+
+  function signInWithOAuth(provider, redirectTo) {
+    sessionStorage.setItem(oauthStateKey, provider);
+    const url = new URL(`${baseUrl}/auth/v1/authorize`);
+    url.searchParams.set("provider", provider);
+    if (redirectTo) url.searchParams.set("redirect_to", redirectTo);
+    location.assign(url.toString());
+  }
+
   function capturePasswordRecovery() {
     const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
     const isRecovery = hash.get("type") === "recovery" || hash.has("error_code") || hash.has("error_description");
@@ -432,6 +504,10 @@ function createRestClient() {
     getPasswordRecovery() {
       return passwordRecovery;
     },
+    getOAuthCallback() {
+      return oauthCallback;
+    },
+    completeOAuthCallback,
     setSession(data) {
       storeSession(data);
     },
@@ -444,6 +520,7 @@ function createRestClient() {
         body: JSON.stringify({ email, password })
       });
     },
+    signInWithOAuth,
     async signUp(email, password) {
       return request("/auth/v1/signup", {
         method: "POST",
