@@ -198,6 +198,14 @@ svg {
   line-height: 1.35;
 }
 
+.auth-confirmation-card {
+  gap: 18px;
+}
+
+.auth-confirmation-message {
+  margin: 0;
+}
+
 .prelaunch-card {
   gap: 18px;
 }
