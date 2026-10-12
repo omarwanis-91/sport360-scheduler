@@ -121,7 +121,7 @@ test("a pending profile stays editable and outside the scheduler", async ({ page
   await expect(page.locator(".sidebar, .workspace")).toHaveCount(0);
 });
 
-test("signup confirmation keeps the employee on account creation", async ({ page }) => {
+test("signup confirmation replaces account creation with a sign-in continuation", async ({ page }) => {
   await configurePrelaunch(page);
   await page.route(`${supabaseUrl}/auth/v1/signup`, (route) => route.fulfill({
     status: 200,
@@ -134,9 +134,14 @@ test("signup confirmation keeps the employee on account creation", async ({ page
   await page.getByLabel("Password", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Create Account", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "Create your Sport360 account", exact: true })).toBeVisible();
-  await expect(page.locator(".form-notice")).toContainText("Check your email");
+  await expect(page.getByRole("heading", { name: "Check your inbox", exact: true })).toBeVisible();
+  await expect(page.locator(".form-notice")).toContainText("Account created. Check your email");
+  await expect(page.locator("#auth-form")).toHaveCount(0);
   await expect(page.locator(".sidebar, .workspace")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Sign In to Continue", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Create your Sport360 account", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveValue("artist@sport360.com");
 });
 
 test("admins review pending profiles and can create an unassigned employee", async ({ page }) => {

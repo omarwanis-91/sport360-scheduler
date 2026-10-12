@@ -107,6 +107,7 @@ const ui = {
   drawer: null,
   loading: true,
   authMode: "sign-in",
+  pendingSignupEmail: "",
   error: "",
   notice: "",
   noticeKind: "info",
@@ -899,6 +900,25 @@ function renderAuth() {
     </div>
   `;
 
+  if (ui.authMode === "signup-confirmation") {
+    return `
+      <main class="auth-shell">
+        <section class="auth-card auth-confirmation-card" aria-labelledby="signup-confirmation-title">
+          ${brand}
+          <div>
+            <span class="eyebrow">Confirm Your Email</span>
+            <h1 id="signup-confirmation-title">Check your inbox</h1>
+            <p>Open the confirmation link sent to your email, then return here to sign in.</p>
+          </div>
+          <p class="form-notice auth-confirmation-message" role="status">
+            Account created. Check your email if confirmation is enabled, then sign in here.
+          </p>
+          <button class="primary wide" type="button" id="continue-to-sign-in">Sign In to Continue</button>
+        </section>
+      </main>
+    `;
+  }
+
   if (ui.authMode === "reset-password") {
     return `
       <main class="auth-shell">
@@ -951,7 +971,7 @@ function renderAuth() {
           <p>${appConfig.prelaunchMode ? "Register with your email, then add your name and optional profile photo." : appConfig.allowSignup ? "Use the same email that was created on your employee profile." : "Access is created by your Sport360 administrator. Use your assigned work email."}</p>
         </div>
         ${feedback}
-        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required value="${escapeHtml(ui.pendingSignupEmail)}"></label>
         <label>Password<input name="password" type="password" autocomplete="current-password" data-password-field required></label>
         <div class="auth-password-actions">
           <label class="password-visibility"><input type="checkbox" data-password-visibility><span>Show password</span></label>
@@ -3850,6 +3870,13 @@ function bindAuthEvents() {
     render();
   });
 
+  document.querySelector("#continue-to-sign-in")?.addEventListener("click", () => {
+    ui.authMode = "sign-in";
+    ui.error = "";
+    ui.notice = "";
+    render();
+  });
+
   document.querySelector("#back-to-sign-in")?.addEventListener("click", () => {
     ui.authMode = "sign-in";
     ui.error = "";
@@ -3934,11 +3961,14 @@ function bindAuthEvents() {
       } else {
         await dataStore.signIn(email, password);
       }
+      ui.pendingSignupEmail = "";
       await reloadState();
       if (ui.error) throw new Error(ui.error);
     });
     if (result.ok && signupNeedsConfirmation) {
-      ui.notice = "Account created. Check your email if confirmation is enabled, then sign in here.";
+      ui.pendingSignupEmail = String(email || "").trim();
+      ui.authMode = "signup-confirmation";
+      ui.notice = "";
       ui.noticeKind = "success";
       render();
     }
@@ -3959,6 +3989,7 @@ async function signOut() {
     await dataStore.signOut();
     ui.pendingOnboardingPhotoFile = null;
     ui.pendingOnboardingPhotoDataUrl = "";
+    ui.pendingSignupEmail = "";
     ui.authMode = "sign-in";
     await reloadState();
   });
