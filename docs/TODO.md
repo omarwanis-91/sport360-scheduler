@@ -6,21 +6,24 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [x] Apply `026_self_service_profile_onboarding.sql`, pass audit 014, deploy the reviewed onboarding UI, enable prelaunch signup, and verify the public isolation page in Chrome, Edge, and Firefox.
-- [ ] Complete the first real employee submission and Admin link-or-create round trip in production.
-- [ ] Configure the Google OAuth client and Supabase Google provider, then enable `SPORT360_GOOGLE_AUTH_ENABLED` and verify the live callback in Chrome, Edge, and Firefox.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
 - [x] Verify the production Admin workflow in Chrome, Edge, and Firefox: sign-in, hidden signup, Scheduler, People, Departments, Rotations, Requests, Activity, Settings, and startup console health.
-- [~] Verify Department Lead, Employee, and unmatched-account production boundaries in Chrome, Edge, and Firefox. The reusable three-browser live verifier is ready; production currently has only the Admin profile claimed, so claimed Lead and Employee accounts plus an unmatched test account are still required.
 - [x] Verify Manager / Lead / Artist saves and parent/sub-department lead assignment against the live database, including returning a parent daily override to weekly rotation through the Scheduler.
 - [x] Apply `024_fix_parent_department_lead_validation.sql`, run audit 012, verify the parent-department write in production, and remove the temporary verification row.
 
 ## Next
 
-- [ ] Design and migrate Events: event dates, visibility, assigned people, optional On Ground prompt, calendar display, and audit trail.
-- [ ] Design and migrate Low Days: owed-day creation, approval/confirmation, replacement day selection, schedule impact, and audit trail.
 - [ ] Repair Docker/WSL or use another machine so `npm.cmd run backup:manual` can create a full Supabase SQL export.
 - [ ] Restore the verified export into a non-production Supabase project.
 - [ ] Pilot one department for five business days and record signoff.
+- [ ] Design and migrate Events: event dates, visibility, assigned people, optional On Ground prompt, calendar display, and audit trail.
+- [ ] Design and migrate Low Days: owed-day creation, approval/confirmation, replacement day selection, schedule impact, and audit trail.
+
+## Deferred
+
+- [ ] Complete the first real employee submission and Admin link-or-create round trip in production when employee testing resumes.
+- [ ] Verify Department Lead, Employee, and unmatched-account production boundaries in Chrome, Edge, and Firefox after claimed test accounts are available.
+- [ ] Configure the Google OAuth client and Supabase Google provider, then enable `SPORT360_GOOGLE_AUTH_ENABLED` and verify the live callback in Chrome, Edge, and Firefox.
 
 ## Later
 
@@ -34,6 +37,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Replaced the inline pending-onboarding badge and edit form with a dedicated Admin setup status view that keeps profile corrections available on demand.
 - [x] Added a runtime-gated Google sign-up/sign-in option that preserves prelaunch isolation and Admin-approved profile onboarding.
 - [x] Merged PR #17, enabled the production onboarding flags, and passed the public no-scheduler-shell check in Chrome, Edge, and Firefox.
 - [x] Replaced email-matched reservations with isolated name/photo onboarding submissions and an explicit Admin link-or-create workflow.
