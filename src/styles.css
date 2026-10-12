@@ -252,6 +252,40 @@ svg {
   gap: 18px;
 }
 
+.prelaunch-waiting-message {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 8% 18%, rgba(34, 197, 94, 0.1), transparent 34%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.prelaunch-waiting-message .prelaunch-status-mark {
+  margin-top: 5px;
+}
+
+.prelaunch-waiting-message .eyebrow {
+  margin-bottom: 6px;
+  color: #86efac;
+}
+
+.prelaunch-waiting-message h1 {
+  font-size: 24px;
+  line-height: 1.12;
+}
+
+.prelaunch-waiting-message p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .prelaunch-status {
   display: inline-flex;
   align-items: center;

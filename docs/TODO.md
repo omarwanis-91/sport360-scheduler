@@ -34,6 +34,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Replaced the inline pending-onboarding badge and edit form with a dedicated Admin setup status view that keeps profile corrections available on demand.
 - [x] Added a runtime-gated Google sign-up/sign-in option that preserves prelaunch isolation and Admin-approved profile onboarding.
 - [x] Merged PR #17, enabled the production onboarding flags, and passed the public no-scheduler-shell check in Chrome, Edge, and Firefox.
 - [x] Replaced email-matched reservations with isolated name/photo onboarding submissions and an explicit Admin link-or-create workflow.

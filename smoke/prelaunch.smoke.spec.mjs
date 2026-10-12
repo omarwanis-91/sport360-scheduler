@@ -101,8 +101,9 @@ test("new accounts submit a basic profile without loading scheduler data", async
     buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
   });
   await page.getByRole("button", { name: "Submit Profile", exact: true }).click();
-  await expect(page.getByText("Waiting for Admin setup", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Your details are saved", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Waiting for Admin setup", exact: true })).toBeVisible();
+  await expect(page.getByText("Your details are saved. An administrator will review and connect your account before scheduler access opens.", { exact: true })).toBeVisible();
+  await expect(page.locator("#onboarding-form")).toHaveCount(0);
   await expect(page.locator(".sidebar, .workspace")).toHaveCount(0);
 
   for (const table of ["departments", "employee_profiles", "shift_statuses", "rotation_versions", "schedule_overrides", "vacation_requests"]) {
@@ -110,15 +111,21 @@ test("new accounts submit a basic profile without loading scheduler data", async
   }
 });
 
-test("a pending profile stays editable and outside the scheduler", async ({ page }) => {
+test("a pending profile gets a dedicated status view and remains editable", async ({ page }) => {
   await configurePrelaunch(page);
   await storeSession(page);
   await mockEmployeeOnboarding(page, pendingSubmission);
   await page.goto("/");
 
-  await expect(page.getByText("Waiting for Admin setup", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Waiting for Admin setup", exact: true })).toBeVisible();
+  await expect(page.getByText("Sport360 Artist", { exact: true })).toBeVisible();
+  await expect(page.locator("#onboarding-form")).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit Name or Photo", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Update your details", exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Sport360 Artist");
   await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveAttribute("readonly", "");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Waiting for Admin setup", exact: true })).toBeVisible();
   await expect(page.locator(".sidebar, .workspace")).toHaveCount(0);
 });
 

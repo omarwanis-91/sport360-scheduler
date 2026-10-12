@@ -105,6 +105,7 @@ const ui = {
   pendingPhotoDataUrl: "",
   pendingOnboardingPhotoFile: null,
   pendingOnboardingPhotoDataUrl: "",
+  editingPendingOnboarding: false,
   drawer: null,
   loading: true,
   authMode: "sign-in",
@@ -770,6 +771,16 @@ function render() {
     app.innerHTML = renderPrelaunchStatus();
     document.querySelector("#retry-profile-onboarding")?.addEventListener("click", reloadState);
     document.querySelector("#onboarding-form")?.addEventListener("submit", saveOnboardingProfile);
+    document.querySelector("#edit-onboarding-profile")?.addEventListener("click", () => {
+      ui.editingPendingOnboarding = true;
+      render();
+    });
+    document.querySelector("#cancel-onboarding-edit")?.addEventListener("click", () => {
+      ui.editingPendingOnboarding = false;
+      ui.pendingOnboardingPhotoFile = null;
+      ui.pendingOnboardingPhotoDataUrl = "";
+      render();
+    });
     bindOnboardingPhotoUploader();
     document.querySelector("#sign-out")?.addEventListener("click", signOut);
     applyMutationPendingUi();
@@ -1021,6 +1032,37 @@ function renderPrelaunchStatus() {
     `;
   }
 
+  if (submission?.status === "pending" && !ui.editingPendingOnboarding) {
+    return `
+      <main class="auth-shell prelaunch-shell">
+        <section class="auth-card prelaunch-card prelaunch-waiting-card" aria-labelledby="prelaunch-title">
+          <div class="brand auth-brand">
+            <div class="brand-mark">S</div>
+            <div><strong>Sport360</strong><span>Scheduler</span></div>
+          </div>
+          <div class="prelaunch-waiting-message" role="status" aria-live="polite">
+            <span class="prelaunch-status-mark" aria-hidden="true"></span>
+            <div>
+              <span class="eyebrow">Profile Submitted</span>
+              <h1 id="prelaunch-title">Waiting for Admin setup</h1>
+              <p>Your details are saved. An administrator will review and connect your account before scheduler access opens.</p>
+            </div>
+          </div>
+          <dl class="prelaunch-profile">
+            <div><dt>Name</dt><dd>${escapeHtml(submission.name)}</dd></div>
+            <div><dt>Email</dt><dd>${escapeHtml(accountEmail)}</dd></div>
+          </dl>
+          <div class="prelaunch-note">
+            <strong>No scheduler access yet</strong>
+            <span>You can safely close this page and return later. Your submitted profile will remain saved.</span>
+          </div>
+          <button class="ghost wide" type="button" id="edit-onboarding-profile">Edit Name or Photo</button>
+          <button class="ghost wide" type="button" id="sign-out">Sign Out</button>
+        </section>
+      </main>
+    `;
+  }
+
   if (!submission || submission.status === "pending") {
     const photo = ui.pendingOnboardingPhotoDataUrl || submission?.photo || "";
     const profile = { name: submission?.name || "?", photo };
@@ -1031,16 +1073,10 @@ function renderPrelaunchStatus() {
             <div class="brand-mark">S</div>
             <div><strong>Sport360</strong><span>Scheduler</span></div>
           </div>
-          ${submission ? `
-            <div class="prelaunch-status" role="status">
-              <span class="prelaunch-status-mark" aria-hidden="true"></span>
-              <span>Waiting for Admin setup</span>
-            </div>
-          ` : ""}
           <div>
-            <span class="eyebrow">${submission ? "Profile Submitted" : "Basic Profile"}</span>
-            <h1 id="prelaunch-title">${submission ? "Your details are saved" : "Tell us who you are"}</h1>
-            <p>${submission ? "You can correct your name or photo while an administrator prepares your access." : "Add your name and an optional photo. Your administrator will handle departments, roles, and scheduler access."}</p>
+            <span class="eyebrow">${submission ? "Edit Submitted Profile" : "Basic Profile"}</span>
+            <h1 id="prelaunch-title">${submission ? "Update your details" : "Tell us who you are"}</h1>
+            <p>${submission ? "Correct your name or photo, then return to the Admin setup status." : "Add your name and an optional photo. Your administrator will handle departments, roles, and scheduler access."}</p>
           </div>
           <label>Email<input type="email" value="${escapeHtml(accountEmail)}" readonly aria-readonly="true"></label>
           <label>Name<input name="name" type="text" autocomplete="name" minlength="2" maxlength="120" required value="${escapeHtml(submission?.name || "")}" placeholder="Your full name"></label>
@@ -1057,6 +1093,7 @@ function renderPrelaunchStatus() {
             <span>Your submission contains only your account email, name, and optional photo.</span>
           </div>
           <button class="primary wide">${submission ? "Save Changes" : "Submit Profile"}</button>
+          ${submission ? `<button class="ghost wide" type="button" id="cancel-onboarding-edit">Cancel</button>` : ""}
           <button class="ghost wide" type="button" id="sign-out">Sign Out</button>
         </form>
       </main>
@@ -4196,6 +4233,7 @@ async function saveOnboardingProfile(event) {
     }
     ui.pendingOnboardingPhotoFile = null;
     ui.pendingOnboardingPhotoDataUrl = "";
+    ui.editingPendingOnboarding = false;
   });
 }
 
