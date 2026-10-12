@@ -143,6 +143,7 @@ Runtime environment values are not committed in frontend modules. `index.html` l
 - Static builds: `scripts/build.js` writes `dist/runtime-config.js` from deployment environment variables and publishes browser assets under `dist/assets/`.
 - Hosted Vercel and Netlify builds require `SPORT360_SUPABASE_URL` and `SPORT360_SUPABASE_ANON_KEY`.
 - `SPORT360_ALLOW_SIGNUP=false` hides public account creation for the internal release.
+- `SPORT360_GOOGLE_AUTH_ENABLED=true` shows Google authentication after its OAuth client is configured in Google and Supabase.
 - `SPORT360_PRELAUNCH_MODE=true` routes non-Admin accounts to self-service profile setup and its holding state.
 - `SPORT360_RELEASE` identifies the deployed release; hosted builds fall back to `VERCEL_GIT_COMMIT_SHA` or `COMMIT_REF`.
 

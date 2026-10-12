@@ -25,6 +25,7 @@ async function configurePrelaunch(page) {
       supabaseUrl,
       supabaseAnonKey: "smoke-test-anon-key",
       allowSignup: true,
+      googleAuthEnabled: true,
       prelaunchMode: true,
       release: "smoke-prelaunch",
       demoMode: false
@@ -142,6 +143,55 @@ test("signup confirmation replaces account creation with a sign-in continuation"
   await page.getByRole("button", { name: "Sign In to Continue", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Create your Sport360 account", exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveValue("artist@sport360.com");
+});
+
+test("Google authentication starts through Supabase with the current app callback", async ({ page }) => {
+  await configurePrelaunch(page);
+  let authorizeUrl = null;
+  await page.route(`${supabaseUrl}/auth/v1/authorize**`, (route) => {
+    authorizeUrl = new URL(route.request().url());
+    return route.fulfill({ status: 200, contentType: "text/html", body: "Google OAuth handoff" });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue with Google", exact: true }).click();
+  await expect.poll(() => authorizeUrl?.searchParams.get("provider")).toBe("google");
+  expect(authorizeUrl.searchParams.get("redirect_to")).toBe("http://127.0.0.1:4174/");
+});
+
+test("Google callback enters isolated profile onboarding without scheduler access", async ({ page }) => {
+  await configurePrelaunch(page);
+  await page.addInitScript(() => sessionStorage.setItem("sport360-oauth-provider", "google"));
+  await page.route(`${supabaseUrl}/auth/v1/user`, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ id: "google-user", email: "google.artist@gmail.com" })
+  }));
+  await page.route(`${supabaseUrl}/rest/v1/rpc/current_role`, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify("employee")
+  }));
+  await page.route(`${supabaseUrl}/rest/v1/rpc/get_my_profile_onboarding`, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify([{
+      user_id: "google-user",
+      email: "google.artist@gmail.com",
+      full_name: null,
+      photo_url: null,
+      status: null,
+      linked_profile_id: null,
+      created_at: null,
+      updated_at: null
+    }])
+  }));
+
+  await page.goto("/#access_token=google-access&refresh_token=google-refresh&expires_in=3600&token_type=bearer");
+  await expect(page.getByRole("heading", { name: "Tell us who you are", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveValue("google.artist@gmail.com");
+  await expect(page.locator(".sidebar, .workspace")).toHaveCount(0);
+  expect(new URL(page.url()).hash).toBe("");
 });
 
 test("admins review pending profiles and can create an unassigned employee", async ({ page }) => {

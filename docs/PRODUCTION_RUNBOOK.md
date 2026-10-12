@@ -55,11 +55,24 @@ The active Vercel project provides:
 - `SPORT360_SUPABASE_URL`
 - `SPORT360_SUPABASE_ANON_KEY`
 - `SPORT360_ALLOW_SIGNUP=false`
+- `SPORT360_GOOGLE_AUTH_ENABLED=false`
 - `SPORT360_PRELAUNCH_MODE=false`
 
 For the temporary reservation landing page, set both flags to `true` only after migration 025 and audit 013 pass.
 
 Local development uses the same variable names in ignored `.env.local`.
+
+### Activate Google Authentication
+
+1. In Google Auth Platform, create a **Web application** OAuth client.
+2. Add `https://sport360-scheduler.vercel.app` as an authorized JavaScript origin.
+3. Copy the exact callback URL shown under **Supabase → Authentication → Sign In / Providers → Google** into Google's authorized redirect URIs.
+4. Save the Google client ID and client secret only in the Supabase Google provider settings, then enable that provider.
+5. Confirm the production origin is the Supabase Site URL and an allowed redirect URL.
+6. Set `SPORT360_GOOGLE_AUTH_ENABLED=true` in Vercel and redeploy only after the provider is working.
+7. Verify a new Google account reaches isolated name/photo onboarding and cannot load the scheduler before Admin approval.
+
+Never commit the Google client secret or place it in browser runtime configuration.
 
 ## Release Verification
 

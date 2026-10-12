@@ -312,3 +312,12 @@ This reservation keeps the account outside the existing claimed-user RLS boundar
 Employees create their own Auth accounts and submit only a name and optional profile photo. The submission is stored separately from operational employee profiles and grants no scheduler access.
 
 An Admin reviews each submission and either links it to an existing unclaimed employee profile or creates a new unassigned employee profile. The Admin then manages departments, title, hierarchy, application role, leave balances, rotations, and scheduling. Email matching must not automatically reserve or claim an employee profile.
+
+## D-043 - Google Authentication Uses The Same Approval Gate
+
+**Date:** 2026-10-12
+**Status:** Accepted
+
+Google OAuth may create or authenticate a Supabase Auth identity without sending a confirmation email. It does not grant operational access, claim an employee profile, or bypass prelaunch mode.
+
+New Google-authenticated users follow the same isolated name/photo submission and explicit Admin link-or-create workflow as email/password users. The Google button remains runtime-gated until the OAuth client, Supabase provider, and allowed redirect URLs are configured.

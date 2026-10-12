@@ -206,6 +206,48 @@ svg {
   margin: 0;
 }
 
+.google-auth-button {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.google-auth-mark,
+.google-auth-mark svg {
+  width: 18px;
+  height: 18px;
+}
+
+.google-auth-mark svg,
+.google-auth-mark svg * {
+  stroke: none;
+}
+
+.google-auth-mark svg {
+  fill: initial;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-soft);
+}
+
 .prelaunch-card {
   gap: 18px;
 }
