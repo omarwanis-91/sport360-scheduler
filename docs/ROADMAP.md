@@ -104,7 +104,9 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Expose parent-department daily-lead cleanup in the Scheduler and complete the production UI round trip without direct SQL.
 - ✅ Build the Admin-approved self-service onboarding replacement: name/photo-only submissions, no email auto-claim, and explicit Admin link-or-create review.
 - ✅ Apply migration 026, pass audit 014, restore the production prelaunch flags, and verify the public replacement page in Chrome, Edge, and Firefox.
-- ⏳ Apply migration 027, run audit 015, and verify the sole-Admin and direct-department Lead/Employee boundaries in production.
+- ✅ Apply migration 027 and pass audit 015 for the sole-Admin and direct-department Lead/Employee boundaries.
+- ✅ Add an Admin-only, read-only Role Preview for inspecting department-scoped Lead and Employee interfaces without fake accounts.
+- ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
 - ⏳ Repair or bypass the local Docker/WSL blocker so the Supabase Free-plan SQL export can be completed and restored in a test project.

@@ -39,6 +39,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 6. Application state is rendered into `#app` using template functions.
 7. Event listeners call workflow functions and persistence methods.
 8. Successful writes update Supabase and then refresh or persist local state.
+9. An Admin-only Role Preview can substitute an effective Lead or Employee role, one department, and one existing representative profile for frontend rendering. A persistent read-only banner identifies the simulation, while the central mutation wrapper blocks writes and the real Supabase Admin session remains unchanged.
 
 ## UI Structure
 
@@ -53,6 +54,8 @@ The application uses view-level render functions rather than routes. Primary vie
 - Rotations
 - Activity
 - Settings
+
+Settings also contains the Admin-only Role Preview launcher. Preview mode is intentionally session-local and UI-only; production authorization remains enforced and tested through Supabase RLS/RPCs.
 
 Right-side drawers handle focused tasks such as shift edits, daily bulk editing, request review, profile editing, department details, and rotation editing. Full employee profile and calendar experiences use the main content area.
 

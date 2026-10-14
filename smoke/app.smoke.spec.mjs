@@ -231,6 +231,60 @@ test("Employee has department read access and own identity editing only", async 
   await expect(page.getByRole("button", { name: "Save Profile", exact: true })).toBeEnabled();
 });
 
+test("Admin can preview Employee access without changing the signed-in user", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+
+  await page.locator("#role-preview-role").selectOption("employee");
+  await page.locator("#role-preview-department").selectOption("support");
+  await page.locator("#role-preview-profile").selectOption("emp-004");
+  await page.getByRole("button", { name: "Start Preview", exact: true }).click();
+
+  const banner = page.getByRole("region", { name: "Role Preview is active" });
+  await expect(banner).toContainText("Previewing Employee · Customer Support");
+  await expect(banner).toContainText("Supabase session remains Admin");
+  await expect(page.locator("#department-select option")).toHaveCount(1);
+  await expect(page.locator("#department-select")).toHaveValue("support");
+  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
+  await expect(page.locator(".user-tile")).toContainText("Youssef Nabil");
+  await expect(page.locator(".user-tile")).toContainText("employee preview");
+
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Preview Must Not Save");
+  await page.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await expect(page.locator(".app-notice.warning")).toContainText("Role Preview is read-only");
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Youssef Nabil");
+
+  await page.locator(".role-preview-sidebar").getByRole("button", { name: "Exit Preview", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
+  await expect(page.locator(".user-tile")).toContainText("Omar Wanis");
+  await expect(page.locator(".role-preview-banner")).toHaveCount(0);
+});
+
+test("Admin can preview Lead scope for one selected department", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+
+  await page.locator("#role-preview-role").selectOption("lead");
+  await page.locator("#role-preview-department").selectOption("ops");
+  await page.locator("#role-preview-profile").selectOption("emp-002");
+  await page.getByRole("button", { name: "Start Preview", exact: true }).click();
+
+  await expect(page.getByRole("region", { name: "Role Preview is active" })).toContainText("Previewing Lead · Operations");
+  await expect(page.locator("#department-select option")).toHaveCount(1);
+  await expect(page.locator("#department-select")).toHaveValue("ops");
+  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "People", exact: true }).click();
+  await expect(page.locator(".person-card")).toHaveCount(3);
+  await expect(page.getByText("Youssef Nabil", { exact: true })).toHaveCount(0);
+});
+
 test("compact controls expose names, selected state, and reduced-motion behavior", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
