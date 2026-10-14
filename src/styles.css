@@ -639,6 +639,27 @@ nav {
   padding: 10px;
 }
 
+.role-preview-sidebar {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid rgba(251, 113, 133, 0.34);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(145deg, rgba(225, 29, 72, 0.1), rgba(255, 255, 255, 0.012)),
+    #131011;
+}
+
+.role-preview-sidebar .eyebrow {
+  margin: 0;
+  color: #fda4af;
+}
+
+.role-preview-sidebar > span:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .eyebrow {
   display: block;
   margin-bottom: 7px;
@@ -828,6 +849,60 @@ textarea:focus {
   position: relative;
   min-width: 0;
   padding: 22px;
+}
+
+.role-preview-banner {
+  position: sticky;
+  top: 10px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(251, 113, 133, 0.38);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(225, 29, 72, 0.13), transparent 34%),
+    rgba(18, 14, 15, 0.96);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.role-preview-banner-copy {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.role-preview-banner-copy strong,
+.role-preview-banner-copy span {
+  display: block;
+}
+
+.role-preview-banner-copy strong {
+  font-size: 12px;
+}
+
+.role-preview-banner-copy span:not(.role-preview-badge) {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.role-preview-badge {
+  flex: 0 0 auto;
+  border: 1px solid rgba(251, 113, 133, 0.36);
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: rgba(225, 29, 72, 0.13);
+  color: #fecdd3;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .workspace::before {
@@ -4431,6 +4506,52 @@ label {
   overflow: hidden;
 }
 
+.role-preview-panel {
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px;
+  overflow: visible;
+  background:
+    radial-gradient(circle at 94% 6%, rgba(225, 29, 72, 0.09), transparent 30%),
+    var(--tech-surface);
+}
+
+.role-preview-panel-copy {
+  max-width: 780px;
+}
+
+.role-preview-panel-copy .eyebrow {
+  margin-bottom: 5px;
+  color: #fda4af;
+}
+
+.role-preview-panel-copy h2 {
+  margin-bottom: 5px;
+}
+
+.role-preview-panel-copy p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.role-preview-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.65fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.role-preview-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.role-preview-form .primary {
+  white-space: nowrap;
+}
+
 .request-row,
 .rotation-row {
   width: 100%;
@@ -5752,6 +5873,15 @@ button:disabled {
     padding: 18px;
   }
 
+  .role-preview-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .role-preview-form label:nth-of-type(3),
+  .role-preview-form .primary {
+    grid-column: 1 / -1;
+  }
+
   .my-profile-layout,
   .profile-page-layout {
     grid-template-columns: 1fr;
@@ -5794,5 +5924,27 @@ button:disabled {
   .onboarding-row-date {
     width: 100%;
     padding-left: 48px;
+  }
+}
+
+@media (max-width: 520px) {
+  .role-preview-banner {
+    position: relative;
+    top: auto;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .role-preview-banner-copy {
+    align-items: flex-start;
+  }
+
+  .role-preview-form {
+    grid-template-columns: 1fr;
+  }
+
+  .role-preview-form label:nth-of-type(3),
+  .role-preview-form .primary {
+    grid-column: auto;
   }
 }

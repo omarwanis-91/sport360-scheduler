@@ -4,7 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Apply `027_strict_role_department_boundaries.sql`, run audit 015, deploy the matching role-scoped UI, and verify Admin, Lead, and Employee boundaries in production.
+- [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [x] Apply `026_self_service_profile_onboarding.sql`, pass audit 014, deploy the reviewed onboarding UI, enable prelaunch signup, and verify the public isolation page in Chrome, Edge, and Firefox.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.
@@ -38,6 +38,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migration 027, passed every audit 015 check, and added a read-only Admin Role Preview that uses existing profiles without changing the Supabase session.
 - [x] Replaced the inline pending-onboarding badge and edit form with a dedicated Admin setup status view that keeps profile corrections available on demand.
 - [x] Added a runtime-gated Google sign-up/sign-in option that preserves prelaunch isolation and Admin-approved profile onboarding.
 - [x] Merged PR #17, enabled the production onboarding flags, and passed the public no-scheduler-shell check in Chrome, Edge, and Firefox.

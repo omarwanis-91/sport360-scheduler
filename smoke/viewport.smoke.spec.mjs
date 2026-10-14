@@ -75,5 +75,16 @@ for (const width of widths) {
     await page.getByRole("button", { name: "Requests", exact: true }).click();
     await expectMainShellHealthy(page);
     await expect(page.getByRole("heading", { name: "Annual Requests", exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await expectMainShellHealthy(page);
+    await expect(page.getByRole("heading", { name: "Preview as a role", exact: true })).toBeVisible();
+    await expect(page.locator("#role-preview-form")).toBeVisible();
+    await page.locator("#role-preview-profile").selectOption("emp-002");
+    await page.getByRole("button", { name: "Start Preview", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Role Preview is active" })).toBeVisible();
+    await expectShellWithinViewport(page);
+    await page.locator(".role-preview-sidebar").getByRole("button", { name: "Exit Preview", exact: true }).click();
+    await expect(page.locator(".role-preview-banner")).toHaveCount(0);
   });
 }

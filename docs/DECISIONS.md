@@ -328,3 +328,12 @@ New Google-authenticated users follow the same isolated name/photo submission an
 **Status:** Accepted
 
 Sport360 has one protected Admin account with unrestricted access. Leads can read and manage rotations, schedules, hierarchy, memberships, and annual-request decisions only for departments to which their employee profile is directly assigned. Leads may add unassigned profiles to those departments but cannot browse or move people from other departments. Employees can read their own directly assigned department data, create their own requests, and update only their own name and profile photo. Supabase RLS and authorized RPCs enforce these boundaries independently of the frontend.
+
+## D-045 - Admin Role Preview Is Read-Only UI Simulation
+
+**Date:** 2026-10-14
+**Status:** Accepted
+
+The sole Admin may preview the Lead or Employee interface for one department using an existing employee profile as the representative identity. Preview mode changes only frontend visibility and permission affordances; the authenticated Supabase session remains Admin and is clearly identified as such.
+
+All application writes, including local rotation-preset changes, are blocked while preview mode is active. The preview is not persisted across reloads and is not a substitute for production RLS verification with real role accounts.

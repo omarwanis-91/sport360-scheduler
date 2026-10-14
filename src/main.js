@@ -113,6 +113,9 @@ const ui = {
   error: "",
   notice: "",
   noticeKind: "info",
+  rolePreview: null,
+  rolePreviewDraftRole: "lead",
+  rolePreviewDraftDepartmentId: "",
   mutation: { key: "", status: "idle", message: "" }
 };
 
@@ -126,8 +129,15 @@ function isMutationPending() {
   return ui.mutation.status === "pending";
 }
 
+function blockRolePreviewMutation() {
+  if (!isRolePreviewActive()) return false;
+  notify("Role Preview is read-only. Exit preview to make changes.", "warning");
+  return true;
+}
+
 async function runMutation(key, messages, action) {
   if (isMutationPending()) return { ok: false };
+  if (blockRolePreviewMutation()) return { ok: false };
   if (dataStore?.mode === "supabase" && !navigator.onLine) {
     notify("You appear to be offline. Reconnect, then try again.", "error");
     return { ok: false };
@@ -234,6 +244,7 @@ function syncHierarchyDepartmentSelection() {
 }
 
 async function resetDemo() {
+  if (blockRolePreviewMutation()) return;
   await dataStore.reset();
   location.reload();
 }
@@ -391,11 +402,21 @@ function currentUser() {
   return byId(state.users, state.currentUserId);
 }
 
+function isRolePreviewActive() {
+  return Boolean(ui.rolePreview?.active && currentUser()?.role === "admin");
+}
+
+function effectiveRole() {
+  return isRolePreviewActive() ? ui.rolePreview.role : currentUser()?.role;
+}
+
 function currentProfile() {
+  if (isRolePreviewActive()) return byId(state.profiles, ui.rolePreview.profileId);
   return byId(state.profiles, currentUser()?.profileId);
 }
 
 function roleForProfile(profile) {
+  if (isRolePreviewActive() && profile?.id === currentProfile()?.id) return effectiveRole();
   return roleForProfileLogic(state, profile);
 }
 
@@ -414,6 +435,9 @@ function directlySharesDepartment(firstProfile, secondProfile) {
 }
 
 function visibleDepartments() {
+  if (isRolePreviewActive()) {
+    return state.departments.filter((department) => department.id === ui.rolePreview.departmentId);
+  }
   if (isAdmin()) return state.departments;
   const allowed = new Set(profileDepartmentIds(currentProfile()));
   return state.departments.filter((department) => allowed.has(department.id));
@@ -421,6 +445,9 @@ function visibleDepartments() {
 
 function canViewProfile(profile) {
   if (!profile) return false;
+  if (isRolePreviewActive()) {
+    return profile.id === currentProfile()?.id || profileDepartmentIds(profile).includes(ui.rolePreview.departmentId);
+  }
   if (isAdmin() || profile.id === currentProfile()?.id) return true;
   return directlySharesDepartment(currentProfile(), profile);
 }
@@ -473,15 +500,15 @@ function scheduleMatchesFilter(schedule) {
 }
 
 function canEditPast() {
-  return currentUser()?.role === "admin";
+  return effectiveRole() === "admin";
 }
 
 function isAdmin() {
-  return currentUser()?.role === "admin";
+  return effectiveRole() === "admin";
 }
 
 function isLead() {
-  return currentUser()?.role === "lead";
+  return effectiveRole() === "lead";
 }
 
 function canManageSystemSettings() {
@@ -497,10 +524,10 @@ function canManageDepartments() {
 }
 
 function canManageDepartment(departmentId) {
-  const user = currentUser();
   if (isAdmin()) return true;
   if (!isLead()) return false;
-  return profileDepartmentIds(byId(state.profiles, user.profileId)).includes(departmentId);
+  if (isRolePreviewActive()) return departmentId === ui.rolePreview.departmentId;
+  return profileDepartmentIds(currentProfile()).includes(departmentId);
 }
 
 function canManageProfileDepartment(profile) {
@@ -789,6 +816,44 @@ function escapeHtml(value = "") {
     .replaceAll("'", "&#039;");
 }
 
+function rolePreviewDepartment() {
+  return byId(state.departments, ui.rolePreview?.departmentId);
+}
+
+function rolePreviewLabel() {
+  const role = effectiveRole();
+  return role ? `${role.charAt(0).toUpperCase()}${role.slice(1)}` : "Role";
+}
+
+function renderRolePreviewBanner() {
+  if (!isRolePreviewActive()) return "";
+  const department = rolePreviewDepartment();
+  return `
+    <section class="role-preview-banner" aria-label="Role Preview is active">
+      <div class="role-preview-banner-copy">
+        <span class="role-preview-badge">Read only</span>
+        <div>
+          <strong>Previewing ${rolePreviewLabel()} · ${escapeHtml(department?.name || "Department")}</strong>
+          <span>UI visibility only. Your Supabase session remains Admin.</span>
+        </div>
+      </div>
+      <button type="button" class="ghost" data-exit-role-preview>Exit Preview</button>
+    </section>
+  `;
+}
+
+function renderRolePreviewSidebar() {
+  if (!isRolePreviewActive()) return "";
+  return `
+    <section class="role-preview-sidebar" aria-label="Active role preview">
+      <span class="eyebrow">Role Preview · Read only</span>
+      <strong>${rolePreviewLabel()}</strong>
+      <span>${escapeHtml(rolePreviewDepartment()?.name || "Department")}</span>
+      <button type="button" class="ghost wide" data-exit-role-preview>Exit Preview</button>
+    </section>
+  `;
+}
+
 function render() {
   const app = document.querySelector("#app");
   if (ui.loading) {
@@ -866,7 +931,12 @@ function render() {
         ${isAdmin() ? navButton("activity", "Activity", icons.activity) : ""}
         ${isAdmin() ? navButton("settings", "Settings", icons.settings) : ""}
       </nav>
-      ${dataStore.mode === "demo" ? `
+      ${dataStore.mode === "demo" ? isRolePreviewActive() ? `
+        <div class="sidebar-card">
+          <span class="eyebrow">Demo Access</span>
+          <p class="hint">Admin preview session</p>
+        </div>
+      ` : `
         <div class="sidebar-card">
           <span class="eyebrow">Demo Access</span>
           <select id="user-switcher">
@@ -877,19 +947,21 @@ function render() {
       ` : `
         <div class="sidebar-card">
           <span class="eyebrow">Live Supabase</span>
-          <p class="hint">${currentUser()?.email || "Signed in"}</p>
-          <button class="ghost wide" id="sign-out">Sign out</button>
+          <p class="hint">${isRolePreviewActive() ? `Admin session: ${escapeHtml(currentUser()?.email || "Signed in")}` : escapeHtml(currentUser()?.email || "Signed in")}</p>
+          ${isRolePreviewActive() ? "" : `<button class="ghost wide" id="sign-out">Sign out</button>`}
         </div>
       `}
+      ${renderRolePreviewSidebar()}
       <div class="user-tile">
         <div class="avatar">${avatar(currentProfile())}</div>
         <div>
           <strong>${currentProfile()?.name || "Unclaimed user"}</strong>
-          <span>${currentUser()?.role || "guest"}</span>
+          <span>${effectiveRole() || "guest"}${isRolePreviewActive() ? " preview" : ""}</span>
         </div>
       </div>
     </aside>
-    <main class="workspace">
+    <main class="workspace ${isRolePreviewActive() ? "role-preview-active" : ""}">
+      ${renderRolePreviewBanner()}
       ${renderActiveView()}
       ${renderAppNotice()}
     </main>
@@ -2427,8 +2499,39 @@ function latestRotationForProfile(profileId) {
 }
 
 function renderSettings() {
+  const selectedDepartment = state.departments.find((department) => department.id === ui.rolePreviewDraftDepartmentId) || state.departments[0];
+  const previewProfiles = state.profiles
+    .filter((profile) => profileDepartmentIds(profile).includes(selectedDepartment?.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
   return `
-    ${renderTopbar("Settings", "Status labels are configurable. Red stays reserved for actions, alerts, and selected states.", canManageSystemSettings() ? `<button class="primary" data-open-drawer="status">${icons.plus} New Status</button>` : "")}
+    ${renderTopbar("Settings", "Manage status labels and safely inspect role-scoped interface access.", canManageSystemSettings() ? `<button class="primary" data-open-drawer="status">${icons.plus} New Status</button>` : "")}
+    <section class="list-panel role-preview-panel" aria-labelledby="role-preview-title">
+      <div class="role-preview-panel-copy">
+        <span class="eyebrow">Admin tool · Read only</span>
+        <h2 id="role-preview-title">Preview as a role</h2>
+        <p class="hint">Choose a department and an existing profile to inspect the Lead or Employee interface. Your real Supabase session stays Admin and all writes are blocked until you exit.</p>
+      </div>
+      <form id="role-preview-form" class="role-preview-form">
+        <label>Role
+          <select name="role" id="role-preview-role">
+            <option value="lead" ${ui.rolePreviewDraftRole === "lead" ? "selected" : ""}>Lead</option>
+            <option value="employee" ${ui.rolePreviewDraftRole === "employee" ? "selected" : ""}>Employee</option>
+          </select>
+        </label>
+        <label>Department
+          <select name="departmentId" id="role-preview-department" ${state.departments.length ? "" : "disabled"}>
+            ${state.departments.map((department) => `<option value="${department.id}" ${department.id === selectedDepartment?.id ? "selected" : ""}>${escapeHtml(departmentLabel(department))}</option>`).join("")}
+          </select>
+        </label>
+        <label>Representative profile
+          <select name="profileId" id="role-preview-profile" ${previewProfiles.length ? "" : "disabled"}>
+            ${previewProfiles.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.name)}</option>`).join("")}
+          </select>
+        </label>
+        <button type="submit" class="primary" ${selectedDepartment && previewProfiles.length ? "" : "disabled"}>Start Preview</button>
+      </form>
+      ${selectedDepartment && !previewProfiles.length ? `<p class="form-error" role="status">This department has no profiles to represent yet.</p>` : ""}
+    </section>
     <section class="status-grid">
       ${state.statuses.map((status) => `
         <button class="status-card" data-open-drawer="status-detail" data-status-id="${status.id}">
@@ -2439,6 +2542,58 @@ function renderSettings() {
       `).join("")}
     </section>
   `;
+}
+
+function startRolePreview(event) {
+  event.preventDefault();
+  if (currentUser()?.role !== "admin") return;
+  const form = new FormData(event.currentTarget);
+  const role = form.get("role");
+  const departmentId = form.get("departmentId");
+  const profileId = form.get("profileId");
+  const department = byId(state.departments, departmentId);
+  const profile = byId(state.profiles, profileId);
+  if (!["lead", "employee"].includes(role) || !department || !profileDepartmentIds(profile).includes(departmentId)) {
+    notify("Choose a valid role, department, and representative profile.", "error");
+    return;
+  }
+
+  ui.rolePreview = { active: true, role, departmentId, profileId };
+  ui.rolePreviewDraftRole = role;
+  ui.rolePreviewDraftDepartmentId = departmentId;
+  ui.activeView = "scheduler";
+  ui.selectedDepartmentId = departmentId;
+  ui.peopleDepartmentId = "all";
+  ui.departmentFocusId = departmentId;
+  ui.hierarchyDepartmentIds = [departmentId];
+  ui.schedulerEditMode = false;
+  ui.schedulerLeadDrafts = [];
+  ui.rotationDepartmentEdit = false;
+  ui.selectedRotationProfileIds = [];
+  ui.rotationBulkEditing = false;
+  ui.drawer = null;
+  ui.notice = "";
+  render();
+}
+
+function exitRolePreview() {
+  if (!isRolePreviewActive()) return;
+  ui.rolePreview = null;
+  const firstDepartment = state.departments[0];
+  ui.activeView = "scheduler";
+  ui.selectedDepartmentId = firstDepartment?.id || "";
+  ui.peopleDepartmentId = "all";
+  ui.departmentFocusId = firstDepartment?.id || "";
+  ui.hierarchyDepartmentIds = state.departments.map((department) => department.id);
+  ui.schedulerEditMode = false;
+  ui.schedulerLeadDrafts = [];
+  ui.rotationDepartmentEdit = false;
+  ui.selectedRotationProfileIds = [];
+  ui.rotationBulkEditing = false;
+  ui.drawer = null;
+  ui.notice = "Returned to Admin access.";
+  ui.noticeKind = "success";
+  render();
 }
 
 function renderActivity() {
@@ -3404,6 +3559,19 @@ function statusDrawer() {
 }
 
 function bindEvents() {
+  document.querySelectorAll("[data-exit-role-preview]").forEach((button) => {
+    button.addEventListener("click", exitRolePreview);
+  });
+
+  document.querySelector("#role-preview-form")?.addEventListener("submit", startRolePreview);
+  document.querySelector("#role-preview-role")?.addEventListener("change", (event) => {
+    ui.rolePreviewDraftRole = event.target.value;
+  });
+  document.querySelector("#role-preview-department")?.addEventListener("change", (event) => {
+    ui.rolePreviewDraftDepartmentId = event.target.value;
+    render();
+  });
+
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.activeView = button.dataset.view;
@@ -3716,6 +3884,7 @@ function bindEvents() {
   });
 
   document.querySelector("#user-switcher")?.addEventListener("change", (event) => {
+    ui.rolePreview = null;
     state.currentUserId = event.target.value;
     const firstDepartment = visibleDepartments()[0];
     ui.selectedDepartmentId = firstDepartment?.id || "";
@@ -3753,6 +3922,7 @@ function bindEvents() {
   document.querySelector("#status-form")?.addEventListener("submit", saveStatus);
 
   document.querySelector("#save-rotation-preset")?.addEventListener("click", () => {
+    if (blockRolePreviewMutation()) return;
     const form = document.querySelector("#rotation-form");
     const name = form?.querySelector('input[name="presetName"]')?.value.trim();
     if (!name) {
@@ -3783,6 +3953,7 @@ function bindEvents() {
 
   document.querySelectorAll("[data-delete-rotation-preset]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (blockRolePreviewMutation()) return;
       rotationPresets = rotationPresets.filter((preset) => preset.id !== button.dataset.deleteRotationPreset);
       saveRotationPresets();
       render();
