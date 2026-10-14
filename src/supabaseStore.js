@@ -39,6 +39,9 @@ function createLocalStore() {
     async createProfile() {},
     async updateProfile() {},
     async updateOwnProfile() {},
+    async updateProfileHierarchy() {},
+    async addProfileToDepartment() {},
+    async removeProfileFromDepartment() {},
     async setProfileDepartments() {},
     async upsertUserRole() {},
     async unlinkProfileAccount() {},
@@ -189,19 +192,38 @@ function createRemoteStore(client) {
       await client.rpc("update_own_profile", {
         p_profile_id: profile.id,
         p_full_name: profile.name,
-        p_photo_url: profile.photoRef || profile.photo || null,
-        p_title: profile.title
+        p_photo_url: profile.photoRef || profile.photo || null
+      });
+    },
+    async updateProfileHierarchy(profile) {
+      await client.rpc("update_profile_hierarchy", {
+        p_profile_id: profile.id,
+        p_seniority_level: profile.seniorityLevel
+      });
+    },
+    async addProfileToDepartment(profileId, departmentId) {
+      await client.rpc("add_profile_to_department", {
+        p_profile_id: profileId,
+        p_department_id: departmentId
+      });
+    },
+    async removeProfileFromDepartment(profileId, departmentId) {
+      await client.rpc("remove_profile_from_department", {
+        p_profile_id: profileId,
+        p_department_id: departmentId
       });
     },
     async setProfileDepartments(profile) {
       await saveProfileMemberships(client, profile);
     },
     async upsertUserRole(userRole) {
-      await client.upsert("user_roles", toDbUserRole(userRole), "user_id");
+      await client.rpc("set_user_access_role", {
+        p_user_id: userRole.userId,
+        p_role: userRole.role
+      });
     },
     async unlinkProfileAccount(profile) {
-      if (profile.userId) await client.delete("user_roles", `user_id=eq.${profile.userId}`);
-      await client.update("employee_profiles", `id=eq.${profile.id}`, { user_id: null });
+      await client.rpc("unlink_profile_account", { p_profile_id: profile.id });
     },
     async deleteProfile(profile) {
       try {

@@ -103,9 +103,11 @@ Parent-department lead assignments use the full descendant department scope. A d
 
 ## Authorization Model
 
-- Admins can manage system settings, departments, profiles, and schedules.
-- Department leads can manage permitted current/future data for their departments.
-- Employees primarily view their own information and create allowed requests.
+- The existing Admin account is the sole Admin and can read or manage every operational record.
+- Department Leads can read and manage current/future rotations, schedules, hierarchy, memberships, and annual-request decisions only for directly assigned departments.
+- Leads can assign currently unassigned profiles to their departments and remove department members, but cannot browse or move profiles assigned only to other departments.
+- Employees can read their directly assigned department schedules, rotations, profiles, and hierarchy, create their own annual requests, and update only their own name and profile photo.
+- Profile hierarchy (`manager`, `lead`, `artist`) is separate from application access (`admin`, `lead`, `employee`).
 - Frontend permission helpers control affordances and visibility.
 - Supabase RLS and RPC functions must enforce the actual security boundary.
 

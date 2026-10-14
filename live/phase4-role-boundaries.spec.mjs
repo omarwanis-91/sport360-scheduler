@@ -37,7 +37,7 @@ async function expectClaimedRole(page, role) {
 async function selectEachDepartment(page, assertion) {
   const select = page.locator("#department-select");
   const values = await select.locator("option").evaluateAll((options) => options.map((option) => option.value));
-  expect(values.length).toBeGreaterThan(1);
+  expect(values.length).toBeGreaterThan(0);
   for (const value of values) {
     await select.selectOption(value);
     await assertion(value);
@@ -90,6 +90,16 @@ test("Admin can open every production workspace", async ({ page }) => {
   await expect(page.getByRole("button", { name: "New Department", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("button", { name: "New Status", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await expect(page.getByLabel("Application access role", { exact: true })).toHaveValue("Admin · sole account");
+  await page.locator("#close-drawer").click();
+  const adminName = await page.locator(".user-tile strong").textContent();
+  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.locator(".person-card").filter({ hasText: adminName || "" }).first().click();
+  await expect(page.getByRole("button", { name: "Unlink Account", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Delete Profile", exact: true })).toHaveCount(0);
 });
 
 test("Department Lead is limited to assigned department workflows", async ({ page }) => {
@@ -100,24 +110,25 @@ test("Department Lead is limited to assigned department workflows", async ({ pag
   await expect(page.getByRole("button", { name: "New Profile", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Departments", exact: true }).click();
   await expect(page.getByRole("button", { name: "New Department", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("button", { name: "New Status", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Member$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
-  let editableDepartments = 0;
-  let readOnlyDepartments = 0;
+  let visibleDepartments = 0;
   await selectEachDepartment(page, async () => {
-    const editSchedule = page.getByRole("button", { name: "Edit Schedule", exact: true });
-    if (await editSchedule.count()) editableDepartments += 1;
-    else readOnlyDepartments += 1;
+    visibleDepartments += 1;
+    await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toBeVisible();
   });
-  expect(editableDepartments, "Lead needs at least one assigned department").toBeGreaterThan(0);
-  expect(readOnlyDepartments, "Lead needs at least one cross-department boundary").toBeGreaterThan(0);
+  expect(visibleDepartments, "Lead needs at least one directly assigned department").toBeGreaterThan(0);
 
   await page.getByRole("button", { name: "Requests", exact: true }).click();
   await expect(page.getByRole("button", { name: "New Request", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await expect(page.getByRole("button", { name: "Edit My Profile", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toBeEnabled();
+  await expect(page.getByLabel("Title", { exact: true })).toBeDisabled();
 });
 
 test("Employee has self-service access without management controls", async ({ page }) => {
@@ -126,6 +137,11 @@ test("Employee has self-service access without management controls", async ({ pa
 
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await expect(page.getByRole("button", { name: "Edit My Profile", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toBeEnabled();
+  await expect(page.getByLabel("Title", { exact: true })).toBeDisabled();
+  await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toBeDisabled();
+  await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Requests", exact: true }).click();
   await expect(page.getByRole("button", { name: "New Request", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "People", exact: true }).click();
@@ -140,8 +156,8 @@ test("Employee has self-service access without management controls", async ({ pa
   await selectEachDepartment(page, async () => {
     await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toHaveCount(0);
   });
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("button", { name: "New Status", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 });
 
 test("Unmatched account cannot load operational data", async ({ page }) => {

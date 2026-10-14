@@ -4,7 +4,7 @@ This document is the durable phased plan for Sport360 Scheduler. It records what
 
 ## Current Position
 
-Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 026 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 026 passed audit 014 with email auto-claim disabled and Admin approval required. The Admin-approved self-service account page is active in production, and its public isolation checks pass in Chrome, Edge, and Firefox. A credential-injected, read-only three-browser role verifier is ready; the full backup/restore gate, first real submission/approval round trip, and production execution for non-Admin roles remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
+Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 026 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 026 passed audit 014 with email auto-claim disabled and Admin approval required. The Admin-approved self-service account page is active in production, and its public isolation checks pass in Chrome, Edge, and Firefox. Migration 027 and audit 015 are prepared to enforce the final sole-Admin, direct-department Lead, and direct-department Employee boundaries. A credential-injected, read-only three-browser role verifier is ready; applying and verifying those boundaries, the full backup/restore gate, and the first real submission/approval round trip remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
 
 ## Phase 0 - Product Foundation
 
@@ -104,6 +104,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Expose parent-department daily-lead cleanup in the Scheduler and complete the production UI round trip without direct SQL.
 - ✅ Build the Admin-approved self-service onboarding replacement: name/photo-only submissions, no email auto-claim, and explicit Admin link-or-create review.
 - ✅ Apply migration 026, pass audit 014, restore the production prelaunch flags, and verify the public replacement page in Chrome, Edge, and Firefox.
+- ⏳ Apply migration 027, run audit 015, and verify the sole-Admin and direct-department Lead/Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
 - ⏳ Repair or bypass the local Docker/WSL blocker so the Supabase Free-plan SQL export can be completed and restored in a test project.
