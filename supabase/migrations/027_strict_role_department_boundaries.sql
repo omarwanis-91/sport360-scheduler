@@ -416,6 +416,27 @@ begin
 end;
 $$;
 
+create function public.update_own_profile(
+  p_profile_id uuid,
+  p_full_name text,
+  p_photo_url text,
+  p_title text
+)
+returns public.employee_profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  updated_profile public.employee_profiles;
+begin
+  select * into updated_profile
+  from public.update_own_profile(p_profile_id, p_full_name, p_photo_url);
+
+  return updated_profile;
+end;
+$$;
+
 create or replace function public.update_profile_hierarchy(
   p_profile_id uuid,
   p_seniority_level text
@@ -755,6 +776,7 @@ end;
 $$;
 
 revoke all on function public.update_own_profile(uuid, text, text) from public, anon;
+revoke all on function public.update_own_profile(uuid, text, text, text) from public, anon;
 revoke all on function public.update_profile_hierarchy(uuid, text) from public, anon;
 revoke all on function public.add_profile_to_department(uuid, uuid) from public, anon;
 revoke all on function public.remove_profile_from_department(uuid, uuid) from public, anon;
@@ -763,6 +785,7 @@ revoke all on function public.unlink_profile_account(uuid) from public, anon;
 revoke all on function public.delete_admin_profile(uuid) from public, anon;
 
 grant execute on function public.update_own_profile(uuid, text, text) to authenticated;
+grant execute on function public.update_own_profile(uuid, text, text, text) to authenticated;
 grant execute on function public.update_profile_hierarchy(uuid, text) to authenticated;
 grant execute on function public.add_profile_to_department(uuid, uuid) to authenticated;
 grant execute on function public.remove_profile_from_department(uuid, uuid) to authenticated;

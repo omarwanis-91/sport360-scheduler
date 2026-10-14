@@ -75,6 +75,18 @@ group by expected.function_name
 order by expected.function_name;
 
 select
+  'legacy own-profile call keeps title locked' as check_name,
+  exists (
+    select 1
+    from pg_proc procedure
+    where procedure.pronamespace = 'public'::regnamespace
+      and procedure.proname = 'update_own_profile'
+      and procedure.pronargs = 4
+      and pg_get_functiondef(procedure.oid) ilike '%from public.update_own_profile(p_profile_id, p_full_name, p_photo_url)%'
+  ) as passed,
+  'Four-argument clients delegate to the name/photo-only function' as detail;
+
+select
   'Admin count' as check_name,
   count(*) = 1 as passed,
   count(*)::text || ' Admin role row' as detail
