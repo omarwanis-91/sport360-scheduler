@@ -4,6 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
+- [ ] Apply `027_strict_role_department_boundaries.sql`, run audit 015, deploy the matching role-scoped UI, and verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [x] Apply `026_self_service_profile_onboarding.sql`, pass audit 014, deploy the reviewed onboarding UI, enable prelaunch signup, and verify the public isolation page in Chrome, Edge, and Firefox.
 - [~] Keep the Phase 4 production gate open: full SQL export/restore is blocked by local Docker/WSL, with dashboard CSV export as the temporary preview-only backup path.

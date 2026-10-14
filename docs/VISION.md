@@ -23,15 +23,15 @@ Build a dark, compact, Supabase-backed workforce scheduler that supports:
 
 ### Admin
 
-Manages departments, people, roles, rotations, schedules, requests, statuses, and system-level settings.
+The sole unrestricted account. Manages departments, people, access roles, rotations, schedules, requests, statuses, and system-level settings.
 
 ### Department Lead
 
-Manages current and future schedules, rotations, and requests for assigned departments.
+Reads and manages current and future schedules, rotations, hierarchy, memberships, and requests only for directly assigned departments.
 
 ### Employee
 
-Views a personal schedule and profile, requests annual leave, and understands upcoming work or approved exceptions.
+Reads personal and directly assigned department schedules, rotations, profiles, and hierarchy. Creates personal annual requests and edits only their own name and profile photo.
 
 ## Product Principles
 

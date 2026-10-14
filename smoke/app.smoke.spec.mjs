@@ -175,6 +175,62 @@ test("demo workspace loads and primary navigation works", async ({ page }) => {
   }
 });
 
+test("Lead sees and manages only the directly assigned department", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#user-switcher").selectOption("user-lead");
+
+  await expect(page.locator("#department-select option")).toHaveCount(1);
+  await expect(page.locator("#department-select")).toHaveValue("ops");
+  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "People", exact: true }).click();
+  await expect(page.locator(".person-card")).toHaveCount(3);
+  await expect(page.locator(".person-card").filter({ hasText: "Omar Wanis" })).toBeVisible();
+  await expect(page.locator(".person-card").filter({ hasText: "Mona Saleh" })).toBeVisible();
+  await expect(page.locator(".person-card").filter({ hasText: "Karim Adel" })).toBeVisible();
+  await expect(page.getByText("Youssef Nabil", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Layla Hassan", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New Profile", exact: true })).toHaveCount(0);
+
+  await page.locator(".person-card").filter({ hasText: "Karim Adel" }).click();
+  await page.getByRole("button", { name: "Edit Hierarchy", exact: true }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Title", { exact: true })).toBeDisabled();
+  await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toBeEnabled();
+  await page.locator("#close-drawer").click();
+
+  await page.getByRole("button", { name: "Departments", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Member$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New Department", exact: true })).toHaveCount(0);
+});
+
+test("Employee has department read access and own identity editing only", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#user-switcher").selectOption("user-employee");
+
+  await expect(page.locator("#department-select option")).toHaveCount(1);
+  await expect(page.locator("#department-select")).toHaveValue("support");
+  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "People", exact: true }).click();
+  await expect(page.locator(".person-card")).toHaveCount(1);
+  await expect(page.locator(".person-card").filter({ hasText: "Youssef Nabil" })).toBeVisible();
+  await expect(page.getByText("Omar Wanis", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Mona Saleh", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toBeEnabled();
+  await expect(page.locator("#photo-input")).toBeEnabled();
+  await expect(page.getByLabel("Title", { exact: true })).toBeDisabled();
+  await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Save Profile", exact: true })).toBeEnabled();
+});
+
 test("compact controls expose names, selected state, and reduced-motion behavior", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");

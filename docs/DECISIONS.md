@@ -321,3 +321,10 @@ An Admin reviews each submission and either links it to an existing unclaimed em
 Google OAuth may create or authenticate a Supabase Auth identity without sending a confirmation email. It does not grant operational access, claim an employee profile, or bypass prelaunch mode.
 
 New Google-authenticated users follow the same isolated name/photo submission and explicit Admin link-or-create workflow as email/password users. The Google button remains runtime-gated until the OAuth client, Supabase provider, and allowed redirect URLs are configured.
+
+## D-044 - Direct Department Role Boundaries
+
+**Date:** 2026-10-14
+**Status:** Accepted
+
+Sport360 has one protected Admin account with unrestricted access. Leads can read and manage rotations, schedules, hierarchy, memberships, and annual-request decisions only for departments to which their employee profile is directly assigned. Leads may add unassigned profiles to those departments but cannot browse or move people from other departments. Employees can read their own directly assigned department data, create their own requests, and update only their own name and profile photo. Supabase RLS and authorized RPCs enforce these boundaries independently of the frontend.
