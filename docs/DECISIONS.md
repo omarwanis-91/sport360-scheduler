@@ -346,3 +346,12 @@ All application writes, including local rotation-preset changes, are blocked whi
 Sport360's interface uses red, black, and white as its visual foundation. Perceived depth comes from nuanced red hues, transparency, layered black surfaces, soft white edge highlights, and selective glow rather than adding a new decorative accent palette. Schedule-state colors remain available only where they communicate operational meaning.
 
 Interaction motion uses shared fast, base, and slow timings. Buttons and cards provide immediate hover and press feedback; views enter with a short stagger; drawers and creation modals animate both in and out. These effects use transform and opacity, never block interaction, and are removed when the user prefers reduced motion.
+
+## D-047 - Schedule Status Color Lives In Icons
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+Scheduler cells, profile calendar days, and compact shift rows use neutral black and charcoal surfaces. Morning, Mid-day, Night, Weekend, Annual, Sick, and On Ground retain distinct muted colors only on their icons and small semantic markers.
+
+This preserves fast status recognition without turning the operational workspace into a grid of competing colored panels. Hover and selection depth come from neutral elevation, white edge highlights, and restrained Sport360 red rather than enlarging the status palette.

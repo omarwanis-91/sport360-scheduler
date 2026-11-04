@@ -310,6 +310,44 @@ test("compact controls expose names, selected state, and reduced-motion behavior
   await expect(page.locator("#close-drawer")).toHaveAccessibleName(/^Close /);
 });
 
+test("primary views reveal their panels and cards with a staggered entrance", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "People", exact: true }).click();
+
+  const stage = page.locator('.view-stage[data-active-view="people"]');
+  await expect(stage).toHaveClass(/is-entering/);
+  await expect(page.locator(".person-card").first()).toBeVisible();
+  const animationName = await page.locator(".person-card").first().evaluate((element) => getComputedStyle(element).animationName);
+  expect(animationName).toContain("sport360CascadeIn");
+
+  await page.locator("#people-department-select").selectOption("all");
+  await expect(stage).not.toHaveClass(/is-entering/);
+});
+
+test("schedule cells stay neutral while status icons carry the shift color", async ({ page }) => {
+  await page.goto("/");
+
+  const morningCell = page.locator(".shift-cell.morning").first();
+  const nightCell = page.locator(".shift-cell.night").first();
+  await expect(morningCell).toBeVisible();
+  await expect(nightCell).toBeVisible();
+
+  const morningSurface = await morningCell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const iconStyle = getComputedStyle(element.querySelector(".shift-icon"));
+    return { backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage, iconColor: iconStyle.color };
+  });
+  const nightSurface = await nightCell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const iconStyle = getComputedStyle(element.querySelector(".shift-icon"));
+    return { backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage, iconColor: iconStyle.color };
+  });
+
+  expect(morningSurface.backgroundColor).toBe(nightSurface.backgroundColor);
+  expect(morningSurface.backgroundImage).toBe(nightSurface.backgroundImage);
+  expect(morningSurface.iconColor).not.toBe(nightSurface.iconColor);
+});
+
 test("missing-lead alerts stay in date headers while coverage keeps coverage details", async ({ page }) => {
   await page.goto("/");
 

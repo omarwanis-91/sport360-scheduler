@@ -1249,6 +1249,8 @@ function navButton(id, label, icon) {
 }
 
 function renderActiveView() {
+  const previousView = document.querySelector(".view-stage")?.dataset.activeView;
+  const enteringClass = previousView !== ui.activeView ? " is-entering" : "";
   let content;
   if (ui.activeView === "me") content = renderMyProfile();
   else if (ui.activeView === "profile-page") content = renderProfilePage();
@@ -1260,7 +1262,7 @@ function renderActiveView() {
   else if (ui.activeView === "activity") content = renderActivity();
   else if (ui.activeView === "settings") content = renderSettings();
   else content = renderScheduler();
-  return `<div class="view-stage" data-active-view="${ui.activeView}">${content}</div>`;
+  return `<div class="view-stage${enteringClass}" data-active-view="${ui.activeView}">${content}</div>`;
 }
 
 function renderMyProfile() {

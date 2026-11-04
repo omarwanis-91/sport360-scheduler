@@ -120,11 +120,11 @@ Parent-department lead assignments use the full descendant department scope. A d
 - Compact typography and restrained spacing.
 - Red reserved for brand actions, selection, warnings, and destructive states.
 - The app uses layered translucent black surfaces, toned crimson gradients, white edge highlights, and selective red glows while preserving the core red/black/white identity.
-- Shared motion tokens drive hover elevation, press feedback, staggered view entrances, and drawer/modal transitions. Motion uses transforms and opacity, remains interruptible, and is disabled through `prefers-reduced-motion`.
+- Shared motion tokens drive hover elevation, press feedback, navigation-triggered staggered view entrances, and drawer/modal transitions. Motion uses transforms and opacity, remains interruptible, does not replay for ordinary in-view updates, and is disabled through `prefers-reduced-motion`.
 - The app should feel like a polished operational tech workspace: subtle animated background lines, restrained glows, layered gradients, and satisfying hover feedback are preferred when they do not reduce scan speed or legibility.
-- Shift-specific colors communicate schedule state.
+- Shift-specific colors are confined to icons and compact markers so schedule and calendar surfaces remain neutral and consistent with the red/black/white workspace.
 - Unavailable states remain quieter than working states.
-- Scheduler cells use the vertical bar as the primary working/non-working signal; individual status type is secondary through icon, label, and subtle texture.
+- Scheduler cells use a neutral vertical bar as the primary working/non-working signal; individual status type is secondary through its colored icon and text label rather than a tinted cell surface.
 - Scheduler filtering can narrow the current range by availability, rotational shift, daily exception, or manual change while keeping the date timeline visible.
 - Cards are used for repeated entities and focused tools, not every page section.
 - Icons and concise status tags carry repeated information.
