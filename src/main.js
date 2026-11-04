@@ -1249,16 +1249,18 @@ function navButton(id, label, icon) {
 }
 
 function renderActiveView() {
-  if (ui.activeView === "me") return renderMyProfile();
-  if (ui.activeView === "profile-page") return renderProfilePage();
-  if (ui.activeView === "requests") return renderRequests();
-  if (ui.activeView === "people") return renderPeople();
-  if (ui.activeView === "hierarchy") return renderHierarchy();
-  if (ui.activeView === "departments") return renderDepartments();
-  if (ui.activeView === "rotations") return renderRotations();
-  if (ui.activeView === "activity") return renderActivity();
-  if (ui.activeView === "settings") return renderSettings();
-  return renderScheduler();
+  let content;
+  if (ui.activeView === "me") content = renderMyProfile();
+  else if (ui.activeView === "profile-page") content = renderProfilePage();
+  else if (ui.activeView === "requests") content = renderRequests();
+  else if (ui.activeView === "people") content = renderPeople();
+  else if (ui.activeView === "hierarchy") content = renderHierarchy();
+  else if (ui.activeView === "departments") content = renderDepartments();
+  else if (ui.activeView === "rotations") content = renderRotations();
+  else if (ui.activeView === "activity") content = renderActivity();
+  else if (ui.activeView === "settings") content = renderSettings();
+  else content = renderScheduler();
+  return `<div class="view-stage" data-active-view="${ui.activeView}">${content}</div>`;
 }
 
 function renderMyProfile() {
@@ -3558,6 +3560,25 @@ function statusDrawer() {
   `;
 }
 
+function closeDrawerWithMotion() {
+  const drawer = document.querySelector(".drawer");
+  const closingDrawer = ui.drawer;
+  const finish = () => {
+    if (ui.drawer !== closingDrawer) return;
+    ui.pendingPhotoFile = null;
+    ui.pendingPhotoDataUrl = "";
+    ui.drawer = null;
+    render();
+  };
+  if (!drawer || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    finish();
+    return;
+  }
+  drawer.classList.add("closing");
+  drawer.addEventListener("animationend", finish, { once: true });
+  window.setTimeout(finish, 190);
+}
+
 function bindEvents() {
   document.querySelectorAll("[data-exit-role-preview]").forEach((button) => {
     button.addEventListener("click", exitRolePreview);
@@ -3603,12 +3624,7 @@ function bindEvents() {
     });
   });
 
-  document.querySelector("#close-drawer")?.addEventListener("click", () => {
-    ui.pendingPhotoFile = null;
-    ui.pendingPhotoDataUrl = "";
-    ui.drawer = null;
-    render();
-  });
+  document.querySelector("#close-drawer")?.addEventListener("click", closeDrawerWithMotion);
 
   document.querySelector("#department-select")?.addEventListener("change", (event) => {
     ui.selectedDepartmentId = event.target.value;
