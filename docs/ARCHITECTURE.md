@@ -119,6 +119,8 @@ Parent-department lead assignments use the full descendant department scope. A d
 - Dark charcoal and black surfaces.
 - Compact typography and restrained spacing.
 - Red reserved for brand actions, selection, warnings, and destructive states.
+- The app uses layered translucent black surfaces, toned crimson gradients, white edge highlights, and selective red glows while preserving the core red/black/white identity.
+- Shared motion tokens drive hover elevation, press feedback, staggered view entrances, and drawer/modal transitions. Motion uses transforms and opacity, remains interruptible, and is disabled through `prefers-reduced-motion`.
 - The app should feel like a polished operational tech workspace: subtle animated background lines, restrained glows, layered gradients, and satisfying hover feedback are preferred when they do not reduce scan speed or legibility.
 - Shift-specific colors communicate schedule state.
 - Unavailable states remain quieter than working states.

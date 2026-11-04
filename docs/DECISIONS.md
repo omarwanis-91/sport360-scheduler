@@ -337,3 +337,12 @@ Sport360 has one protected Admin account with unrestricted access. Leads can rea
 The sole Admin may preview the Lead or Employee interface for one department using an existing employee profile as the representative identity. Preview mode changes only frontend visibility and permission affordances; the authenticated Supabase session remains Admin and is clearly identified as such.
 
 All application writes, including local rotation-preset changes, are blocked while preview mode is active. The preview is not persisted across reloads and is not a substitute for production RLS verification with real role accounts.
+
+## D-046 - Cinematic Polish Preserves The Operational Palette
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+Sport360's interface uses red, black, and white as its visual foundation. Perceived depth comes from nuanced red hues, transparency, layered black surfaces, soft white edge highlights, and selective glow rather than adding a new decorative accent palette. Schedule-state colors remain available only where they communicate operational meaning.
+
+Interaction motion uses shared fast, base, and slow timings. Buttons and cards provide immediate hover and press feedback; views enter with a short stagger; drawers and creation modals animate both in and out. These effects use transform and opacity, never block interaction, and are removed when the user prefers reduced motion.

@@ -38,6 +38,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added the cinematic Sport360 polish layer: nuanced red/black glass surfaces, highlight glows, elevated primary actions, hover/press feedback, staggered view entrances, animated drawers, and reduced-motion support.
 - [x] Applied migration 027, passed every audit 015 check, and added a read-only Admin Role Preview that uses existing profiles without changing the Supabase session.
 - [x] Replaced the inline pending-onboarding badge and edit form with a dedicated Admin setup status view that keeps profile corrections available on demand.
 - [x] Added a runtime-gated Google sign-up/sign-in option that preserves prelaunch isolation and Admin-approved profile onboarding.
