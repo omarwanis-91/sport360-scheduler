@@ -346,3 +346,37 @@ All application writes, including local rotation-preset changes, are blocked whi
 Sport360's interface uses red, black, and white as its visual foundation. Perceived depth comes from nuanced red hues, transparency, layered black surfaces, soft white edge highlights, and selective glow rather than adding a new decorative accent palette. Schedule-state colors remain available only where they communicate operational meaning.
 
 Interaction motion uses shared fast, base, and slow timings. Buttons and cards provide immediate hover and press feedback; views enter with a short stagger; drawers and creation modals animate both in and out. These effects use transform and opacity, never block interaction, and are removed when the user prefers reduced motion.
+
+## D-047 - Schedule Status Color Lives In Icons
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+Scheduler cells, profile calendar days, and compact shift rows use neutral black and charcoal surfaces. Morning, Mid-day, Night, Weekend, Annual, Sick, and On Ground retain distinct muted colors only on their icons and small semantic markers.
+
+This preserves fast status recognition without turning the operational workspace into a grid of competing colored panels. Hover and selection depth come from neutral elevation, white edge highlights, and restrained Sport360 red rather than enlarging the status palette.
+
+## D-048 - Calendar Surfaces Use Separated Neutral Cards
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+The Scheduler timeline and profile month calendar use compact gaps and individually rounded charcoal cards instead of a continuous tinted spreadsheet surface. Subtle white inner edges and layered black elevation separate dates while keeping the board dense and operational.
+
+Morning, Mid-day, Night, Weekend, Annual, Sick, and On Ground never tint the card surface. Their icons remain distinct; Sport360 red is reserved for today, selection, editing, and warning emphasis.
+
+## D-049 - Daily Overrides Open Directly From Scheduler Cells
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+For authorized Admins and department Leads, clicking a Scheduler shift cell opens the one-time daily-change editor directly. Scheduler edit mode remains a separate staged workflow for assigning day leads and does not gate ordinary daily overrides.
+
+Employees and read-only role previews continue to receive the day-detail view without write controls.
+
+## D-050 - People Structure Uses One Team Navigation Group
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+People, Hierarchy, and Departments remain distinct operational views but are bundled into one compact Team group in the primary navigation. This keeps each established workflow intact while reducing top-level navigation noise and making the relationship between people, structure, and departments explicit.

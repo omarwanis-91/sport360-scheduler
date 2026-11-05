@@ -310,6 +310,69 @@ test("compact controls expose names, selected state, and reduced-motion behavior
   await expect(page.locator("#close-drawer")).toHaveAccessibleName(/^Close /);
 });
 
+test("primary views reveal their panels and cards with a staggered entrance", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "People", exact: true }).click();
+
+  const stage = page.locator('.view-stage[data-active-view="people"]');
+  await expect(stage).toHaveClass(/is-entering/);
+  await expect(page.locator(".person-card").first()).toBeVisible();
+  const animationName = await page.locator(".person-card").first().evaluate((element) => getComputedStyle(element).animationName);
+  expect(animationName).toContain("sport360CascadeIn");
+
+  await page.locator("#people-department-select").selectOption("all");
+  await expect(stage).not.toHaveClass(/is-entering/);
+});
+
+test("schedule cells stay neutral while status icons carry the shift color", async ({ page }) => {
+  await page.goto("/");
+
+  const morningCell = page.locator(".shift-cell.morning").first();
+  const nightCell = page.locator(".shift-cell.night").first();
+  await expect(morningCell).toBeVisible();
+  await expect(nightCell).toBeVisible();
+
+  const morningSurface = await morningCell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const iconStyle = getComputedStyle(element.querySelector(".shift-icon"));
+    return { backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage, iconColor: iconStyle.color };
+  });
+  const nightSurface = await nightCell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const iconStyle = getComputedStyle(element.querySelector(".shift-icon"));
+    return { backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage, iconColor: iconStyle.color };
+  });
+
+  expect(morningSurface.backgroundColor).toBe(nightSurface.backgroundColor);
+  expect(morningSurface.backgroundImage).toBe(nightSurface.backgroundImage);
+  expect(morningSurface.iconColor).not.toBe(nightSurface.iconColor);
+
+  const scheduleSurfaces = await page.locator(".schedule-grid .shift-cell").evaluateAll((elements) => [
+    ...new Set(elements.map((element) => {
+      const style = getComputedStyle(element);
+      return `${style.backgroundColor}|${style.backgroundImage}`;
+    }))
+  ]);
+  expect(scheduleSurfaces).toHaveLength(1);
+
+  const cardGeometry = await morningCell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const gridStyle = getComputedStyle(element.closest(".schedule-grid"));
+    return { borderRadius: parseFloat(style.borderRadius), columnGap: parseFloat(gridStyle.columnGap) };
+  });
+  expect(cardGeometry.borderRadius).toBeGreaterThan(0);
+  expect(cardGeometry.columnGap).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  const calendarSurfaces = await page.locator(".month-day:not(.empty):not(.today):not(.selected)").evaluateAll((elements) => [
+    ...new Set(elements.map((element) => {
+      const style = getComputedStyle(element);
+      return `${style.backgroundColor}|${style.backgroundImage}`;
+    }))
+  ]);
+  expect(calendarSurfaces).toHaveLength(1);
+});
+
 test("missing-lead alerts stay in date headers while coverage keeps coverage details", async ({ page }) => {
   await page.goto("/");
 
@@ -379,6 +442,46 @@ test("personal profile shift details stay read-only and route edits to Scheduler
 
   await page.getByRole("button", { name: "Open in Scheduler", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Operations", exact: true })).toBeVisible();
+});
+
+test("authorized scheduler clicks open one-time shift editing without lead edit mode", async ({ page }) => {
+  await page.goto("/");
+
+  const shift = page.locator('.schedule-grid .shift-cell[data-profile-id="emp-001"]').first();
+  await expect(shift).toHaveAttribute("data-open-drawer", "shift");
+  await shift.click();
+
+  await expect(page.getByRole("heading", { name: "Shift Override", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save Daily Change", exact: true })).toBeEnabled();
+  await expect(page.getByText("Saving creates a manual daily change.", { exact: false })).toBeVisible();
+});
+
+test("annual request review includes the affected team rotation mini view", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Requests", exact: true }).click();
+  await page.locator(".request-row").first().click();
+
+  await expect(page.getByText("Team Rotation Impact", { exact: true })).toBeVisible();
+  await expect(page.locator(".leave-team-impact")).toContainText("Operations team");
+  await expect(page.locator(".leave-impact-person.requested")).toContainText("Karim Adel");
+  await expect(page.locator(".leave-impact-shift.projected").first()).toBeVisible();
+});
+
+test("rotation pattern choices update in place without refreshing the workspace", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Rotations", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Rotation", exact: true }).click();
+  await page.locator('.rotation-cell[data-open-drawer="rotation-detail"]').first().click();
+
+  await page.getByPlaceholder("Preset name", { exact: true }).fill("Unsaved draft");
+  await page.evaluate(() => { window.__sport360WorkspaceBeforePatternEdit = document.querySelector(".workspace"); });
+  const option = page.locator(".pattern-slot").first().locator(".pattern-chip:not(.active)").first();
+  const selectedStatus = await option.getAttribute("data-pattern-status");
+  await option.click();
+
+  await expect(page.getByPlaceholder("Preset name", { exact: true })).toHaveValue("Unsaved draft");
+  expect(await page.evaluate(() => window.__sport360WorkspaceBeforePatternEdit === document.querySelector(".workspace"))).toBe(true);
+  await expect(page.locator(".pattern-slot").first().locator(`[data-pattern-status="${selectedStatus}"]`)).toHaveAttribute("aria-pressed", "true");
 });
 
 test("admins can assign hierarchy roles and weekly or daily department leads", async ({ page }) => {

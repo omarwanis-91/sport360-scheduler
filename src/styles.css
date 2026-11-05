@@ -6471,6 +6471,1280 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(9, 9, 9, 0.9);
 }
 
+/* Cinematic pass 2: deeper workspace hierarchy, neutral schedule surfaces, visible view choreography. */
+@keyframes sport360ViewReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.988);
+    filter: blur(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes sport360CascadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.965);
+    filter: blur(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.view-stage,
+.view-stage > * {
+  animation: none;
+}
+
+.view-stage.is-entering {
+  animation: sport360ViewReveal 480ms var(--ease-out) backwards;
+}
+
+.view-stage.is-entering > * {
+  animation: sport360CascadeIn 460ms var(--ease-out) backwards;
+}
+
+.view-stage.is-entering > :nth-child(1) {
+  animation-delay: 35ms;
+}
+
+.view-stage.is-entering > :nth-child(2) {
+  animation-delay: 95ms;
+}
+
+.view-stage.is-entering > :nth-child(3) {
+  animation-delay: 145ms;
+}
+
+.view-stage.is-entering > :nth-child(n + 4) {
+  animation-delay: 185ms;
+}
+
+.view-stage.is-entering :is(
+  .people-grid,
+  .metric-grid,
+  .status-grid,
+  .people-tile-grid,
+  .people-kanban,
+  .people-kanban-list,
+  .hierarchy-levels,
+  .department-focus-members,
+  .department-focus-children,
+  .activity-summary,
+  .profile-info-grid,
+  .profile-stat-grid,
+  .rotation-overview-stats
+) > * {
+  animation: sport360CascadeIn 430ms var(--ease-out) backwards;
+}
+
+.view-stage.is-entering :is(
+  .people-grid,
+  .metric-grid,
+  .status-grid,
+  .people-tile-grid,
+  .people-kanban,
+  .people-kanban-list,
+  .hierarchy-levels,
+  .department-focus-members,
+  .department-focus-children,
+  .activity-summary,
+  .profile-info-grid,
+  .profile-stat-grid,
+  .rotation-overview-stats
+) > :nth-child(1) {
+  animation-delay: 155ms;
+}
+
+.view-stage.is-entering :is(
+  .people-grid,
+  .metric-grid,
+  .status-grid,
+  .people-tile-grid,
+  .people-kanban,
+  .people-kanban-list,
+  .hierarchy-levels,
+  .department-focus-members,
+  .department-focus-children,
+  .activity-summary,
+  .profile-info-grid,
+  .profile-stat-grid,
+  .rotation-overview-stats
+) > :nth-child(2) {
+  animation-delay: 195ms;
+}
+
+.view-stage.is-entering :is(
+  .people-grid,
+  .metric-grid,
+  .status-grid,
+  .people-tile-grid,
+  .people-kanban,
+  .people-kanban-list,
+  .hierarchy-levels,
+  .department-focus-members,
+  .department-focus-children,
+  .activity-summary,
+  .profile-info-grid,
+  .profile-stat-grid,
+  .rotation-overview-stats
+) > :nth-child(3) {
+  animation-delay: 235ms;
+}
+
+.view-stage.is-entering :is(
+  .people-grid,
+  .metric-grid,
+  .status-grid,
+  .people-tile-grid,
+  .people-kanban,
+  .people-kanban-list,
+  .hierarchy-levels,
+  .department-focus-members,
+  .department-focus-children,
+  .activity-summary,
+  .profile-info-grid,
+  .profile-stat-grid,
+  .rotation-overview-stats
+) > :nth-child(4) {
+  animation-delay: 275ms;
+}
+
+.view-stage.is-entering :is(
+  .people-grid,
+  .metric-grid,
+  .status-grid,
+  .people-tile-grid,
+  .people-kanban,
+  .people-kanban-list,
+  .hierarchy-levels,
+  .department-focus-members,
+  .department-focus-children,
+  .activity-summary,
+  .profile-info-grid,
+  .profile-stat-grid,
+  .rotation-overview-stats
+) > :nth-child(n + 5) {
+  animation-delay: 315ms;
+}
+
+@media (min-width: 981px) {
+  .sidebar {
+    height: calc(100vh - 24px);
+    margin: 12px 0 12px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.105);
+    border-radius: 18px;
+    box-shadow:
+      24px 0 72px rgba(0, 0, 0, 0.4),
+      0 26px 70px rgba(0, 0, 0, 0.34),
+      0 0 52px rgba(151, 28, 55, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.065);
+  }
+
+  .workspace {
+    padding: 18px 22px 24px 28px;
+  }
+}
+
+.topbar {
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 78px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 15px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.105);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(189, 42, 70, 0.13), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.008) 52%, rgba(139, 24, 48, 0.04)),
+    rgba(13, 13, 15, 0.8);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.3),
+    0 0 36px rgba(149, 27, 54, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.065);
+  backdrop-filter: blur(20px) saturate(112%);
+}
+
+.topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0 9% auto;
+  z-index: -1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), rgba(224, 74, 102, 0.34), transparent);
+  box-shadow: 0 0 22px rgba(212, 62, 90, 0.13);
+}
+
+.topbar::after {
+  left: 16px;
+  right: 52%;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(228, 79, 106, 0.58), rgba(255, 255, 255, 0.1), transparent);
+}
+
+.topbar h1 {
+  font-size: clamp(23px, 2vw, 28px);
+  letter-spacing: -0.025em;
+}
+
+.topbar p {
+  max-width: 70ch;
+  margin-top: 5px;
+  color: #a9a9b2;
+  font-size: 12px;
+}
+
+.top-actions,
+.control-row {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.006)),
+    rgba(8, 8, 10, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+}
+
+.top-actions {
+  padding: 5px;
+}
+
+.control-row {
+  margin-bottom: 12px;
+  padding: 6px;
+}
+
+.scheduler-shell,
+.list-panel,
+.people-department-group,
+.people-kanban-column,
+.people-list-view,
+.activity-list,
+.hierarchy-board,
+.department-focus-panel,
+.rotation-overview,
+.rotation-edit-toolbar,
+.rotation-bulk-editor,
+.edit-commit-bar,
+.onboarding-queue,
+.profile-hero-card,
+.profile-info-card,
+.person-calendar {
+  border-color: rgba(255, 255, 255, 0.105);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(174, 35, 64, 0.075), transparent 31%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.006) 48%, rgba(133, 23, 47, 0.032)),
+    rgba(12, 12, 14, 0.84);
+  box-shadow:
+    0 26px 72px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(18px) saturate(108%);
+}
+
+.scheduler-shell,
+.people-department-group,
+.people-kanban-column,
+.people-list-view,
+.activity-list,
+.hierarchy-board,
+.department-focus-panel,
+.rotation-overview,
+.rotation-edit-toolbar,
+.rotation-bulk-editor,
+.edit-commit-bar,
+.onboarding-queue,
+.profile-hero-card,
+.person-calendar {
+  border-radius: 16px;
+}
+
+.scheduler-shell {
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 12%),
+    rgba(10, 10, 12, 0.9);
+}
+
+.scheduler-month-bar {
+  min-height: 52px;
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+  background:
+    radial-gradient(circle at 86% 0%, rgba(182, 38, 67, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.006)),
+    rgba(12, 12, 14, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 12px 34px rgba(0, 0, 0, 0.2);
+}
+
+.month-title-control strong {
+  color: #fafafa;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.08);
+}
+
+.date-head,
+.coverage-cell,
+.employee-head,
+.employee-cell {
+  border-color: rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.004)),
+    rgba(13, 13, 15, 0.9);
+}
+
+.date-head.today {
+  background:
+    radial-gradient(circle at 50% 110%, rgba(194, 44, 73, 0.16), transparent 52%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.006)),
+    rgba(15, 15, 17, 0.95);
+}
+
+.person-card,
+.metric-card,
+.status-card,
+.person-kanban-card,
+.person-list-row,
+.person-tile,
+.department-card,
+.hierarchy-person,
+.activity-summary span {
+  border-color: rgba(255, 255, 255, 0.095);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.008) 52%, rgba(146, 27, 53, 0.045)),
+    rgba(15, 15, 17, 0.88);
+  box-shadow:
+    0 16px 42px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.052);
+}
+
+.person-card::before,
+.metric-card::before,
+.status-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 14% auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.24), transparent);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.person-card:hover::before,
+.metric-card:hover::before,
+.status-card:hover::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), rgba(219, 66, 95, 0.24), transparent);
+}
+
+.request-row,
+.activity-item,
+.onboarding-row,
+.department-detail-row {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.024), transparent 62%),
+    rgba(8, 8, 10, 0.24);
+}
+
+.request-row:hover,
+.activity-item.clickable:hover,
+.onboarding-row:hover,
+.department-detail-row:hover {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055), rgba(151, 28, 55, 0.055) 72%, transparent),
+    rgba(16, 16, 18, 0.68);
+}
+
+/* Schedule state colors belong to icons and small markers, never the cell surface. */
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground),
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible {
+  border-color: rgba(255, 255, 255, 0.055);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.004)),
+    #121214;
+  color: #e8e8ec;
+  box-shadow: none;
+}
+
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible {
+  z-index: 3;
+  border-color: rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.008) 58%, rgba(145, 27, 53, 0.035)),
+    #161618;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.shift-cell:is(.morning, .midday, .night, .vacation, .sick, .ground)::before {
+  background: #77777f;
+}
+
+.shift-cell.weekend::before {
+  background: repeating-linear-gradient(to bottom, rgba(126, 126, 135, 0.62) 0 4px, transparent 4px 7px);
+}
+
+.shift-cell:is(.vacation, .sick, .ground)::after {
+  opacity: 0;
+  background: none;
+}
+
+.shift-cell.state-off::after {
+  opacity: 0.22;
+  background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, 0.04) 8px 10px, transparent 10px 18px);
+}
+
+.shift-cell .shift-label {
+  color: #ededf0;
+}
+
+.shift-icon {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  transition:
+    transform var(--motion-base) var(--ease-spring),
+    color var(--motion-base) ease,
+    border-color var(--motion-base) ease,
+    background var(--motion-base) ease,
+    box-shadow var(--motion-base) ease;
+}
+
+.shift-cell:hover .shift-icon,
+.shift-cell:focus-visible .shift-icon {
+  transform: translateY(-1px) scale(1.1);
+}
+
+.shift-cell.morning .shift-icon,
+.month-day.morning em,
+.request-row.morning .shift-icon,
+.pattern-chip.morning svg,
+.status-choice.morning svg {
+  color: #e6cc86;
+}
+
+.shift-cell.morning .shift-icon {
+  border-color: rgba(230, 204, 134, 0.22);
+  background: rgba(230, 204, 134, 0.075);
+  box-shadow: 0 0 18px rgba(230, 204, 134, 0.08);
+}
+
+.shift-cell.midday .shift-icon,
+.month-day.midday em,
+.request-row.midday .shift-icon,
+.pattern-chip.midday svg,
+.status-choice.midday svg {
+  color: #e9a875;
+}
+
+.shift-cell.midday .shift-icon {
+  border-color: rgba(233, 168, 117, 0.22);
+  background: rgba(233, 168, 117, 0.075);
+  box-shadow: 0 0 18px rgba(233, 168, 117, 0.08);
+}
+
+.shift-cell.night .shift-icon,
+.month-day.night em,
+.request-row.night .shift-icon,
+.pattern-chip.night svg,
+.status-choice.night svg {
+  color: #aeb8dc;
+}
+
+.shift-cell.night .shift-icon {
+  border-color: rgba(174, 184, 220, 0.23);
+  background: rgba(174, 184, 220, 0.075);
+  box-shadow: 0 0 18px rgba(174, 184, 220, 0.08);
+}
+
+.shift-cell.weekend .shift-icon,
+.month-day.weekend em,
+.request-row.weekend .shift-icon,
+.pattern-chip.weekend svg,
+.status-choice.weekend svg {
+  color: #85858e;
+}
+
+.shift-cell.vacation .shift-icon,
+.month-day.vacation em,
+.month-day.approved-vacation em,
+.request-row.vacation .shift-icon,
+.status-choice.vacation svg {
+  color: #8fb8c4;
+}
+
+.shift-cell.sick .shift-icon,
+.month-day.sick em,
+.request-row.sick .shift-icon,
+.status-choice.sick svg {
+  color: #d78b98;
+}
+
+.shift-cell.ground .shift-icon,
+.month-day.ground em,
+.request-row.ground .shift-icon,
+.status-choice.ground svg {
+  color: #88aaa3;
+}
+
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away),
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):hover,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):focus-visible {
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.004)),
+    #101012;
+  color: #a7a7af;
+}
+
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):hover,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):focus-visible {
+  border-color: rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(144, 26, 51, 0.025)),
+    #151517;
+}
+
+.month-day em {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: 0 0 16px currentColor;
+}
+
+.my-shifts .request-row:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) {
+  border-color: rgba(255, 255, 255, 0.075);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent 70%),
+    rgba(13, 13, 15, 0.82);
+}
+
+.pattern-chip:is(.morning, .midday, .night, .weekend).active {
+  border-color: rgba(226, 82, 109, 0.42);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.09), transparent 50%),
+    rgba(137, 24, 48, 0.17);
+  color: #f6f6f8;
+  box-shadow: 0 0 20px rgba(185, 39, 67, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.status-choice:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) input:checked + span {
+  border-color: rgba(226, 82, 109, 0.42);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(145, 27, 53, 0.095)),
+    #171719;
+  color: #f2f2f4;
+  box-shadow: 0 0 20px rgba(185, 39, 67, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Calendar card system: reference-inspired spacing with Sport360 surfaces and accents. */
+.scheduler-shell {
+  overflow: auto;
+  padding: 0;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% -12%, rgba(170, 31, 60, 0.1), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 38%),
+    rgba(8, 8, 10, 0.94);
+  scrollbar-color: rgba(128, 128, 138, 0.72) rgba(8, 8, 10, 0.7);
+  scrollbar-width: thin;
+}
+
+.schedule-grid {
+  gap: 6px;
+  padding: 8px;
+  background: transparent;
+}
+
+.month-corner,
+.scheduler-month-bar,
+.employee-head,
+.date-head,
+.coverage-head,
+.coverage-cell,
+.employee-cell,
+.schedule-grid .shift-cell {
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004) 56%),
+    rgba(16, 16, 19, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.month-corner,
+.employee-head,
+.coverage-head,
+.employee-cell {
+  left: 8px;
+}
+
+.month-corner,
+.scheduler-month-bar {
+  min-height: 52px;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(184, 37, 67, 0.11), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.006)),
+    rgba(13, 13, 16, 0.98);
+}
+
+.scheduler-month-bar {
+  padding: 7px 9px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.schedule-grid.is-editing .scheduler-month-bar {
+  border-color: rgba(226, 82, 109, 0.32);
+  background:
+    radial-gradient(circle at 88% 0%, rgba(202, 47, 77, 0.17), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.006)),
+    rgba(15, 13, 16, 0.98);
+}
+
+.date-head,
+.coverage-cell,
+.schedule-grid .shift-cell {
+  isolation: isolate;
+}
+
+.date-head.week-start,
+.coverage-cell.week-start,
+.schedule-grid .shift-cell.week-start {
+  border-left-width: 1px;
+  box-shadow:
+    -3px 0 0 rgba(230, 230, 234, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.date-head.today {
+  border-color: rgba(224, 76, 105, 0.48);
+  background:
+    radial-gradient(circle at 50% 112%, rgba(193, 43, 72, 0.16), transparent 54%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.005)),
+    rgba(18, 16, 19, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(179, 39, 67, 0.1),
+    0 0 26px rgba(181, 38, 67, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.date-head span small {
+  border-color: rgba(225, 82, 108, 0.34);
+  background: rgba(151, 27, 52, 0.2);
+  color: #f6a8b7;
+}
+
+.date-head.lead-missing {
+  border-color: rgba(226, 82, 109, 0.28);
+  background:
+    linear-gradient(145deg, rgba(151, 27, 52, 0.08), rgba(255, 255, 255, 0.004) 54%),
+    rgba(17, 15, 18, 0.98);
+}
+
+.coverage-cell.low {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004) 56%),
+    rgba(16, 16, 19, 0.96);
+}
+
+/* Every schedule status uses this exact surface. Only its icon changes color. */
+.schedule-grid .shift-cell,
+.schedule-grid .shift-cell.state-working,
+.schedule-grid .shift-cell.state-off,
+.schedule-grid .shift-cell.state-away,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) {
+  border-color: rgba(255, 255, 255, 0.085);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004) 56%),
+    rgba(16, 16, 19, 0.96);
+  color: #e8e8ec;
+  opacity: 1;
+  filter: none;
+}
+
+.schedule-grid .shift-cell:hover,
+.schedule-grid .shift-cell:focus-visible,
+.schedule-grid .shift-cell.state-working:hover,
+.schedule-grid .shift-cell.state-off:hover,
+.schedule-grid .shift-cell.state-away:hover,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible {
+  z-index: 3;
+  border-color: rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.008) 58%, rgba(145, 27, 53, 0.035)),
+    rgba(21, 21, 24, 0.98);
+  color: #f5f5f7;
+  opacity: 1;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.28),
+    0 0 22px rgba(255, 255, 255, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.schedule-grid .shift-cell::after,
+.schedule-grid .shift-cell.state-off::after,
+.schedule-grid .shift-cell.state-away::after,
+.schedule-grid .shift-cell:is(.vacation, .sick, .ground)::after {
+  opacity: 0;
+  background: none;
+}
+
+.schedule-grid .shift-cell.state-working::before,
+.schedule-grid .shift-cell:is(.morning, .midday, .night)::before {
+  background: rgba(202, 202, 208, 0.52);
+}
+
+.schedule-grid .shift-cell.state-off::before,
+.schedule-grid .shift-cell.weekend::before {
+  background: repeating-linear-gradient(to bottom, rgba(133, 133, 142, 0.52) 0 4px, transparent 4px 7px);
+}
+
+.schedule-grid .shift-cell.state-away::before,
+.schedule-grid .shift-cell:is(.vacation, .sick, .ground)::before {
+  background: rgba(126, 126, 135, 0.46);
+}
+
+.schedule-grid .shift-cell.state-off .shift-label,
+.schedule-grid .shift-cell.state-off small {
+  color: #8c8c96;
+}
+
+.schedule-grid .shift-cell.state-away .shift-label,
+.schedule-grid .shift-cell.state-away small {
+  color: #b8b8c0;
+}
+
+.schedule-grid .shift-cell.filtered-out {
+  opacity: 0.34;
+  filter: grayscale(0.45);
+}
+
+.schedule-grid .shift-cell.filtered-match {
+  opacity: 1;
+  filter: none;
+}
+
+.person-calendar {
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 90% -8%, rgba(171, 32, 61, 0.11), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.005) 46%),
+    rgba(10, 10, 13, 0.94);
+}
+
+.calendar-head {
+  align-items: center;
+  min-height: 42px;
+  padding: 2px 2px 4px;
+}
+
+.calendar-head strong {
+  margin-top: 3px;
+  color: #f4f4f6;
+  font-size: 15px;
+  letter-spacing: -0.015em;
+}
+
+.calendar-metrics {
+  gap: 8px;
+}
+
+.calendar-metrics span {
+  min-height: 42px;
+  padding: 8px 10px;
+  border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004)),
+    rgba(16, 16, 19, 0.96);
+}
+
+.month-grid {
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 24%),
+    rgba(7, 7, 9, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.month-weekday {
+  min-height: 24px;
+  color: #777780;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+
+.month-day,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away) {
+  min-height: 52px;
+  padding: 7px;
+  border-color: rgba(255, 255, 255, 0.085);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.004) 58%),
+    rgba(16, 16, 19, 0.98);
+  color: #a7a7af;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.person-calendar.page .month-day {
+  min-height: 72px;
+}
+
+.month-day:not(.empty):hover,
+.month-day:not(.empty):focus-visible,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):hover,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):focus-visible {
+  z-index: 2;
+  border-color: rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.008) 58%, rgba(145, 27, 53, 0.035)),
+    rgba(21, 21, 24, 0.98);
+  color: #d7d7dc;
+  filter: none;
+  transform: translateY(-2px);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.month-day.today,
+.month-day.today:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away) {
+  border-color: rgba(225, 82, 108, 0.56);
+  background:
+    radial-gradient(circle at 50% 110%, rgba(193, 43, 72, 0.15), transparent 54%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.005)),
+    rgba(18, 16, 19, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(179, 39, 67, 0.12),
+    0 0 24px rgba(181, 38, 67, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.today-label {
+  color: #f0a0b0;
+}
+
+.month-day.selected,
+.month-day.today.selected {
+  border-color: rgba(241, 105, 131, 0.82);
+  box-shadow:
+    0 0 0 2px rgba(209, 49, 80, 0.24),
+    0 0 28px rgba(184, 39, 68, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.month-day.selected::after,
+.month-day.today.selected::after {
+  border-color: rgba(241, 105, 131, 0.3);
+  border-radius: 7px;
+}
+
+.month-day.empty {
+  min-height: 52px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.month-day em {
+  width: 21px;
+  height: 21px;
+  border-radius: 8px;
+}
+
+.calendar-legend {
+  padding: 0 2px;
+}
+
+/* Focused interaction refinements: compact team navigation and precise controls. */
+.team-nav-group {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.004)),
+    rgba(8, 8, 10, 0.44);
+}
+
+.team-nav-group.active {
+  border-color: rgba(218, 72, 99, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 0 24px rgba(164, 31, 59, 0.055);
+}
+
+.team-nav-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 5px 4px;
+  color: #8f8f98;
+  font-size: 10px;
+  font-weight: 780;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.team-nav-heading svg {
+  width: 13px;
+  height: 13px;
+}
+
+.team-nav-items {
+  display: grid;
+  gap: 2px;
+}
+
+.team-nav-items .nav-item {
+  min-height: 29px;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.team-nav-items .nav-item svg {
+  width: 14px;
+  height: 14px;
+}
+
+.team-nav-items .nav-item::before {
+  inset-block: 5px;
+}
+
+.month-title-control {
+  grid-template-columns: 34px minmax(150px, auto) 34px auto;
+}
+
+.month-title-control .icon-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  place-items: center;
+}
+
+.month-title-control .icon-button svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+  margin: auto;
+}
+
+.month-today-button {
+  min-height: 34px;
+  padding-inline: 12px;
+}
+
+select,
+select:hover,
+select:focus {
+  appearance: none;
+  padding-right: 38px;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m6 8 4 4 4-4' fill='none' stroke='%23b5b5bd' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.008));
+  background-color: #0c0c0e;
+  background-position: right 12px center, 0 0;
+  background-repeat: no-repeat;
+  background-size: 15px 15px, auto;
+}
+
+.scheduler-shell {
+  scrollbar-color: rgba(192, 61, 88, 0.72) rgba(8, 8, 10, 0.78);
+}
+
+.scheduler-shell::-webkit-scrollbar {
+  width: 10px;
+  height: 11px;
+}
+
+.scheduler-shell::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(5, 5, 7, 0.86);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.72);
+}
+
+.scheduler-shell::-webkit-scrollbar-thumb {
+  min-width: 52px;
+  border: 2px solid rgba(5, 5, 7, 0.86);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(126, 31, 51, 0.92), rgba(210, 67, 96, 0.9), rgba(126, 31, 51, 0.92));
+  box-shadow: 0 0 14px rgba(198, 52, 82, 0.2);
+}
+
+.scheduler-shell::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(90deg, rgba(151, 36, 60, 0.96), rgba(232, 86, 113, 0.96), rgba(151, 36, 60, 0.96));
+}
+
+/* Status color is intentionally stronger here because it is confined to the icon. */
+.shift-cell.morning,
+.month-day.morning,
+.request-row.morning,
+.leave-impact-shift.morning,
+.pattern-chip.morning,
+.status-choice.morning {
+  --status-accent: #ffd55f;
+  --status-rgb: 255 213 95;
+}
+
+.shift-cell.midday,
+.month-day.midday,
+.request-row.midday,
+.leave-impact-shift.midday,
+.pattern-chip.midday,
+.status-choice.midday {
+  --status-accent: #ff9f63;
+  --status-rgb: 255 159 99;
+}
+
+.shift-cell.night,
+.month-day.night,
+.request-row.night,
+.leave-impact-shift.night,
+.pattern-chip.night,
+.status-choice.night {
+  --status-accent: #bdc8ff;
+  --status-rgb: 189 200 255;
+}
+
+.shift-cell.weekend,
+.month-day.weekend,
+.month-day.weekend-day,
+.request-row.weekend,
+.leave-impact-shift.weekend,
+.pattern-chip.weekend,
+.status-choice.weekend {
+  --status-accent: #c4c6cf;
+  --status-rgb: 196 198 207;
+}
+
+.shift-cell.vacation,
+.month-day.vacation,
+.month-day.approved-vacation,
+.request-row.vacation,
+.leave-impact-shift.vacation,
+.status-choice.vacation {
+  --status-accent: #78d2ee;
+  --status-rgb: 120 210 238;
+}
+
+.shift-cell.sick,
+.month-day.sick,
+.request-row.sick,
+.leave-impact-shift.sick,
+.status-choice.sick {
+  --status-accent: #ff91a5;
+  --status-rgb: 255 145 165;
+}
+
+.shift-cell.ground,
+.month-day.ground,
+.request-row.ground,
+.leave-impact-shift.ground,
+.status-choice.ground {
+  --status-accent: #79d9c5;
+  --status-rgb: 121 217 197;
+}
+
+.shift-cell .shift-icon,
+.month-day em,
+.request-row .shift-icon,
+.leave-impact-shift .shift-icon {
+  color: var(--status-accent, #d5d5dc);
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.42);
+  background: rgb(var(--status-rgb, 213 213 220) / 0.13) !important;
+  box-shadow:
+    0 0 0 1px rgb(var(--status-rgb, 213 213 220) / 0.06),
+    0 0 18px rgb(var(--status-rgb, 213 213 220) / 0.24);
+}
+
+.pattern-chip svg,
+.status-choice svg {
+  color: var(--status-accent, currentColor);
+  filter: drop-shadow(0 0 5px rgb(var(--status-rgb, 213 213 220) / 0.32));
+}
+
+.lead-marker,
+.department-manager-icon {
+  border-color: rgba(237, 78, 108, 0.48);
+  background: rgba(137, 24, 49, 0.5);
+  color: #ff9eb1;
+  box-shadow: 0 0 0 3px rgba(208, 48, 79, 0.12), 0 0 18px rgba(217, 58, 89, 0.18);
+}
+
+.assign-lead-action {
+  border-color: rgba(231, 73, 103, 0.42);
+  background:
+    linear-gradient(120deg, rgba(163, 29, 56, 0.3), rgba(93, 16, 34, 0.7), rgba(163, 29, 56, 0.3));
+  color: #ffb4c2;
+}
+
+.shift-cell.can-assign-lead:hover .assign-lead-action,
+.shift-cell.can-assign-lead:focus-visible .assign-lead-action {
+  box-shadow: 0 0 18px rgba(221, 61, 92, 0.24);
+}
+
+.leave-team-impact {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004)),
+    rgba(9, 9, 11, 0.72);
+}
+
+.leave-team-impact .section-title {
+  align-items: end;
+}
+
+.leave-team-impact .hint {
+  margin: -2px 0 1px;
+}
+
+.leave-impact-scroll {
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-color: rgba(192, 61, 88, 0.68) rgba(5, 5, 7, 0.7);
+  scrollbar-width: thin;
+}
+
+.leave-impact-grid {
+  display: grid;
+  grid-template-columns: 112px repeat(var(--impact-days), minmax(62px, 1fr));
+  gap: 4px;
+  min-width: max-content;
+}
+
+.leave-impact-corner,
+.leave-impact-date,
+.leave-impact-person,
+.leave-impact-shift {
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 9px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.003)),
+    rgba(15, 15, 18, 0.94);
+}
+
+.leave-impact-corner,
+.leave-impact-date {
+  display: grid;
+  align-content: center;
+  padding: 6px;
+}
+
+.leave-impact-corner {
+  color: #8f8f98;
+  font-size: 10px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.leave-impact-date span,
+.leave-impact-date small {
+  color: #85858e;
+  font-size: 9px;
+}
+
+.leave-impact-date strong {
+  color: #e7e7eb;
+  font-size: 10px;
+}
+
+.leave-impact-date.low {
+  border-color: rgba(231, 73, 103, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(196, 42, 72, 0.08);
+}
+
+.leave-impact-date.low small {
+  color: #ff9fb2;
+}
+
+.leave-impact-person {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+}
+
+.leave-impact-person .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 8px;
+}
+
+.leave-impact-person span {
+  overflow: hidden;
+  color: #d7d7dc;
+  font-size: 10px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leave-impact-person.requested {
+  border-color: rgba(229, 75, 104, 0.42);
+  background:
+    linear-gradient(145deg, rgba(166, 31, 58, 0.12), rgba(255, 255, 255, 0.005)),
+    rgba(17, 14, 17, 0.96);
+}
+
+.leave-impact-shift {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  padding: 5px;
+}
+
+.leave-impact-shift .shift-icon {
+  grid-row: auto;
+}
+
+.leave-impact-shift small {
+  max-width: 56px;
+  overflow: hidden;
+  color: #aaaab2;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leave-impact-shift.projected {
+  border-color: rgba(120, 210, 238, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(120, 210, 238, 0.06);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -6506,6 +7780,23 @@ button:disabled {
 
   nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .team-nav-group {
+    grid-column: 1 / -1;
+  }
+
+  .team-nav-heading {
+    display: none;
+  }
+
+  .team-nav-items {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .team-nav-items .nav-item {
+    justify-content: center;
   }
 
   .topbar {
