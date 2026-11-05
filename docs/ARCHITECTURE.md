@@ -48,16 +48,16 @@ The application uses view-level render functions rather than routes. Primary vie
 - My Profile
 - Scheduler
 - Annual Requests
-- People
-- Hierarchy
-- Departments
+- Team, presented as one compact navigation group containing People, Hierarchy, and Departments
 - Rotations
 - Activity
 - Settings
 
 Settings also contains the Admin-only Role Preview launcher. Preview mode is intentionally session-local and UI-only; production authorization remains enforced and tested through Supabase RLS/RPCs.
 
-Right-side drawers handle focused tasks such as shift edits, daily bulk editing, request review, profile editing, department details, and rotation editing. Full employee profile and calendar experiences use the main content area.
+Right-side drawers handle focused tasks such as shift edits, daily bulk editing, request review, profile editing, department details, and rotation editing. Authorized Scheduler cell clicks open one-time daily overrides directly; Scheduler edit mode remains reserved for staged day-lead changes. Annual-request review includes a compact team schedule preview across the affected dates. Full employee profile and calendar experiences use the main content area.
+
+Rotation pattern choices update their existing editor controls in place instead of rebuilding the application shell, preserving focus and unsaved form content during rapid pattern editing.
 
 ## Scheduling Model
 

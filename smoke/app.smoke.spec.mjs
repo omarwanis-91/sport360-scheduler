@@ -444,6 +444,46 @@ test("personal profile shift details stay read-only and route edits to Scheduler
   await expect(page.getByRole("heading", { name: "Operations", exact: true })).toBeVisible();
 });
 
+test("authorized scheduler clicks open one-time shift editing without lead edit mode", async ({ page }) => {
+  await page.goto("/");
+
+  const shift = page.locator('.schedule-grid .shift-cell[data-profile-id="emp-001"]').first();
+  await expect(shift).toHaveAttribute("data-open-drawer", "shift");
+  await shift.click();
+
+  await expect(page.getByRole("heading", { name: "Shift Override", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save Daily Change", exact: true })).toBeEnabled();
+  await expect(page.getByText("Saving creates a manual daily change.", { exact: false })).toBeVisible();
+});
+
+test("annual request review includes the affected team rotation mini view", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Requests", exact: true }).click();
+  await page.locator(".request-row").first().click();
+
+  await expect(page.getByText("Team Rotation Impact", { exact: true })).toBeVisible();
+  await expect(page.locator(".leave-team-impact")).toContainText("Operations team");
+  await expect(page.locator(".leave-impact-person.requested")).toContainText("Karim Adel");
+  await expect(page.locator(".leave-impact-shift.projected").first()).toBeVisible();
+});
+
+test("rotation pattern choices update in place without refreshing the workspace", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Rotations", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Rotation", exact: true }).click();
+  await page.locator('.rotation-cell[data-open-drawer="rotation-detail"]').first().click();
+
+  await page.getByPlaceholder("Preset name", { exact: true }).fill("Unsaved draft");
+  await page.evaluate(() => { window.__sport360WorkspaceBeforePatternEdit = document.querySelector(".workspace"); });
+  const option = page.locator(".pattern-slot").first().locator(".pattern-chip:not(.active)").first();
+  const selectedStatus = await option.getAttribute("data-pattern-status");
+  await option.click();
+
+  await expect(page.getByPlaceholder("Preset name", { exact: true })).toHaveValue("Unsaved draft");
+  expect(await page.evaluate(() => window.__sport360WorkspaceBeforePatternEdit === document.querySelector(".workspace"))).toBe(true);
+  await expect(page.locator(".pattern-slot").first().locator(`[data-pattern-status="${selectedStatus}"]`)).toHaveAttribute("aria-pressed", "true");
+});
+
 test("admins can assign hierarchy roles and weekly or daily department leads", async ({ page }) => {
   const today = localIso();
   const weekend = [0, 6].includes(new Date().getDay());

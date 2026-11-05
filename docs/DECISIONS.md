@@ -364,3 +364,19 @@ This preserves fast status recognition without turning the operational workspace
 The Scheduler timeline and profile month calendar use compact gaps and individually rounded charcoal cards instead of a continuous tinted spreadsheet surface. Subtle white inner edges and layered black elevation separate dates while keeping the board dense and operational.
 
 Morning, Mid-day, Night, Weekend, Annual, Sick, and On Ground never tint the card surface. Their icons remain distinct; Sport360 red is reserved for today, selection, editing, and warning emphasis.
+
+## D-049 - Daily Overrides Open Directly From Scheduler Cells
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+For authorized Admins and department Leads, clicking a Scheduler shift cell opens the one-time daily-change editor directly. Scheduler edit mode remains a separate staged workflow for assigning day leads and does not gate ordinary daily overrides.
+
+Employees and read-only role previews continue to receive the day-detail view without write controls.
+
+## D-050 - People Structure Uses One Team Navigation Group
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+People, Hierarchy, and Departments remain distinct operational views but are bundled into one compact Team group in the primary navigation. This keeps each established workflow intact while reducing top-level navigation noise and making the relationship between people, structure, and departments explicit.

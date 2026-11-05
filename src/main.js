@@ -345,12 +345,12 @@ function departmentLabel(department) {
   return parent ? `${parent.name} / ${department.name}` : department?.name || "";
 }
 
-function departmentOptions(selectedId, { excludeId = "", includeNone = false, noneLabel = "Top-level department" } = {}) {
+function departmentOptions(selectedId, { excludeId = "", includeNone = false, noneLabel = "Top-level department", teamNames = false } = {}) {
   return `
     ${includeNone ? `<option value="" ${selectedId ? "" : "selected"}>${noneLabel}</option>` : ""}
     ${visibleDepartments()
       .filter((department) => department.id !== excludeId)
-      .map((department) => `<option value="${department.id}" ${department.id === selectedId ? "selected" : ""}>${departmentLabel(department)}</option>`)
+      .map((department) => `<option value="${department.id}" ${department.id === selectedId ? "selected" : ""}>${teamNames ? `${department.name} team` : departmentLabel(department)}</option>`)
       .join("")}
   `;
 }
@@ -924,9 +924,7 @@ function render() {
         ${navButton("me", "My Profile", icons.people)}
         ${navButton("scheduler", "Scheduler", icons.scheduler)}
         ${navButton("requests", "Requests", icons.requests)}
-        ${navButton("people", "People", icons.people)}
-        ${navButton("hierarchy", "Hierarchy", icons.departments)}
-        ${navButton("departments", "Departments", icons.departments)}
+        ${renderTeamNavGroup()}
         ${navButton("rotations", "Rotations", icons.rotations)}
         ${isAdmin() ? navButton("activity", "Activity", icons.activity) : ""}
         ${isAdmin() ? navButton("settings", "Settings", icons.settings) : ""}
@@ -1248,6 +1246,20 @@ function navButton(id, label, icon) {
   return `<button class="nav-item ${active ? "active" : ""}" data-view="${id}" ${active ? 'aria-current="page"' : ""}>${icon}<span>${label}</span></button>`;
 }
 
+function renderTeamNavGroup() {
+  const active = ["people", "hierarchy", "departments", "profile-page"].includes(ui.activeView);
+  return `
+    <section class="team-nav-group ${active ? "active" : ""}" aria-label="Team workspace">
+      <div class="team-nav-heading">${icons.people}<span>Team</span></div>
+      <div class="team-nav-items">
+        ${navButton("people", "People", icons.people)}
+        ${navButton("hierarchy", "Hierarchy", icons.departments)}
+        ${navButton("departments", "Departments", icons.departments)}
+      </div>
+    </section>
+  `;
+}
+
 function renderActiveView() {
   const previousView = document.querySelector(".view-stage")?.dataset.activeView;
   const enteringClass = previousView !== ui.activeView ? " is-entering" : "";
@@ -1560,7 +1572,7 @@ function renderScheduler() {
       <div class="schedule-grid ${schedulerRangeClass()} ${ui.schedulerEditMode ? "is-editing" : ""}" style="--days: ${dates.length}">
         <div class="month-corner">
           <select id="department-select" title="Department">
-            ${departmentOptions(ui.selectedDepartmentId)}
+            ${departmentOptions(ui.selectedDepartmentId, { teamNames: true })}
           </select>
         </div>
         <div class="scheduler-month-bar">
@@ -1568,6 +1580,7 @@ function renderScheduler() {
             <button class="ghost icon-button" id="month-prev-range" aria-label="Previous range" title="Previous range">${icons.chevron}</button>
             <strong>${schedulerMonthLabel(dates)}</strong>
             <button class="ghost icon-button" id="month-next-range" aria-label="Next range" title="Next range">${icons.chevron}</button>
+            <button class="ghost month-today-button" id="today-range">Today</button>
           </div>
           <label class="bar-date-control">Start <input id="schedule-start-date" type="date" value="${ui.startDate}"></label>
           <button class="ghost" id="month-start-range">Month Start</button>
@@ -1581,7 +1594,6 @@ function renderScheduler() {
             ${scheduleFilterOptions()}
           </select>
           <button class="ghost icon-button" id="zoom-out-range" aria-label="Zoom out" title="Zoom out">${icons.minus}</button>
-          <button class="ghost" id="today-range">Today</button>
           ${canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
             <button class="primary" id="save-scheduler-edit">${icons.lead} Save</button>
             <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
@@ -1724,8 +1736,11 @@ function renderShiftCell(profile, date) {
   const filterClass = scheduleMatchesFilter(status)
     ? ui.scheduleStatusFilter === "all" ? "" : "filtered-match"
     : "filtered-out";
+  const drawerType = canManageProfileDepartment(profile) && editableDate(date) && !isRolePreviewActive()
+    ? "shift"
+    : "calendar-day";
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="${ui.schedulerEditMode ? "shift" : "calendar-day"}" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${displayStatusLabel(status)}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="${drawerType}" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${displayStatusLabel(status)}${drawerType === "shift" ? ". Click to edit this day" : ""}">
       <span class="shift-icon">${icon}</span>
       ${isDayLead ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${displayStatusLabel(status)}</span>
@@ -3283,6 +3298,7 @@ function requestDetailDrawer() {
       ${!enoughBalance ? `<p class="form-error">This request exceeds the employee's remaining annual balance.</p>` : ""}
       ${hasCoverageRisk ? `<div class="approval-risk"><strong>${impact.lowCoverageRows.length} coverage risk${impact.lowCoverageRows.length === 1 ? "" : "s"}</strong><span>Approval drops available people below target on highlighted dates.</span></div>` : ""}
       <p class="hint">${request.reason || "No reason provided."}</p>
+      ${renderVacationTeamImpact(request, profile, department, impact)}
       <div class="impact-section">
         <div class="section-title">
           <span class="eyebrow">Schedule Impact</span>
@@ -3295,6 +3311,60 @@ function requestDetailDrawer() {
       <button class="primary wide" data-approve-request="${request.id}" ${approvable && enoughBalance ? "" : "disabled"}>Approve & Deduct</button>
       <button class="danger wide" data-reject-request="${request.id}" ${approvable ? "" : "disabled"}>Reject Request</button>
     </div>
+  `;
+}
+
+function renderVacationTeamImpact(request, requestedProfile, department, impact) {
+  if (!department || !impact.rows.length) return "";
+  const team = visibleProfiles()
+    .filter((profile) => profileBelongsToDepartment(profile, department.id))
+    .sort((a, b) => {
+      if (a.id === requestedProfile.id) return -1;
+      if (b.id === requestedProfile.id) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  if (!team.length) return "";
+  return `
+    <section class="leave-team-impact" aria-labelledby="leave-team-impact-title">
+      <div class="section-title">
+        <span class="eyebrow">Team Rotation Impact</span>
+        <strong id="leave-team-impact-title">${department.name} team</strong>
+      </div>
+      <p class="hint">Resolved shifts across the requested dates. The outlined row previews this request as Annual.</p>
+      <div class="leave-impact-scroll">
+        <div class="leave-impact-grid" style="--impact-days: ${impact.rows.length}">
+          <div class="leave-impact-corner">Team</div>
+          ${impact.rows.map((row) => {
+            const low = row.changesToVacation && row.target > 0 && row.availableAfter < row.target;
+            const available = request.status === "pending" && row.changesToVacation ? row.availableAfter : row.coverage.available;
+            return `
+              <div class="leave-impact-date ${low ? "low" : ""}">
+                <span>${formatDay(row.date)}</span>
+                <strong>${formatDate(row.date)}</strong>
+                <small>${available}/${row.target || "-"}</small>
+              </div>
+            `;
+          }).join("")}
+          ${team.map((profile) => `
+            <div class="leave-impact-person ${profile.id === requestedProfile.id ? "requested" : ""}">
+              <div class="avatar">${avatar(profile)}</div>
+              <span>${profile.name}</span>
+            </div>
+            ${impact.rows.map((row) => {
+              const current = scheduleFor(profile.id, row.date);
+              const projected = profile.id === requestedProfile.id && request.status === "pending" && row.changesToVacation;
+              const status = projected ? byId(state.statuses, "vacation") || current : current;
+              return `
+                <div class="leave-impact-shift ${status.id} ${projected ? "projected" : ""}" title="${profile.name}, ${formatDate(row.date)}: ${projected ? `${displayStatusLabel(current)} to Annual` : displayStatusLabel(status)}">
+                  <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
+                  <small>${displayStatusLabel(status)}</small>
+                </div>
+              `;
+            }).join("")}
+          `).join("")}
+        </div>
+      </div>
+    </section>
   `;
 }
 
@@ -3374,7 +3444,7 @@ function bulkRotationDay(statusId, index) {
       <div><span>${weekDays[index]}</span><strong>${displayStatusLabel(status)}</strong></div>
       <div class="pattern-chip-row">
         ${rotationStatuses().map((item) => `
-          <button type="button" class="pattern-chip ${item.id} ${item.id === status.id ? "active" : ""}" data-bulk-pattern-day="${index}" data-pattern-status="${item.id}" title="${item.label}">
+          <button type="button" class="pattern-chip ${item.id} ${item.id === status.id ? "active" : ""}" data-bulk-pattern-day="${index}" data-pattern-status="${item.id}" aria-pressed="${item.id === status.id}" title="${item.label}">
             ${statusIcons[item.id] || icons.scheduler}
           </button>
         `).join("")}
@@ -3525,7 +3595,7 @@ function patternSlot(statusId, index, canEdit = true) {
       <input type="hidden" name="patternItem" value="${status?.id || statusId || "weekend"}">
       <div class="pattern-chip-row">
         ${rotationStatuses().map((item) => `
-          <button type="button" class="pattern-chip ${item.id} ${item.id === status?.id ? "active" : ""}" data-pattern-day="${index}" data-pattern-status="${item.id}" ${canEdit ? "" : "disabled"} title="${item.label}">
+          <button type="button" class="pattern-chip ${item.id} ${item.id === status?.id ? "active" : ""}" data-pattern-day="${index}" data-pattern-status="${item.id}" aria-pressed="${item.id === status?.id}" ${canEdit ? "" : "disabled"} title="${item.label}">
             ${statusIcons[item.id] || icons.scheduler}
           </button>
         `).join("")}
@@ -3545,6 +3615,39 @@ function rotationPatternStats(pattern) {
     else stats.off += 1;
     return stats;
   }, { working: 0, off: 0 });
+}
+
+function updatePatternChipSelection(container, statusId) {
+  container?.querySelectorAll("[data-pattern-status]").forEach((button) => {
+    const active = button.dataset.patternStatus === statusId;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function updateRotationDrawerPattern(pattern) {
+  const normalized = sanitizeRotationPattern(pattern);
+  document.querySelectorAll(".pattern-slot").forEach((slot, index) => {
+    const status = byId(state.statuses, normalized[index]) || byId(state.statuses, "weekend");
+    const label = slot.querySelector(".pattern-slot-head strong");
+    const input = slot.querySelector('input[name="patternItem"]');
+    if (label) label.textContent = displayStatusLabel(status);
+    if (input) input.value = status.id;
+    updatePatternChipSelection(slot, status.id);
+  });
+  const stats = rotationPatternStats(normalized);
+  const summary = document.querySelector(".pattern-editor .section-title strong");
+  if (summary) summary.textContent = `${stats.working} working - ${stats.off} weekend/off`;
+}
+
+function updateBulkRotationPattern(pattern) {
+  const normalized = sanitizeRotationPattern(pattern);
+  document.querySelectorAll(".rotation-bulk-day").forEach((day, index) => {
+    const status = byId(state.statuses, normalized[index]) || byId(state.statuses, "weekend");
+    const label = day.querySelector("strong");
+    if (label) label.textContent = displayStatusLabel(status);
+    updatePatternChipSelection(day, status.id);
+  });
 }
 
 function statusDrawer() {
@@ -3726,7 +3829,7 @@ function bindEvents() {
       const pattern = sanitizeRotationPattern(ui.rotationBulkPattern);
       pattern[Number(button.dataset.bulkPatternDay)] = button.dataset.patternStatus;
       ui.rotationBulkPattern = pattern;
-      render();
+      updateBulkRotationPattern(pattern);
     });
   });
 
@@ -3735,7 +3838,7 @@ function bindEvents() {
       const preset = rotationPresets.find((item) => item.id === button.dataset.bulkRotationPreset);
       if (!preset) return;
       ui.rotationBulkPattern = sanitizeRotationPattern(preset.pattern);
-      render();
+      updateBulkRotationPattern(ui.rotationBulkPattern);
     });
   });
 
@@ -3965,7 +4068,7 @@ function bindEvents() {
       const preset = rotationPresets.find((item) => item.id === button.dataset.rotationPreset);
       if (!preset) return;
       ui.drawer.patternDraft = sanitizeRotationPattern(preset.pattern);
-      render();
+      updateRotationDrawerPattern(ui.drawer.patternDraft);
     });
   });
 
@@ -3983,7 +4086,7 @@ function bindEvents() {
       const pattern = sanitizeRotationPattern(ui.drawer.patternDraft || byId(state.rotationVersions, ui.drawer.rotationId)?.pattern || latestRotationForProfile(ui.drawer.profileId)?.pattern);
       pattern[Number(button.dataset.patternDay)] = button.dataset.patternStatus;
       ui.drawer.patternDraft = pattern;
-      render();
+      updateRotationDrawerPattern(pattern);
     });
   });
 

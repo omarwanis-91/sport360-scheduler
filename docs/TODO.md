@@ -38,6 +38,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Restored direct one-time shift editing, added a team rotation preview to annual approvals, bundled People/Hierarchy/Departments into Team navigation, refined Scheduler controls, and removed full-shell redraws from rotation pattern choices.
 - [x] Reworked Scheduler and profile calendars into separated rounded charcoal cards, removed every status tint from their surfaces, and kept shift identity exclusively on icons and compact markers.
 - [x] Completed the second cinematic interior pass with navigation-only staggered entrances, a floating glass workspace hierarchy, richer panel and list depth, and neutral schedule/calendar surfaces that confine shift colors to icons.
 - [x] Added the cinematic Sport360 polish layer: nuanced red/black glass surfaces, highlight glows, elevated primary actions, hover/press feedback, staggered view entrances, animated drawers, and reduced-motion support.
