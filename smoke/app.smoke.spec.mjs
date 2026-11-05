@@ -162,8 +162,7 @@ test("demo workspace loads and primary navigation works", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Leads", exact: true })).toHaveAttribute("aria-pressed", "false");
 
   const destinations = [
-    ["People", "People"],
-    ["Departments", "Departments"],
+    ["Team", "Team"],
     ["Rotations", "Rotations"],
     ["My Profile", "My Profile"]
   ];
@@ -185,7 +184,7 @@ test("Lead sees and manages only the directly assigned department", async ({ pag
   await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
   await expect(page.locator(".person-card")).toHaveCount(3);
   await expect(page.locator(".person-card").filter({ hasText: "Omar Wanis" })).toBeVisible();
   await expect(page.locator(".person-card").filter({ hasText: "Mona Saleh" })).toBeVisible();
@@ -201,7 +200,7 @@ test("Lead sees and manages only the directly assigned department", async ({ pag
   await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toBeEnabled();
   await page.locator("#close-drawer").click();
 
-  await page.getByRole("button", { name: "Departments", exact: true }).click();
+  await page.locator("#team-department-select").selectOption("ops");
   await expect(page.getByRole("button", { name: /Member$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "New Department", exact: true })).toHaveCount(0);
 });
@@ -216,7 +215,7 @@ test("Employee has department read access and own identity editing only", async 
   await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
   await expect(page.locator(".person-card")).toHaveCount(1);
   await expect(page.locator(".person-card").filter({ hasText: "Youssef Nabil" })).toBeVisible();
   await expect(page.getByText("Omar Wanis", { exact: true })).toHaveCount(0);
@@ -280,7 +279,7 @@ test("Admin can preview Lead scope for one selected department", async ({ page }
   await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
   await expect(page.locator(".person-card")).toHaveCount(3);
   await expect(page.getByText("Youssef Nabil", { exact: true })).toHaveCount(0);
 });
@@ -301,7 +300,7 @@ test("compact controls expose names, selected state, and reduced-motion behavior
   }));
   expect(ambientAnimationNames).toEqual({ bodyBefore: "none", bodyAfter: "none", workspaceBefore: "none" });
 
-  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
   await expect(page.getByRole("button", { name: "Default", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Kanban", exact: true })).toHaveAttribute("aria-pressed", "false");
 
@@ -312,19 +311,19 @@ test("compact controls expose names, selected state, and reduced-motion behavior
 
 test("primary views reveal their panels and cards with a staggered entrance", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
 
-  const stage = page.locator('.view-stage[data-active-view="people"]');
+  const stage = page.locator('.view-stage[data-active-view="team"]');
   await expect(stage).toHaveClass(/is-entering/);
   await expect(page.locator(".person-card").first()).toBeVisible();
   const animationName = await page.locator(".person-card").first().evaluate((element) => getComputedStyle(element).animationName);
   expect(animationName).toContain("sport360CascadeIn");
 
-  await page.locator("#people-department-select").selectOption("all");
+  await page.locator("#team-department-select").selectOption("all");
   await expect(stage).not.toHaveClass(/is-entering/);
 });
 
-test("schedule cells stay neutral while status icons carry the shift color", async ({ page }) => {
+test("schedule, rotation, and profile surfaces keep a restrained status tint", async ({ page }) => {
   await page.goto("/");
 
   const morningCell = page.locator(".shift-cell.morning").first();
@@ -344,7 +343,7 @@ test("schedule cells stay neutral while status icons carry the shift color", asy
   });
 
   expect(morningSurface.backgroundColor).toBe(nightSurface.backgroundColor);
-  expect(morningSurface.backgroundImage).toBe(nightSurface.backgroundImage);
+  expect(morningSurface.backgroundImage).not.toBe(nightSurface.backgroundImage);
   expect(morningSurface.iconColor).not.toBe(nightSurface.iconColor);
 
   const scheduleSurfaces = await page.locator(".schedule-grid .shift-cell").evaluateAll((elements) => [
@@ -353,7 +352,8 @@ test("schedule cells stay neutral while status icons carry the shift color", asy
       return `${style.backgroundColor}|${style.backgroundImage}`;
     }))
   ]);
-  expect(scheduleSurfaces).toHaveLength(1);
+  expect(scheduleSurfaces.length).toBeGreaterThan(1);
+  expect(scheduleSurfaces.length).toBeLessThanOrEqual(7);
 
   const cardGeometry = await morningCell.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -370,7 +370,15 @@ test("schedule cells stay neutral while status icons carry the shift color", asy
       return `${style.backgroundColor}|${style.backgroundImage}`;
     }))
   ]);
-  expect(calendarSurfaces).toHaveLength(1);
+  expect(calendarSurfaces.length).toBeGreaterThan(1);
+
+  await page.getByRole("button", { name: "Rotations", exact: true }).click();
+  const rotationMorning = page.locator(".rotation-cell.morning").first();
+  const rotationNight = page.locator(".rotation-cell.night").first();
+  await expect(rotationMorning).toBeVisible();
+  await expect(rotationNight).toBeVisible();
+  expect(await rotationMorning.evaluate((element) => getComputedStyle(element).backgroundImage))
+    .not.toBe(await rotationNight.evaluate((element) => getComputedStyle(element).backgroundImage));
 });
 
 test("missing-lead alerts stay in date headers while coverage keeps coverage details", async ({ page }) => {
@@ -390,7 +398,7 @@ test("missing-lead alerts stay in date headers while coverage keeps coverage det
 
 test("creation opens centered while editing stays in the right sidebar", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Departments", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
 
   await page.getByRole("button", { name: "New Department", exact: true }).click();
   await expect(page.locator(".drawer.creation-modal")).toBeVisible();
@@ -398,14 +406,13 @@ test("creation opens centered while editing stays in the right sidebar", async (
   await page.getByRole("textbox", { name: "Department name", exact: true }).fill("Motion Graphics");
   await page.getByRole("combobox", { name: "Parent department", exact: true }).selectOption("ops");
   await page.getByRole("button", { name: "Create Department", exact: true }).click();
-  const subDepartmentTab = page.locator(".department-focus-tab").filter({ hasText: "Motion Graphics" });
-  await expect(subDepartmentTab).toContainText("Sub-dept");
-  await expect(subDepartmentTab).toContainText("0 people");
-  await page.getByRole("button", { name: "Details", exact: true }).click();
-  await expect(page.locator(".department-detail-row").filter({ hasText: "Motion Graphics" })).toContainText("Operations /");
+  const subDepartmentOption = page.locator(".team-department-option").filter({ hasText: "Motion Graphics" });
+  await expect(subDepartmentOption).toContainText("Operations");
+  await expect(subDepartmentOption).toContainText("0");
 
   await page.locator("#close-drawer").click();
-  await page.locator('[data-open-drawer="department-detail"]').first().click();
+  await subDepartmentOption.click();
+  await page.getByRole("button", { name: "Edit department", exact: true }).click();
   await expect(page.locator(".drawer.edit-sidebar")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Department", exact: true })).toBeVisible();
 });
@@ -461,6 +468,13 @@ test("annual request review includes the affected team rotation mini view", asyn
   await page.getByRole("button", { name: "Requests", exact: true }).click();
   await page.locator(".request-row").first().click();
 
+  await expect(page.locator(".drawer.request-review-modal")).toBeVisible();
+  const reviewGeometry = await page.locator(".drawer.request-review-modal").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { width: rect.width, centerDelta: Math.abs((rect.left + rect.width / 2) - window.innerWidth / 2) };
+  });
+  expect(reviewGeometry.width).toBeGreaterThan(700);
+  expect(reviewGeometry.centerDelta).toBeLessThan(2);
   await expect(page.getByText("Team Rotation Impact", { exact: true })).toBeVisible();
   await expect(page.locator(".leave-team-impact")).toContainText("Operations team");
   await expect(page.locator(".leave-impact-person.requested")).toContainText("Karim Adel");
@@ -471,7 +485,7 @@ test("rotation pattern choices update in place without refreshing the workspace"
   await page.goto("/");
   await page.getByRole("button", { name: "Rotations", exact: true }).click();
   await page.getByRole("button", { name: "Edit Rotation", exact: true }).click();
-  await page.locator('.rotation-cell[data-open-drawer="rotation-detail"]').first().click();
+  await page.locator('.rotation-cell [data-open-drawer="rotation-detail"]').first().click();
 
   await page.getByPlaceholder("Preset name", { exact: true }).fill("Unsaved draft");
   await page.evaluate(() => { window.__sport360WorkspaceBeforePatternEdit = document.querySelector(".workspace"); });
@@ -502,8 +516,12 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
 
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Rotations", exact: true }).click();
-  await expect(page.getByText("Department Lead Rotation", { exact: true })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Sat", exact: true })).toHaveValue("emp-003");
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-003"][data-weekday="5"] .lead-shift-marker.active')).toBeVisible();
+  await page.getByRole("button", { name: "Edit Rotation", exact: true }).click();
+  const newSaturdayLead = page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="5"] .lead-shift-button');
+  await newSaturdayLead.click();
+  await expect(newSaturdayLead).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-003"][data-weekday="5"] .lead-shift-button')).toHaveAttribute("aria-pressed", "false");
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
   if (weekend) {
@@ -622,9 +640,9 @@ test("profile title and multiple department memberships persist in the UI", asyn
 
 test("admins can delete pseudo profiles", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
 
-  await page.locator('[data-profile-id="emp-003"]').click();
+  await page.locator('.person-card[data-profile-id="emp-003"]').click();
   await expect(page.getByRole("button", { name: "Delete Profile", exact: true })).toBeVisible();
 
   page.once("dialog", async (dialog) => {
@@ -634,31 +652,26 @@ test("admins can delete pseudo profiles", async ({ page }) => {
   await expect(page.getByText("Karim Adel", { exact: true })).toHaveCount(0);
 });
 
-test("hierarchy view groups people as managers, leads, and artists", async ({ page }) => {
+test("unified Team workspace groups people as managers, leads, and artists", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
   await page.getByRole("checkbox", { name: "Customer Support", exact: true }).check();
   await page.getByRole("button", { name: "Save Profile", exact: true }).click();
 
-  await page.getByRole("button", { name: "Hierarchy", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "Hierarchy", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
+  await page.locator("#team-department-select").selectOption("ops");
   const operations = page.locator('[data-hierarchy-department="ops"]');
-  const support = page.locator('[data-hierarchy-department="support"]');
   await expect(operations).toBeVisible();
   await expect(operations.getByText("Manager", { exact: true })).toBeVisible();
   await expect(operations.getByText("Lead", { exact: true })).toBeVisible();
   await expect(operations.getByText("Artist", { exact: true })).toBeVisible();
   await expect(operations.getByText("Omar Wanis", { exact: true })).toBeVisible();
+  await page.locator("#team-department-select").selectOption("support");
+  const support = page.locator('[data-hierarchy-department="support"]');
   await expect(support).toBeVisible();
   await expect(support.getByText("Omar Wanis", { exact: true })).toBeVisible();
-
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
-  await expect(page.getByText("No departments selected", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Operations", exact: true }).click();
-  await page.getByRole("button", { name: "Customer Support", exact: true }).click();
-  await expect(operations).toBeVisible();
-  await expect(support).toBeVisible();
-  await expect(page.locator('[data-hierarchy-department="field"]')).toHaveCount(0);
+  await expect(page.locator('[data-hierarchy-department="ops"]')).toHaveCount(0);
 });

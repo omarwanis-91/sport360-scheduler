@@ -7530,8 +7530,8 @@ select:focus {
 .leave-impact-shift.night,
 .pattern-chip.night,
 .status-choice.night {
-  --status-accent: #bdc8ff;
-  --status-rgb: 189 200 255;
+  --status-accent: #c5a8ff;
+  --status-rgb: 197 168 255;
 }
 
 .shift-cell.weekend,
@@ -7743,6 +7743,408 @@ select:focus {
 .leave-impact-shift.projected {
   border-color: rgba(120, 210, 238, 0.35);
   box-shadow: inset 0 0 0 1px rgba(120, 210, 238, 0.06);
+}
+
+/* One Team destination combines department context, hierarchy, and people management. */
+.team-workspace {
+  display: grid;
+  grid-template-columns: minmax(190px, 230px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.team-top-actions {
+  flex-wrap: wrap;
+}
+
+.team-top-actions > select {
+  min-width: 180px;
+}
+
+.team-department-rail,
+.team-overview-card,
+.team-structure-panel,
+.team-directory-panel {
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 15px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004) 58%),
+    rgba(12, 12, 15, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 14px 34px rgba(0, 0, 0, 0.18);
+}
+
+.team-department-rail {
+  position: sticky;
+  top: 12px;
+  display: grid;
+  gap: 5px;
+  padding: 9px;
+}
+
+.team-rail-head,
+.team-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-rail-head {
+  padding: 3px 4px 7px;
+}
+
+.team-rail-head strong,
+.team-section-head > span {
+  color: #92929b;
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.team-department-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  min-height: 48px;
+  padding: 8px 9px;
+  border-color: transparent;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.018);
+  text-align: left;
+}
+
+.team-department-option span {
+  overflow: hidden;
+  color: #d5d5da;
+  font-size: 11px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-department-option strong {
+  color: #a8a8b0;
+  font-size: 11px;
+}
+
+.team-department-option small {
+  grid-column: 1 / -1;
+  color: #74747d;
+  font-size: 9px;
+}
+
+.team-department-option.is-child {
+  margin-left: 10px;
+}
+
+.team-department-option:hover,
+.team-department-option:focus-visible {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.team-department-option.active {
+  border-color: rgba(226, 76, 105, 0.36);
+  background:
+    linear-gradient(135deg, rgba(164, 31, 59, 0.19), rgba(255, 255, 255, 0.018)),
+    rgba(18, 14, 18, 0.96);
+  box-shadow: inset 3px 0 0 rgba(231, 76, 106, 0.76), 0 0 22px rgba(178, 39, 68, 0.08);
+}
+
+.team-workspace-main {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.team-overview-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 18px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(178, 39, 68, 0.11), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.004)),
+    rgba(12, 12, 15, 0.96);
+}
+
+.team-overview-card h2,
+.team-section-head h2 {
+  margin: 3px 0 0;
+  color: #f1f1f4;
+  font-size: 16px;
+}
+
+.team-overview-card p {
+  max-width: 72ch;
+  margin: 5px 0 0;
+  color: #8f8f98;
+  font-size: 11px;
+}
+
+.team-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.team-overview-actions button {
+  min-height: 31px;
+}
+
+.team-overview-stats {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.team-overview-stats span {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.022);
+  color: #85858e;
+  font-size: 10px;
+}
+
+.team-overview-stats strong {
+  color: #ececf0;
+  font-size: 14px;
+}
+
+.team-child-departments {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.team-child-departments > span {
+  color: #777780;
+  font-size: 9px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.team-child-departments button {
+  min-height: 27px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #bdbdc4;
+  font-size: 10px;
+}
+
+.team-structure-panel,
+.team-directory-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.team-structure-panel .hierarchy-board,
+.team-structure-panel .hierarchy-department {
+  margin: 0;
+}
+
+.team-structure-panel .hierarchy-department {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.team-structure-panel .hierarchy-department-head {
+  display: none;
+}
+
+.team-structure-panel .hierarchy-levels {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.team-structure-panel .hierarchy-level {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.team-structure-panel .hierarchy-level:last-child {
+  border-bottom: 0;
+}
+
+.team-directory-panel .people-department-stack,
+.team-directory-panel .people-kanban,
+.team-directory-panel .people-list-view,
+.team-directory-panel .people-tile-grid {
+  margin: 0;
+}
+
+/* Annual approval needs the comparison width of a focused review modal. */
+.drawer.request-review-modal {
+  width: min(1080px, calc(100vw - 48px));
+  max-height: calc(100dvh - 40px);
+  padding: 18px;
+}
+
+.request-review-modal .leave-impact-grid {
+  width: 100%;
+}
+
+/* Lead assignment is part of each rotation shift, represented by the red star. */
+.rotation-cell {
+  position: relative;
+}
+
+.rotation-cell-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+}
+
+.rotation-cell-open:focus-visible {
+  outline: 2px solid rgba(242, 98, 126, 0.9);
+  outline-offset: -3px;
+}
+
+.rotation-cell > .shift-icon,
+.rotation-cell > .shift-label,
+.rotation-cell > small {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.lead-shift-button,
+.lead-shift-marker {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: grid;
+  width: 23px;
+  height: 23px;
+  min-height: 23px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(231, 76, 106, 0.3);
+  border-radius: 999px;
+  background: rgba(112, 21, 42, 0.36);
+  color: rgba(255, 145, 166, 0.58);
+  box-shadow: 0 0 0 3px rgba(208, 48, 79, 0.06);
+}
+
+.lead-shift-button svg,
+.lead-shift-marker svg {
+  width: 13px;
+  height: 13px;
+}
+
+.lead-shift-button:hover,
+.lead-shift-button:focus-visible,
+.lead-shift-button.active,
+.lead-shift-marker.active {
+  border-color: rgba(246, 101, 130, 0.72);
+  background: rgba(153, 27, 54, 0.78);
+  color: #ffb0c0;
+  box-shadow: 0 0 0 3px rgba(211, 49, 80, 0.13), 0 0 20px rgba(224, 65, 96, 0.28);
+}
+
+.lead-shift-button:active {
+  transform: scale(0.9);
+}
+
+/* Status surfaces receive a restrained tint capped below twenty percent. */
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground),
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.16);
+  background:
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.18), rgb(var(--status-rgb, 213 213 220) / 0.045) 58%, transparent 82%),
+    rgba(16, 16, 19, 0.97);
+}
+
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.28);
+  background:
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.2), rgb(var(--status-rgb, 213 213 220) / 0.065) 58%, transparent 84%),
+    rgba(21, 21, 24, 0.98);
+}
+
+.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground),
+.my-shifts .request-row:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground),
+.leave-impact-shift:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.15);
+  background:
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.17), rgb(var(--status-rgb, 213 213 220) / 0.04) 62%, transparent 86%),
+    rgba(15, 15, 18, 0.97);
+}
+
+.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground):hover,
+.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground):focus-visible {
+  background:
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.2), rgb(var(--status-rgb, 213 213 220) / 0.06) 62%, transparent 86%),
+    rgba(20, 20, 23, 0.98);
+}
+
+.pattern-chip:is(.morning, .midday, .night, .weekend),
+.status-choice:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) > span {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.15);
+  background: rgb(var(--status-rgb, 213 213 220) / 0.07);
+}
+
+.pattern-chip:is(.morning, .midday, .night, .weekend).active,
+.status-choice:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) input:checked + span {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.34);
+  background:
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.19), rgb(var(--status-rgb, 213 213 220) / 0.06)),
+    rgba(17, 17, 20, 0.96);
+}
+
+@media (max-width: 1100px) {
+  .team-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .team-department-rail {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .team-rail-head {
+    grid-column: 1 / -1;
+  }
+
+  .team-department-option.is-child {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .team-department-rail,
+  .team-overview-stats,
+  .team-structure-panel .hierarchy-levels {
+    grid-template-columns: 1fr;
+  }
+
+  .team-overview-card {
+    grid-template-columns: 1fr;
+  }
+
+  .team-overview-actions {
+    justify-content: flex-start;
+  }
+
+  .drawer.request-review-modal {
+    width: min(100vw - 20px, 1080px);
+    max-height: calc(100dvh - 20px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

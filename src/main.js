@@ -924,7 +924,7 @@ function render() {
         ${navButton("me", "My Profile", icons.people)}
         ${navButton("scheduler", "Scheduler", icons.scheduler)}
         ${navButton("requests", "Requests", icons.requests)}
-        ${renderTeamNavGroup()}
+        ${navButton("team", "Team", icons.people)}
         ${navButton("rotations", "Rotations", icons.rotations)}
         ${isAdmin() ? navButton("activity", "Activity", icons.activity) : ""}
         ${isAdmin() ? navButton("settings", "Settings", icons.settings) : ""}
@@ -1242,22 +1242,8 @@ function renderPrelaunchStatus() {
 }
 
 function navButton(id, label, icon) {
-  const active = ui.activeView === id || (ui.activeView === "profile-page" && id === "people");
+  const active = ui.activeView === id || (ui.activeView === "profile-page" && id === "team");
   return `<button class="nav-item ${active ? "active" : ""}" data-view="${id}" ${active ? 'aria-current="page"' : ""}>${icon}<span>${label}</span></button>`;
-}
-
-function renderTeamNavGroup() {
-  const active = ["people", "hierarchy", "departments", "profile-page"].includes(ui.activeView);
-  return `
-    <section class="team-nav-group ${active ? "active" : ""}" aria-label="Team workspace">
-      <div class="team-nav-heading">${icons.people}<span>Team</span></div>
-      <div class="team-nav-items">
-        ${navButton("people", "People", icons.people)}
-        ${navButton("hierarchy", "Hierarchy", icons.departments)}
-        ${navButton("departments", "Departments", icons.departments)}
-      </div>
-    </section>
-  `;
 }
 
 function renderActiveView() {
@@ -1267,9 +1253,7 @@ function renderActiveView() {
   if (ui.activeView === "me") content = renderMyProfile();
   else if (ui.activeView === "profile-page") content = renderProfilePage();
   else if (ui.activeView === "requests") content = renderRequests();
-  else if (ui.activeView === "people") content = renderPeople();
-  else if (ui.activeView === "hierarchy") content = renderHierarchy();
-  else if (ui.activeView === "departments") content = renderDepartments();
+  else if (["team", "people", "hierarchy", "departments"].includes(ui.activeView)) content = renderTeam();
   else if (ui.activeView === "rotations") content = renderRotations();
   else if (ui.activeView === "activity") content = renderActivity();
   else if (ui.activeView === "settings") content = renderSettings();
@@ -1817,6 +1801,147 @@ function renderPeople() {
   `;
 }
 
+function renderTeam() {
+  const departments = visibleDepartments();
+  const selectedDepartment = ui.peopleDepartmentId === "all"
+    ? null
+    : departments.find((department) => department.id === ui.peopleDepartmentId) || null;
+  const profiles = selectedDepartment
+    ? visibleProfiles().filter((profile) => profileBelongsToDepartment(profile, selectedDepartment.id))
+    : visibleProfiles();
+  const hierarchySection = {
+    id: selectedDepartment?.id || "all-team",
+    name: selectedDepartment?.name || "All teams",
+    meta: `${profiles.length} ${profiles.length === 1 ? "person" : "people"}`,
+    profiles
+  };
+  const levels = [
+    ["manager", "Manager"],
+    ["lead", "Lead"],
+    ["artist", "Artist"]
+  ];
+  const actions = `
+    <div class="top-actions team-top-actions">
+      <select id="team-department-select" aria-label="Team department">
+        <option value="all" ${selectedDepartment ? "" : "selected"}>All teams</option>
+        ${departments.map((department) => `<option value="${department.id}" ${department.id === selectedDepartment?.id ? "selected" : ""}>${departmentLabel(department)}</option>`).join("")}
+      </select>
+      <div class="people-view-switch" aria-label="People view">
+        ${peopleViewButton("default", "Default")}
+        ${peopleViewButton("kanban", "Kanban")}
+        ${peopleViewButton("list", "List")}
+        ${peopleViewButton("tiles", "Tiles")}
+      </div>
+      ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
+      ${canManageDepartments() ? `<button class="ghost" data-open-drawer="department">${icons.plus} New Department</button>` : ""}
+    </div>
+  `;
+  return `
+    ${renderTopbar("Team", "People, hierarchy, and departments in one operational workspace.", actions)}
+    ${renderPendingOnboarding()}
+    <section class="team-workspace">
+      <aside class="team-department-rail" aria-label="Team departments">
+        <div class="team-rail-head">
+          <span class="eyebrow">Departments</span>
+          <strong>${departments.length}</strong>
+        </div>
+        <button class="team-department-option ${selectedDepartment ? "" : "active"}" data-team-department="all" aria-pressed="${!selectedDepartment}">
+          <span>All teams</span>
+          <strong>${visibleProfiles().length}</strong>
+        </button>
+        ${departments.map((department) => {
+          const stats = departmentStats(department);
+          const parent = byId(state.departments, department.parentDepartmentId);
+          return `
+            <button class="team-department-option ${department.id === selectedDepartment?.id ? "active" : ""} ${parent ? "is-child" : ""}" data-team-department="${department.id}" aria-pressed="${department.id === selectedDepartment?.id}">
+              <span>${department.name}</span>
+              <strong>${stats.members.length}</strong>
+              <small>${parent ? parent.name : `${stats.target} coverage target`}</small>
+            </button>
+          `;
+        }).join("")}
+      </aside>
+      <div class="team-workspace-main">
+        ${renderTeamDepartmentOverview(selectedDepartment, departments, profiles)}
+        <section class="team-structure-panel" aria-labelledby="team-structure-title">
+          <div class="team-section-head">
+            <div>
+              <span class="eyebrow">Hierarchy</span>
+              <h2 id="team-structure-title">Team structure</h2>
+            </div>
+            <span>${hierarchySection.meta}</span>
+          </div>
+          <div class="hierarchy-board compact">
+            ${renderHierarchyDepartment(hierarchySection, levels)}
+          </div>
+        </section>
+        <section class="team-directory-panel" aria-labelledby="team-directory-title">
+          <div class="team-section-head">
+            <div>
+              <span class="eyebrow">People</span>
+              <h2 id="team-directory-title">Directory</h2>
+            </div>
+            <span>${selectedDepartment?.name || "All departments"}</span>
+          </div>
+          ${renderPeopleView(profiles)}
+        </section>
+      </div>
+    </section>
+  `;
+}
+
+function renderTeamDepartmentOverview(department, departments, profiles) {
+  if (!department) {
+    const pending = state.vacationRequests.filter((request) => request.status === "pending").length;
+    const unassigned = profiles.filter((profile) => !profileDepartmentIds(profile).length).length;
+    return `
+      <article class="team-overview-card">
+        <div>
+          <span class="eyebrow">Organization</span>
+          <h2>Sport360 team</h2>
+          <p>Choose a department to manage its members, structure, schedule, and details without leaving this workspace.</p>
+        </div>
+        <div class="team-overview-stats">
+          <span><strong>${profiles.length}</strong> people</span>
+          <span><strong>${departments.length}</strong> departments</span>
+          <span><strong>${pending}</strong> pending requests</span>
+          <span><strong>${unassigned}</strong> unassigned</span>
+        </div>
+      </article>
+    `;
+  }
+  const stats = departmentStats(department);
+  const parent = byId(state.departments, department.parentDepartmentId);
+  const children = childDepartmentsOf(department.id);
+  return `
+    <article class="team-overview-card focused">
+      <div class="team-overview-copy">
+        <span class="eyebrow">${parent ? "Sub-department" : "Department"}</span>
+        <h2>${department.name}</h2>
+        <p>${parent ? `Part of ${parent.name}.` : children.length ? `${children.length} connected sub-${children.length === 1 ? "department" : "departments"}.` : "Independent department."} ${departmentStructureSummary(stats.members)}.</p>
+      </div>
+      <div class="team-overview-actions">
+        <button class="ghost" data-open-drawer="department-detail" data-department-id="${department.id}">${canManageDepartments() ? "Edit department" : "View department"}</button>
+        ${canManageDepartmentMembers(department.id) ? `<button class="ghost" data-create-member="${department.id}">${icons.plus} Member</button>` : ""}
+        <button class="ghost" data-go-department="${department.id}">Schedule</button>
+        <button class="ghost" data-go-rotations="${department.id}">Rotations</button>
+      </div>
+      <div class="team-overview-stats">
+        <span><strong>${stats.members.length}</strong> members</span>
+        <span><strong>${stats.target}</strong> coverage target</span>
+        <span><strong>${stats.pendingRequests}</strong> pending requests</span>
+        <span><strong>${stats.unclaimed}</strong> unclaimed</span>
+      </div>
+      ${children.length ? `
+        <div class="team-child-departments">
+          <span>Sub-departments</span>
+          ${children.map((child) => `<button type="button" data-team-department="${child.id}">${child.name}</button>`).join("")}
+        </div>
+      ` : ""}
+    </article>
+  `;
+}
+
 function renderPendingOnboarding() {
   if (!canManageProfiles()) return "";
   const submissions = (state.onboardingSubmissions || []).filter((submission) => submission.status === "pending");
@@ -2265,7 +2390,7 @@ function renderRotations() {
         <span><strong>${stats.nextEffective || "None"}</strong> next start</span>
       </div>
     </section>
-    ${ui.rotationDepartmentEdit ? renderRotationEditCommitBar(department) : renderLeadRotationPanel(department)}
+    ${ui.rotationDepartmentEdit ? renderRotationEditCommitBar(department) : ""}
     ${ui.rotationDepartmentEdit ? renderDepartmentRotationToolbar(profiles) : ""}
     <section class="rotation-board ${ui.rotationDepartmentEdit ? "is-editing" : ""}">
       <div class="rotation-grid">
@@ -2473,7 +2598,7 @@ function renderRotationEditCommitBar(department) {
       <div>
         <span class="eyebrow">Rotation Edit Mode</span>
         <strong>Changes are staged until saved</strong>
-        <p>Hover a rotation shift to assign that person as the weekday lead. Select people below to bulk-edit weekly shift patterns.</p>
+        <p>Use the red star inside a shift to make that person the weekday lead. Select people below to bulk-edit weekly shift patterns.</p>
       </div>
       <label>Effective start<input type="date" id="rotation-edit-effective-start" value="${ui.rotationLeadEffectiveStart || todayIso}"></label>
       <div class="edit-commit-actions">
@@ -2487,27 +2612,31 @@ function renderRotationEditCommitBar(department) {
 function renderRotationCell(profile, rotation, statusId, weekday = 0) {
   const isLeadSlot = leadForProfileWeekday(profile, ui.selectedDepartmentId, weekday)?.id === profile.id;
   const canAssignLead = ui.rotationDepartmentEdit && rotation && canManageDepartment(ui.selectedDepartmentId);
-  const detailAttrs = ui.rotationDepartmentEdit ? `data-open-drawer="rotation-detail"` : "";
   if (!rotation) {
     return `
-      <button class="rotation-cell shift-cell state-off missing" ${detailAttrs} data-profile-id="${profile.id}" data-rotation-id="">
+      <div class="rotation-cell shift-cell state-off missing" data-profile-id="${profile.id}" data-rotation-id="" data-weekday="${weekday}">
         <span class="shift-icon">${icons.scheduler}</span>
-        ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
+        ${isLeadSlot ? `<span class="lead-shift-marker active" aria-label="Department lead shift">${icons.lead}</span>` : ""}
         <span class="shift-label">No template</span>
         <small>Template</small>
-      </button>
+      </div>
     `;
   }
   const status = byId(state.statuses, statusId) || byId(state.statuses, "weekend");
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
+  const leadLabel = isLeadSlot
+    ? `${profile.name} is the ${weekDays[weekday]} lead`
+    : `Make ${profile.name} the ${weekDays[weekday]} lead`;
   return `
-    <button class="rotation-cell shift-cell ${availabilityState} ${status?.id || ""} ${canAssignLead ? "can-assign-lead" : ""}" ${detailAttrs} data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">
+    <div class="rotation-cell shift-cell ${availabilityState} ${status?.id || ""} ${canAssignLead ? "can-assign-lead" : ""}" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}" data-weekday="${weekday}">
+      ${ui.rotationDepartmentEdit ? `<button type="button" class="rotation-cell-open" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}" aria-label="Edit ${profile.name} ${weekDays[weekday]} rotation shift"></button>` : ""}
       <span class="shift-icon">${statusIcons[status?.id] || icons.scheduler}</span>
-      ${isLeadSlot ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
       <span class="shift-label">${displayStatusLabel(status) || "Unassigned"}</span>
       <small>Template</small>
-      ${canAssignLead ? `<span class="assign-lead-action" data-assign-rotation-lead="${profile.id}" data-weekday="${weekday}">${icons.lead}<em>Lead</em></span>` : ""}
-    </button>
+      ${canAssignLead
+        ? `<button type="button" class="lead-shift-button ${isLeadSlot ? "active" : ""}" data-assign-rotation-lead="${profile.id}" data-weekday="${weekday}" aria-label="${leadLabel}" aria-pressed="${isLeadSlot}" title="${leadLabel}">${icons.lead}</button>`
+        : isLeadSlot ? `<span class="lead-shift-marker active" aria-label="Department lead shift" title="Department lead shift">${icons.lead}</span>` : ""}
+    </div>
   `;
 }
 
@@ -2796,6 +2925,7 @@ function renderMiniActivity(entries) {
 function renderDrawer() {
   if (!ui.drawer) return "";
   const isCreation = isCreationDrawer();
+  const isCentered = isCreation || ui.drawer.type === "request-detail";
   const titleMap = {
     shift: "Shift Override",
     person: "Employee Profile",
@@ -2816,10 +2946,10 @@ function renderDrawer() {
   };
 
   return `
-    <aside class="drawer open ${isCreation ? "creation-modal" : "edit-sidebar"}" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+    <aside class="drawer open ${isCentered ? "creation-modal" : "edit-sidebar"} ${ui.drawer.type === "request-detail" ? "request-review-modal" : ""}" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
       <div class="drawer-head">
         <div>
-          <span class="eyebrow">${isCreation ? "Create" : "Details"}</span>
+          <span class="eyebrow">${ui.drawer.type === "request-detail" ? "Review" : isCreation ? "Create" : "Details"}</span>
           <h2 id="drawer-title">${titleMap[ui.drawer.type]}</h2>
         </div>
         <button class="icon-button" id="close-drawer" aria-label="Close ${titleMap[ui.drawer.type]}" title="Close">${icons.close}</button>
@@ -3849,6 +3979,20 @@ function bindEvents() {
     render();
   });
 
+  document.querySelector("#team-department-select")?.addEventListener("change", (event) => {
+    ui.peopleDepartmentId = event.target.value;
+    ui.departmentFocusId = event.target.value === "all" ? visibleDepartments()[0]?.id || "" : event.target.value;
+    render();
+  });
+
+  document.querySelectorAll("[data-team-department]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ui.peopleDepartmentId = button.dataset.teamDepartment;
+      ui.departmentFocusId = button.dataset.teamDepartment === "all" ? visibleDepartments()[0]?.id || "" : button.dataset.teamDepartment;
+      render();
+    });
+  });
+
   document.querySelectorAll("[data-people-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.peopleView = button.dataset.peopleView;
@@ -4759,7 +4903,7 @@ async function deleteDepartment() {
     await dataStore.deleteDepartment(department);
     await saveState();
     ui.drawer = null;
-    ui.activeView = "departments";
+    ui.activeView = "team";
     render();
   }).then((result) => {
     if (result.ok) return;

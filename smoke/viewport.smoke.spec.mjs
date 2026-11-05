@@ -54,23 +54,20 @@ for (const width of widths) {
     await expect(page.getByRole("heading", { name: "My Profile", exact: true })).toBeVisible();
     await expect(page.locator(".person-calendar.page")).toBeVisible();
 
-    await page.getByRole("button", { name: "People", exact: true }).click();
+    await page.getByRole("button", { name: "Team", exact: true }).click();
     await expectMainShellHealthy(page);
-    await expect(page.getByRole("heading", { name: "People", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
     await expect(page.locator("[data-people-view]")).toHaveCount(4);
     await expect(page.getByRole("button", { name: "Default", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Tiles", exact: true })).toBeVisible();
-
-    await page.getByRole("button", { name: "Departments", exact: true }).click();
-    await expectMainShellHealthy(page);
-    await expect(page.getByRole("heading", { name: "Departments", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Focus", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Details", exact: true })).toBeVisible();
+    await expect(page.locator(".team-department-rail")).toBeVisible();
+    await expect(page.locator(".team-structure-panel")).toBeVisible();
+    await expect(page.locator(".team-directory-panel")).toBeVisible();
 
     await page.getByRole("button", { name: "Rotations", exact: true }).click();
     await expectMainShellHealthy(page);
     await expect(page.getByRole("heading", { name: "Rotations", exact: true })).toBeVisible();
-    await expect(page.locator(".lead-rotation-panel")).toBeVisible();
+    await expect(page.locator(".lead-shift-marker.active").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Requests", exact: true }).click();
     await expectMainShellHealthy(page);

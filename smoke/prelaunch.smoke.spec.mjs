@@ -227,7 +227,7 @@ test("admins review pending profiles and can create an unassigned employee", asy
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "People", exact: true }).click();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pending profiles", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Review", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Review New Account", exact: true })).toBeVisible();
