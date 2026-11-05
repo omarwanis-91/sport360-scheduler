@@ -123,6 +123,7 @@ Parent-department lead assignments use the full descendant department scope. A d
 - Shared motion tokens drive hover elevation, press feedback, navigation-triggered staggered view entrances, and drawer/modal transitions. Motion uses transforms and opacity, remains interruptible, does not replay for ordinary in-view updates, and is disabled through `prefers-reduced-motion`.
 - The app should feel like a polished operational tech workspace: subtle animated background lines, restrained glows, layered gradients, and satisfying hover feedback are preferred when they do not reduce scan speed or legibility.
 - Shift-specific colors are confined to icons and compact markers so schedule and calendar surfaces remain neutral and consistent with the red/black/white workspace.
+- Scheduler timelines and profile month calendars use a shared separated-card rhythm: compact gaps, rounded charcoal cells, subtle white inner edges, and red-only today/selection emphasis inspired by modern calendar dashboards without adopting their blue palette.
 - Unavailable states remain quieter than working states.
 - Scheduler cells use a neutral vertical bar as the primary working/non-working signal; individual status type is secondary through its colored icon and text label rather than a tinted cell surface.
 - Scheduler filtering can narrow the current range by availability, rotational shift, daily exception, or manual change while keeping the date timeline visible.

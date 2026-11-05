@@ -7046,6 +7046,339 @@ button:disabled {
   box-shadow: 0 0 20px rgba(185, 39, 67, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+/* Calendar card system: reference-inspired spacing with Sport360 surfaces and accents. */
+.scheduler-shell {
+  overflow: auto;
+  padding: 0;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% -12%, rgba(170, 31, 60, 0.1), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 38%),
+    rgba(8, 8, 10, 0.94);
+  scrollbar-color: rgba(128, 128, 138, 0.72) rgba(8, 8, 10, 0.7);
+  scrollbar-width: thin;
+}
+
+.schedule-grid {
+  gap: 6px;
+  padding: 8px;
+  background: transparent;
+}
+
+.month-corner,
+.scheduler-month-bar,
+.employee-head,
+.date-head,
+.coverage-head,
+.coverage-cell,
+.employee-cell,
+.schedule-grid .shift-cell {
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004) 56%),
+    rgba(16, 16, 19, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.month-corner,
+.employee-head,
+.coverage-head,
+.employee-cell {
+  left: 8px;
+}
+
+.month-corner,
+.scheduler-month-bar {
+  min-height: 52px;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(184, 37, 67, 0.11), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.006)),
+    rgba(13, 13, 16, 0.98);
+}
+
+.scheduler-month-bar {
+  padding: 7px 9px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.schedule-grid.is-editing .scheduler-month-bar {
+  border-color: rgba(226, 82, 109, 0.32);
+  background:
+    radial-gradient(circle at 88% 0%, rgba(202, 47, 77, 0.17), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.006)),
+    rgba(15, 13, 16, 0.98);
+}
+
+.date-head,
+.coverage-cell,
+.schedule-grid .shift-cell {
+  isolation: isolate;
+}
+
+.date-head.week-start,
+.coverage-cell.week-start,
+.schedule-grid .shift-cell.week-start {
+  border-left-width: 1px;
+  box-shadow:
+    -3px 0 0 rgba(230, 230, 234, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.date-head.today {
+  border-color: rgba(224, 76, 105, 0.48);
+  background:
+    radial-gradient(circle at 50% 112%, rgba(193, 43, 72, 0.16), transparent 54%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.005)),
+    rgba(18, 16, 19, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(179, 39, 67, 0.1),
+    0 0 26px rgba(181, 38, 67, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.date-head span small {
+  border-color: rgba(225, 82, 108, 0.34);
+  background: rgba(151, 27, 52, 0.2);
+  color: #f6a8b7;
+}
+
+.date-head.lead-missing {
+  border-color: rgba(226, 82, 109, 0.28);
+  background:
+    linear-gradient(145deg, rgba(151, 27, 52, 0.08), rgba(255, 255, 255, 0.004) 54%),
+    rgba(17, 15, 18, 0.98);
+}
+
+.coverage-cell.low {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004) 56%),
+    rgba(16, 16, 19, 0.96);
+}
+
+/* Every schedule status uses this exact surface. Only its icon changes color. */
+.schedule-grid .shift-cell,
+.schedule-grid .shift-cell.state-working,
+.schedule-grid .shift-cell.state-off,
+.schedule-grid .shift-cell.state-away,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) {
+  border-color: rgba(255, 255, 255, 0.085);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004) 56%),
+    rgba(16, 16, 19, 0.96);
+  color: #e8e8ec;
+  opacity: 1;
+  filter: none;
+}
+
+.schedule-grid .shift-cell:hover,
+.schedule-grid .shift-cell:focus-visible,
+.schedule-grid .shift-cell.state-working:hover,
+.schedule-grid .shift-cell.state-off:hover,
+.schedule-grid .shift-cell.state-away:hover,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible {
+  z-index: 3;
+  border-color: rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.008) 58%, rgba(145, 27, 53, 0.035)),
+    rgba(21, 21, 24, 0.98);
+  color: #f5f5f7;
+  opacity: 1;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.28),
+    0 0 22px rgba(255, 255, 255, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.schedule-grid .shift-cell::after,
+.schedule-grid .shift-cell.state-off::after,
+.schedule-grid .shift-cell.state-away::after,
+.schedule-grid .shift-cell:is(.vacation, .sick, .ground)::after {
+  opacity: 0;
+  background: none;
+}
+
+.schedule-grid .shift-cell.state-working::before,
+.schedule-grid .shift-cell:is(.morning, .midday, .night)::before {
+  background: rgba(202, 202, 208, 0.52);
+}
+
+.schedule-grid .shift-cell.state-off::before,
+.schedule-grid .shift-cell.weekend::before {
+  background: repeating-linear-gradient(to bottom, rgba(133, 133, 142, 0.52) 0 4px, transparent 4px 7px);
+}
+
+.schedule-grid .shift-cell.state-away::before,
+.schedule-grid .shift-cell:is(.vacation, .sick, .ground)::before {
+  background: rgba(126, 126, 135, 0.46);
+}
+
+.schedule-grid .shift-cell.state-off .shift-label,
+.schedule-grid .shift-cell.state-off small {
+  color: #8c8c96;
+}
+
+.schedule-grid .shift-cell.state-away .shift-label,
+.schedule-grid .shift-cell.state-away small {
+  color: #b8b8c0;
+}
+
+.schedule-grid .shift-cell.filtered-out {
+  opacity: 0.34;
+  filter: grayscale(0.45);
+}
+
+.schedule-grid .shift-cell.filtered-match {
+  opacity: 1;
+  filter: none;
+}
+
+.person-calendar {
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 90% -8%, rgba(171, 32, 61, 0.11), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.005) 46%),
+    rgba(10, 10, 13, 0.94);
+}
+
+.calendar-head {
+  align-items: center;
+  min-height: 42px;
+  padding: 2px 2px 4px;
+}
+
+.calendar-head strong {
+  margin-top: 3px;
+  color: #f4f4f6;
+  font-size: 15px;
+  letter-spacing: -0.015em;
+}
+
+.calendar-metrics {
+  gap: 8px;
+}
+
+.calendar-metrics span {
+  min-height: 42px;
+  padding: 8px 10px;
+  border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.004)),
+    rgba(16, 16, 19, 0.96);
+}
+
+.month-grid {
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 24%),
+    rgba(7, 7, 9, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.month-weekday {
+  min-height: 24px;
+  color: #777780;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+
+.month-day,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away) {
+  min-height: 52px;
+  padding: 7px;
+  border-color: rgba(255, 255, 255, 0.085);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.004) 58%),
+    rgba(16, 16, 19, 0.98);
+  color: #a7a7af;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.person-calendar.page .month-day {
+  min-height: 72px;
+}
+
+.month-day:not(.empty):hover,
+.month-day:not(.empty):focus-visible,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):hover,
+.month-day:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away):focus-visible {
+  z-index: 2;
+  border-color: rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.008) 58%, rgba(145, 27, 53, 0.035)),
+    rgba(21, 21, 24, 0.98);
+  color: #d7d7dc;
+  filter: none;
+  transform: translateY(-2px);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.month-day.today,
+.month-day.today:is(.working, .morning, .midday, .night, .off, .weekend-day, .leave, .vacation, .approved-vacation, .sick, .ground, .away) {
+  border-color: rgba(225, 82, 108, 0.56);
+  background:
+    radial-gradient(circle at 50% 110%, rgba(193, 43, 72, 0.15), transparent 54%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.005)),
+    rgba(18, 16, 19, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(179, 39, 67, 0.12),
+    0 0 24px rgba(181, 38, 67, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.today-label {
+  color: #f0a0b0;
+}
+
+.month-day.selected,
+.month-day.today.selected {
+  border-color: rgba(241, 105, 131, 0.82);
+  box-shadow:
+    0 0 0 2px rgba(209, 49, 80, 0.24),
+    0 0 28px rgba(184, 39, 68, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.month-day.selected::after,
+.month-day.today.selected::after {
+  border-color: rgba(241, 105, 131, 0.3);
+  border-radius: 7px;
+}
+
+.month-day.empty {
+  min-height: 52px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.month-day em {
+  width: 21px;
+  height: 21px;
+  border-radius: 8px;
+}
+
+.calendar-legend {
+  padding: 0 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

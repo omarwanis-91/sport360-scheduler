@@ -355,3 +355,12 @@ Interaction motion uses shared fast, base, and slow timings. Buttons and cards p
 Scheduler cells, profile calendar days, and compact shift rows use neutral black and charcoal surfaces. Morning, Mid-day, Night, Weekend, Annual, Sick, and On Ground retain distinct muted colors only on their icons and small semantic markers.
 
 This preserves fast status recognition without turning the operational workspace into a grid of competing colored panels. Hover and selection depth come from neutral elevation, white edge highlights, and restrained Sport360 red rather than enlarging the status palette.
+
+## D-048 - Calendar Surfaces Use Separated Neutral Cards
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+The Scheduler timeline and profile month calendar use compact gaps and individually rounded charcoal cards instead of a continuous tinted spreadsheet surface. Subtle white inner edges and layered black elevation separate dates while keeping the board dense and operational.
+
+Morning, Mid-day, Night, Weekend, Annual, Sick, and On Ground never tint the card surface. Their icons remain distinct; Sport360 red is reserved for today, selection, editing, and warning emphasis.

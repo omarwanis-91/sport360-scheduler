@@ -346,6 +346,31 @@ test("schedule cells stay neutral while status icons carry the shift color", asy
   expect(morningSurface.backgroundColor).toBe(nightSurface.backgroundColor);
   expect(morningSurface.backgroundImage).toBe(nightSurface.backgroundImage);
   expect(morningSurface.iconColor).not.toBe(nightSurface.iconColor);
+
+  const scheduleSurfaces = await page.locator(".schedule-grid .shift-cell").evaluateAll((elements) => [
+    ...new Set(elements.map((element) => {
+      const style = getComputedStyle(element);
+      return `${style.backgroundColor}|${style.backgroundImage}`;
+    }))
+  ]);
+  expect(scheduleSurfaces).toHaveLength(1);
+
+  const cardGeometry = await morningCell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const gridStyle = getComputedStyle(element.closest(".schedule-grid"));
+    return { borderRadius: parseFloat(style.borderRadius), columnGap: parseFloat(gridStyle.columnGap) };
+  });
+  expect(cardGeometry.borderRadius).toBeGreaterThan(0);
+  expect(cardGeometry.columnGap).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  const calendarSurfaces = await page.locator(".month-day:not(.empty):not(.today):not(.selected)").evaluateAll((elements) => [
+    ...new Set(elements.map((element) => {
+      const style = getComputedStyle(element);
+      return `${style.backgroundColor}|${style.backgroundImage}`;
+    }))
+  ]);
+  expect(calendarSurfaces).toHaveLength(1);
 });
 
 test("missing-lead alerts stay in date headers while coverage keeps coverage details", async ({ page }) => {
