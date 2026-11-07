@@ -89,8 +89,6 @@ const ui = {
   startDate: todayIso,
   calendarMonth: todayIso.slice(0, 7),
   profileViewId: null,
-  selectedFilter: "all",
-  scheduleStatusFilter: "all",
   requestFilter: "pending",
   activityType: "all",
   activitySearch: "",
@@ -475,31 +473,10 @@ function hierarchyProfilesForDepartment(departmentId) {
     : profileDepartmentIds(profile).includes(departmentId));
 }
 
-function departmentProfiles({ applyScheduleFilter = true } = {}) {
-  let profiles = visibleProfiles().filter((profile) => isAdmin()
+function departmentProfiles() {
+  return visibleProfiles().filter((profile) => isAdmin()
     ? profileBelongsToDepartment(profile, ui.selectedDepartmentId)
     : profileDepartmentIds(profile).includes(ui.selectedDepartmentId));
-  if (ui.selectedFilter === "leads") {
-    const leadIds = new Set(state.departmentLeads.filter((lead) => lead.departmentId === ui.selectedDepartmentId).map((lead) => lead.profileId));
-    profiles = profiles.filter((profile) => leadIds.has(profile.id));
-  }
-  if (ui.selectedFilter === "unclaimed") profiles = profiles.filter((profile) => !profile.userId);
-  if (ui.selectedFilter === "vacation") {
-    profiles = profiles.filter((profile) => datesInRange().some((date) => scheduleFor(profile.id, date).id === "vacation"));
-  }
-  if (applyScheduleFilter && ui.scheduleStatusFilter !== "all") {
-    const dates = datesInRange();
-    profiles = profiles.filter((profile) => dates.some((date) => scheduleMatchesFilter(scheduleFor(profile.id, date))));
-  }
-  return profiles;
-}
-
-function scheduleMatchesFilter(schedule) {
-  if (ui.scheduleStatusFilter === "all") return true;
-  if (ui.scheduleStatusFilter === "available") return schedule.kind === "working" && schedule.id !== "ground";
-  if (ui.scheduleStatusFilter === "unavailable") return schedule.kind !== "working";
-  if (ui.scheduleStatusFilter === "manual") return isManualOverrideSchedule(schedule);
-  return schedule.id === ui.scheduleStatusFilter;
 }
 
 function canEditPast() {
@@ -1590,7 +1567,6 @@ function renderTopbar(title, subtitle, action = "") {
 function renderScheduler() {
   const dates = datesInRange();
   const profiles = departmentProfiles();
-  const coverageProfiles = departmentProfiles({ applyScheduleFilter: false });
   const department = byId(state.departments, ui.selectedDepartmentId);
   if (!department) {
     return renderTopbar("No Departments", "Create at least one department in Supabase before building schedules.", "");
@@ -1598,15 +1574,8 @@ function renderScheduler() {
 
   return `
     ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.")}
-    <section class="control-row">
-      ${filterButton("all", "All people")}
-      ${filterButton("leads", "Leads")}
-      ${filterButton("unclaimed", "Unclaimed")}
-      ${filterButton("vacation", "On annual")}
-    </section>
     ${ui.schedulerEditMode ? renderSchedulerEditCommitBar() : ""}
-    <section class="scheduler-shell">
-      <div class="schedule-grid ${schedulerRangeClass()} ${ui.schedulerEditMode ? "is-editing" : ""}" style="--days: ${dates.length}">
+    <section class="scheduler-toolbar" aria-label="Schedule controls">
         <div class="month-corner">
           <select id="department-select" title="Department">
             ${departmentOptions(ui.selectedDepartmentId, { teamNames: true })}
@@ -1619,30 +1588,27 @@ function renderScheduler() {
             <button class="ghost icon-button" id="month-next-range" aria-label="Next range" title="Next range">${icons.chevron}</button>
             <button class="ghost month-today-button" id="today-range">Today</button>
           </div>
-          <label class="bar-date-control">Start <input id="schedule-start-date" type="date" value="${ui.startDate}"></label>
-          <button class="ghost" id="month-start-range">Month Start</button>
-          <button class="ghost icon-button" id="zoom-in-range" aria-label="Zoom in" title="Zoom in">${icons.plus}</button>
-          <select id="range-select" title="Schedule zoom">
-            <option value="7" ${ui.rangeDays === 7 ? "selected" : ""}>1 Week</option>
-            <option value="14" ${ui.rangeDays === 14 ? "selected" : ""}>2 Weeks</option>
-            <option value="30" ${ui.rangeDays === 30 ? "selected" : ""}>1 Month</option>
-          </select>
-          <select id="schedule-status-filter" title="Schedule filter">
-            ${scheduleFilterOptions()}
-          </select>
-          <button class="ghost icon-button" id="zoom-out-range" aria-label="Zoom out" title="Zoom out">${icons.minus}</button>
+          <label class="bar-date-control"><input id="schedule-start-date" aria-label="Schedule start date" type="date" value="${ui.startDate}"></label>
+          <button class="ghost icon-button" id="month-start-range" aria-label="Month Start" title="Month Start">${icons.scheduler}</button>
+          <div class="schedule-zoom" role="group" aria-label="Schedule zoom">
+            <button class="ghost icon-button" id="zoom-out-range" aria-label="Zoom out" title="Zoom out" ${ui.rangeDays === 30 ? "disabled" : ""}>${icons.minus}</button>
+            <output aria-label="Schedule zoom level" title="${ui.rangeDays}-day range">${ui.rangeDays === 7 ? "200" : ui.rangeDays === 14 ? "100" : "50"}%</output>
+            <button class="ghost icon-button" id="zoom-in-range" aria-label="Zoom in" title="Zoom in" ${ui.rangeDays === 7 ? "disabled" : ""}>${icons.plus}</button>
+          </div>
           ${canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
             <button class="primary" id="save-scheduler-edit">${icons.lead} Save</button>
             <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
           ` : `<button class="primary" id="toggle-scheduler-edit">${icons.plus} Edit Schedule</button>` : ""}
         </div>
+    </section>
+    <section class="scheduler-shell">
+      <div class="schedule-grid ${schedulerRangeClass()} ${ui.schedulerEditMode ? "is-editing" : ""}" style="--days: ${dates.length}">
         ${renderSchedulerWeekBands(dates)}
         <div class="employee-head">
           <span>People</span>
           <strong>${profiles.length} profiles</strong>
         </div>
         ${dates.map((date) => renderDateHead(date)).join("")}
-        ${renderCoverageRow(coverageProfiles, dates, department)}
         ${profiles.map((profile) => renderProfileRow(profile, dates)).join("")}
       </div>
     </section>
@@ -1663,52 +1629,6 @@ function renderSchedulerEditCommitBar() {
       </div>
     </section>
   `;
-}
-
-function renderCoverageRow(profiles, dates, department) {
-  const target = coverageTargetForDepartment(department);
-  return `
-    <div class="coverage-head">
-      <span>Coverage</span>
-      <strong>${target} target</strong>
-    </div>
-    ${dates.map((date) => {
-      const coverage = coverageForDate(profiles, date);
-      const isLow = coverage.available < target;
-      const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
-      const selectedOverride = dailyLeadOverrideForDate(ui.selectedDepartmentId, date);
-      const leadDepartmentId = selectedOverride ? ui.selectedDepartmentId : leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
-      const drawerType = ui.schedulerEditMode && (selectedOverride || leadInfo.missing) ? "lead" : "coverage";
-      return `
-        <button class="coverage-cell ${isLow ? "low" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}">
-          <span class="coverage-count">${coverage.available}</span>
-          <span class="coverage-meta">avail</span>
-          <small>${coverage.unavailable} off - ${coverage.away} ground</small>
-        </button>
-      `;
-    }).join("")}
-  `;
-}
-function filterButton(id, label) {
-  const active = ui.selectedFilter === id;
-  return `<button class="segment ${active ? "active" : ""}" data-filter="${id}" aria-pressed="${active}">${label}</button>`;
-}
-
-function scheduleFilterOptions() {
-  const options = [
-    ["all", "All shifts"],
-    ["available", "Available"],
-    ["unavailable", "Unavailable"],
-    ["morning", "Morning"],
-    ["midday", "Mid-day"],
-    ["night", "Night"],
-    ["weekend", "Weekend"],
-    ["vacation", "Annual"],
-    ["sick", "Sick"],
-    ["ground", "On Ground"],
-    ["manual", "Manual changes"]
-  ];
-  return options.map(([id, label]) => `<option value="${id}" ${ui.scheduleStatusFilter === id ? "selected" : ""}>${label}</option>`).join("");
 }
 
 function requestFilterButton(id, label, count) {
@@ -1744,7 +1664,6 @@ function renderDateHead(date) {
     <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${leadLabel}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
-      <em>${leadLabel}</em>
     </button>
   `;
 }
@@ -1774,14 +1693,11 @@ function renderShiftCell(profile, date) {
   const source = isDayLead ? "Department lead" : displayScheduleSource(status.source);
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
-  const filterClass = scheduleMatchesFilter(status)
-    ? ui.scheduleStatusFilter === "all" ? "" : "filtered-match"
-    : "filtered-out";
   const drawerType = canManageProfileDepartment(profile) && editableDate(date) && !isRolePreviewActive()
     ? "shift"
     : "calendar-day";
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" data-open-drawer="${drawerType}" data-profile-id="${profile.id}" data-date="${date}" title="${profile.name}, ${formatDate(date)}, ${label}${drawerType === "shift" ? ". Click to edit this day" : ""}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" data-open-drawer="${drawerType}" data-profile-id="${profile.id}" data-date="${date}" title="${profile.name}, ${formatDate(date)}, ${label}${drawerType === "shift" ? ". Click to edit this day" : ""}">
       <span class="shift-icon">${icon}</span>
       <span class="shift-label">${label}</span>
       <small>${source}</small>
@@ -4110,15 +4026,6 @@ function bindEvents() {
     });
   });
 
-  document.querySelector("#range-select")?.addEventListener("change", (event) => {
-    ui.rangeDays = Number(event.target.value);
-    render();
-  });
-
-  document.querySelector("#schedule-status-filter")?.addEventListener("change", (event) => {
-    ui.scheduleStatusFilter = event.target.value;
-    render();
-  });
 
   document.querySelector("#schedule-start-date")?.addEventListener("change", (event) => {
     if (!event.target.value) return;
@@ -4177,12 +4084,6 @@ function bindEvents() {
     });
   });
 
-  document.querySelectorAll("[data-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      ui.selectedFilter = button.dataset.filter;
-      render();
-    });
-  });
 
   document.querySelectorAll("[data-request-filter]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -4616,10 +4517,6 @@ async function signOut() {
 
 async function saveShiftOverride(event) {
   event.preventDefault();
-  if (!ui.schedulerEditMode) {
-    notify("Turn on Edit Schedule before changing shifts.", "error");
-    return;
-  }
   const form = new FormData(event.currentTarget);
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile || !canManageProfileDepartment(profile) || !editableDate(ui.drawer.date)) return;
@@ -4630,6 +4527,10 @@ async function saveShiftOverride(event) {
   const targetDates = datesBetween(rangeStart, rangeEnd).filter(editableDate);
   const selectedStatusId = form.get("statusId");
   const selectedStatus = byId(state.statuses, selectedStatusId);
+  if (!selectedStatus || ![...rotationStatusIds, ...manualExceptionStatusIds].includes(selectedStatusId)) {
+    notify("Choose a daily shift. Annual leave must go through requests.", "error");
+    return;
+  }
   const leadAssignmentsToReplace = selectedStatus && !isScheduleLeadAvailable(selectedStatus)
     ? assignedLeadDatesForProfile(profile.id, targetDates)
     : [];
@@ -4668,10 +4569,6 @@ async function saveShiftOverride(event) {
 }
 
 async function clearShiftOverride() {
-  if (!ui.schedulerEditMode) {
-    notify("Turn on Edit Schedule before changing shifts.", "error");
-    return;
-  }
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile || !canManageProfileDepartment(profile) || !editableDate(ui.drawer.date)) return;
   const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === ui.drawer.date);

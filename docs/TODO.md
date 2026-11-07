@@ -39,6 +39,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Pinned Scheduler controls outside the horizontal scroller, simplified zoom to percentage/icons, removed board filters and redundant lead/coverage rows, and fixed saving/clearing daily changes without lead-edit mode.
 - [x] Added numbered closed week bands, kept Weekend/Annual/Sick rails visible at rest, and enforced non-overlapping Annual eligibility in the UI and database migration.
 - [x] Strengthened Monday week boundaries and made Weekend/Annual/Sick cells recede at rest while restoring full clarity and brightness on hover or keyboard focus.
 - [x] Made Lead replace the underlying working shift across schedule surfaces, added subdued hatching for Weekend/Annual/Sick, limited Pending Annual to working days, strengthened semantic scan cues, and added clear Monday week separators.
