@@ -67,7 +67,10 @@ for (const width of widths) {
     await page.getByRole("button", { name: "Rotations", exact: true }).click();
     await expectMainShellHealthy(page);
     await expect(page.getByRole("heading", { name: "Rotations", exact: true })).toBeVisible();
-    await expect(page.locator(".lead-shift-marker.active").first()).toBeVisible();
+    const leadShift = page.locator(".rotation-cell.lead").first();
+    await expect(leadShift).toBeVisible();
+    await expect(leadShift.locator(".shift-label")).toHaveText("Lead");
+    await expect(leadShift.locator(".lead-shift-marker")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Requests", exact: true }).click();
     await expectMainShellHealthy(page);

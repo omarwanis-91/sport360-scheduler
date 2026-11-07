@@ -407,3 +407,12 @@ This supersedes D-050's decision to retain three distinct operational views. Exi
 The weekly lead control is represented by a red star inside each person's weekday rotation shift. Authorized users choose the lead in the same grid where the weekly pattern is understood instead of using a separate lead panel above it.
 
 The star writes to the existing effective-dated department lead rotation and is not a fifth rotational status. Morning, Mid-day, Night, and Weekend remain the only rotation-template states.
+
+## D-054 - Lead Replaces The Underlying Shift In Presentation
+
+**Date:** 2026-11-07
+**Status:** Accepted
+
+When a working person is the resolved department lead for a date or weekday, Scheduler, Rotations, profile calendars, upcoming shifts, and request-impact previews display Lead as the primary shift with the red star icon. Morning, Mid-day, or Night must not remain visible beneath a separate lead badge.
+
+The underlying rotation result remains authoritative for availability, coverage, leave deductions, effective-dated history, and persistence. Weekend, Sick, and Annual are not eligible Lead presentations. Those non-working states use a subdued diagonal hatch, and Pending Annual appears only on affected working days. Semantic tints remain restrained, while status-matched left rails and Monday week gutters improve one-glance scanning without introducing a louder palette.

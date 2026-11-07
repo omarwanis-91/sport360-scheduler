@@ -735,6 +735,34 @@ function leadForProfileDate(profile, departmentId, dateIso) {
     .find((lead) => lead?.profile?.id === profile.id && lead.available);
 }
 
+function leadForProfileAcrossDepartments(profile, dateIso) {
+  return state.departments
+    .filter((department) => profileBelongsToDepartment(profile, department.id))
+    .map((department) => leadForProfileDate(profile, department.id, dateIso))
+    .find(Boolean);
+}
+
+function shiftPresentation(profile, dateIso, departmentId = "") {
+  const schedule = scheduleFor(profile.id, dateIso);
+  const lead = departmentId
+    ? leadForProfileDate(profile, departmentId, dateIso)
+    : leadForProfileAcrossDepartments(profile, dateIso);
+  const isLeadShift = Boolean(lead);
+  return {
+    schedule,
+    isLeadShift,
+    visualId: isLeadShift ? "lead" : schedule.id,
+    icon: isLeadShift ? icons.lead : statusIcons[schedule.id] || icons.scheduler,
+    label: isLeadShift ? "Lead" : displayStatusLabel(schedule),
+    source: isLeadShift ? "Department lead" : displayScheduleSource(schedule.source)
+  };
+}
+
+function pendingAnnualForWorkingDate(profileId, dateIso, schedule = scheduleFor(profileId, dateIso)) {
+  if (!isScheduleLeadAvailable(schedule)) return null;
+  return vacationRequestForDate(profileId, dateIso, "pending");
+}
+
 function scheduleFor(profileId, dateIso) {
   const schedule = scheduleForLogic(state, profileId, dateIso);
   if (schedule.override?.statusId === "vacation" && /^Vacation request\b/i.test(schedule.override.note || "")) {
@@ -1294,18 +1322,7 @@ function renderMyProfile() {
       </template>
       <section class="list-panel my-shifts">
         <span class="eyebrow">Upcoming</span>
-        ${upcoming.map((date) => {
-          const status = scheduleFor(profile.id, date);
-          return `
-            <button class="request-row ${status.id}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}">
-              <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
-              <div>
-                <strong>${formatDay(date)} ${formatDate(date)}</strong>
-                <span>${displayStatusLabel(status)} - ${displayScheduleSource(status.source)}</span>
-              </div>
-            </button>
-          `;
-        }).join("")}
+        ${upcoming.map((date) => renderUpcomingShiftRow(profile, date)).join("")}
       </section>
       </div>
       ${renderPersonMonthCalendar(profile, "page")}
@@ -1347,18 +1364,7 @@ function renderProfilePage() {
         </template>
         <section class="list-panel my-shifts">
           <span class="eyebrow">Upcoming</span>
-          ${upcoming.map((date) => {
-            const status = scheduleFor(profile.id, date);
-            return `
-              <button class="request-row ${status.id}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}">
-                <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
-                <div>
-                  <strong>${formatDay(date)} ${formatDate(date)}</strong>
-                  <span>${displayStatusLabel(status)} - ${displayScheduleSource(status.source)}</span>
-                </div>
-              </button>
-            `;
-          }).join("")}
+          ${upcoming.map((date) => renderUpcomingShiftRow(profile, date)).join("")}
         </section>
       </aside>
       <div class="profile-page-main">
@@ -1375,6 +1381,19 @@ function renderProfilePage() {
         </section>
       </div>
     </section>
+  `;
+}
+
+function renderUpcomingShiftRow(profile, date) {
+  const presentation = shiftPresentation(profile, date);
+  return `
+    <button class="request-row ${presentation.visualId}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}">
+      <span class="shift-icon">${presentation.icon}</span>
+      <div>
+        <strong>${formatDay(date)} ${formatDate(date)}</strong>
+        <span>${presentation.label} - ${presentation.source}</span>
+      </div>
+    </button>
   `;
 }
 
@@ -1500,8 +1519,9 @@ function renderPersonMonthCalendar(profile, placement = "drawer") {
 }
 
 function renderCalendarDay(profile, date) {
-  const schedule = scheduleFor(profile.id, date);
-  const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
+  const presentation = shiftPresentation(profile, date);
+  const schedule = presentation.schedule;
+  const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, schedule);
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
   const isSelected = ui.drawer?.type === "calendar-day"
     && ui.drawer.profileId === profile.id
@@ -1509,12 +1529,12 @@ function renderCalendarDay(profile, date) {
   const sourceClass = schedule.source.toLowerCase().replace(/\s+/g, "-");
   const dayClass = schedule.id === "ground" ? "away" : schedule.kind;
   const weekendClass = weekdayIndex(date) >= 5 ? "weekend-day" : "";
-  const calendarClass = `month-day ${dayClass} ${schedule.id} ${sourceClass} ${weekendClass} ${approvedVacation ? "approved-vacation" : ""} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
+  const calendarClass = `month-day ${dayClass} ${presentation.visualId} ${sourceClass} ${weekendClass} ${approvedVacation ? "approved-vacation" : ""} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
   return `
-    <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${displayStatusLabel(schedule)} - ${displayScheduleSource(schedule.source)}">
+    <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${presentation.label} - ${presentation.source}">
       <span>${parseDate(date).getDate()}</span>
       ${date === todayIso ? `<small class="today-label">Today</small>` : ""}
-      <em>${statusIcons[schedule.id] || icons.scheduler}</em>
+      <em>${presentation.icon}</em>
       ${pendingVacation ? `<i class="day-marker pending"></i>` : ""}
       ${approvedVacation ? `<i class="day-marker approved"></i>` : ""}
     </button>
@@ -1710,11 +1730,14 @@ function renderProfileRow(profile, dates) {
 
 function renderShiftCell(profile, date) {
   const status = scheduleFor(profile.id, date);
-  const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
+  const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, status);
   const lead = leadForProfileDate(profile, ui.selectedDepartmentId, date);
   const isDayLead = lead?.profile?.id === profile.id;
-  const canAssignLead = ui.schedulerEditMode && canManageDepartment(ui.selectedDepartmentId) && isScheduleLeadAvailable(status);
-  const icon = statusIcons[status.id] || icons.scheduler;
+  const canAssignLead = ui.schedulerEditMode && canManageDepartment(ui.selectedDepartmentId) && isScheduleLeadAvailable(status) && !isDayLead;
+  const visualId = isDayLead ? "lead" : status.id;
+  const icon = isDayLead ? icons.lead : statusIcons[status.id] || icons.scheduler;
+  const label = isDayLead ? "Lead" : displayStatusLabel(status);
+  const source = isDayLead ? "Department lead" : displayScheduleSource(status.source);
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
   const sourceClass = status.source.toLowerCase().replace(/\s+/g, "-");
   const filterClass = scheduleMatchesFilter(status)
@@ -1724,11 +1747,10 @@ function renderShiftCell(profile, date) {
     ? "shift"
     : "calendar-day";
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${status.id}" data-open-drawer="${drawerType}" data-profile-id="${profile.id}" data-date="${date}" title="${isDayLead ? "Department lead - " : ""}${profile.name}, ${formatDate(date)}, ${displayStatusLabel(status)}${drawerType === "shift" ? ". Click to edit this day" : ""}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${filterClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" data-open-drawer="${drawerType}" data-profile-id="${profile.id}" data-date="${date}" title="${profile.name}, ${formatDate(date)}, ${label}${drawerType === "shift" ? ". Click to edit this day" : ""}">
       <span class="shift-icon">${icon}</span>
-      ${isDayLead ? `<span class="lead-marker" aria-label="Department lead">${icons.lead}</span>` : ""}
-      <span class="shift-label">${displayStatusLabel(status)}</span>
-      <small>${displayScheduleSource(status.source)}</small>
+      <span class="shift-label">${label}</span>
+      <small>${source}</small>
       ${pendingVacation ? `<span class="cell-alert">Pending annual</span>` : ""}
       ${canAssignLead ? `<span class="assign-lead-action" data-assign-schedule-lead="${profile.id}" data-date="${date}">${icons.lead}<em>Lead</em></span>` : ""}
     </button>
@@ -2611,31 +2633,35 @@ function renderRotationEditCommitBar(department) {
 
 function renderRotationCell(profile, rotation, statusId, weekday = 0) {
   const isLeadSlot = leadForProfileWeekday(profile, ui.selectedDepartmentId, weekday)?.id === profile.id;
-  const canAssignLead = ui.rotationDepartmentEdit && rotation && canManageDepartment(ui.selectedDepartmentId);
   if (!rotation) {
     return `
       <div class="rotation-cell shift-cell state-off missing" data-profile-id="${profile.id}" data-rotation-id="" data-weekday="${weekday}">
         <span class="shift-icon">${icons.scheduler}</span>
-        ${isLeadSlot ? `<span class="lead-shift-marker active" aria-label="Department lead shift">${icons.lead}</span>` : ""}
         <span class="shift-label">No template</span>
         <small>Template</small>
       </div>
     `;
   }
   const status = byId(state.statuses, statusId) || byId(state.statuses, "weekend");
+  const showsLeadShift = isLeadSlot && isScheduleLeadAvailable(status);
+  const canAssignLead = ui.rotationDepartmentEdit
+    && canManageDepartment(ui.selectedDepartmentId)
+    && isScheduleLeadAvailable(status)
+    && !showsLeadShift;
   const availabilityState = status.id === "ground" ? "state-away" : status.kind === "working" ? "state-working" : "state-off";
-  const leadLabel = isLeadSlot
-    ? `${profile.name} is the ${weekDays[weekday]} lead`
-    : `Make ${profile.name} the ${weekDays[weekday]} lead`;
+  const visualId = showsLeadShift ? "lead" : status.id;
+  const icon = showsLeadShift ? icons.lead : statusIcons[status.id] || icons.scheduler;
+  const label = showsLeadShift ? "Lead" : displayStatusLabel(status) || "Unassigned";
+  const leadLabel = `Make ${profile.name} the ${weekDays[weekday]} lead`;
   return `
-    <div class="rotation-cell shift-cell ${availabilityState} ${status?.id || ""} ${canAssignLead ? "can-assign-lead" : ""}" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}" data-weekday="${weekday}">
+    <div class="rotation-cell shift-cell ${availabilityState} ${visualId} ${showsLeadShift ? "is-lead-shift" : ""} ${canAssignLead ? "can-assign-lead" : ""}" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}" data-weekday="${weekday}" aria-label="${profile.name}, ${weekDays[weekday]}, ${label}">
       ${ui.rotationDepartmentEdit ? `<button type="button" class="rotation-cell-open" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}" aria-label="Edit ${profile.name} ${weekDays[weekday]} rotation shift"></button>` : ""}
-      <span class="shift-icon">${statusIcons[status?.id] || icons.scheduler}</span>
-      <span class="shift-label">${displayStatusLabel(status) || "Unassigned"}</span>
-      <small>Template</small>
+      <span class="shift-icon">${icon}</span>
+      <span class="shift-label">${label}</span>
+      <small>${showsLeadShift ? "Weekly lead" : "Template"}</small>
       ${canAssignLead
-        ? `<button type="button" class="lead-shift-button ${isLeadSlot ? "active" : ""}" data-assign-rotation-lead="${profile.id}" data-weekday="${weekday}" aria-label="${leadLabel}" aria-pressed="${isLeadSlot}" title="${leadLabel}">${icons.lead}</button>`
-        : isLeadSlot ? `<span class="lead-shift-marker active" aria-label="Department lead shift" title="Department lead shift">${icons.lead}</span>` : ""}
+        ? `<button type="button" class="lead-shift-button" data-assign-rotation-lead="${profile.id}" data-weekday="${weekday}" aria-label="${leadLabel}" aria-pressed="false" title="${leadLabel}">${icons.lead}</button>`
+        : ""}
     </div>
   `;
 }
@@ -3026,7 +3052,7 @@ function shiftDrawer() {
   const rotation = activeRotation(profile.id, ui.drawer.date);
   const rotationStatus = schedule.rotationStatus;
   const existingOverride = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === ui.drawer.date);
-  const pendingVacation = vacationRequestForDate(profile.id, ui.drawer.date, "pending");
+  const pendingVacation = pendingAnnualForWorkingDate(profile.id, ui.drawer.date, schedule);
   const history = relatedAuditEntries((entry) => entry.detail.includes(ui.drawer.date) || entry.entityId === existingOverride?.id);
   return `
     <form id="shift-form" class="drawer-form">
@@ -3321,9 +3347,10 @@ function calendarDayDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   const department = byId(state.departments, profile.departmentId);
   const date = ui.drawer.date;
-  const schedule = scheduleFor(profile.id, date);
+  const presentation = shiftPresentation(profile, date);
+  const schedule = presentation.schedule;
   const rotationStatus = schedule.rotationStatus;
-  const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
+  const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, schedule);
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
   const canRequest = canRequestVacationFor(profile);
   const schedulerDepartmentId = profileDepartmentIds(profile).find((departmentId) => canManageDepartment(departmentId)) || profile.departmentId;
@@ -3337,11 +3364,11 @@ function calendarDayDrawer() {
           <span>${profile.title}</span>
         </div>
       </div>
-      <div class="calendar-day-summary ${schedule.kind} ${schedule.id}">
-        <span class="shift-icon">${statusIcons[schedule.id] || icons.scheduler}</span>
+      <div class="calendar-day-summary ${schedule.kind} ${presentation.visualId}">
+        <span class="shift-icon">${presentation.icon}</span>
         <div>
-          <strong>${displayStatusLabel(schedule)}</strong>
-          <span>${schedule.id === "ground" ? "Away" : schedule.kind === "working" ? "Available" : "Unavailable"} - ${displayScheduleSource(schedule.source)}</span>
+          <strong>${presentation.label}</strong>
+          <span>${schedule.id === "ground" ? "Away" : schedule.kind === "working" ? "Available" : "Unavailable"} - ${presentation.source}</span>
         </div>
       </div>
       <div class="detail-line"><span>Date</span><strong>${formatDay(date)} ${formatDate(date)}</strong></div>
@@ -3481,13 +3508,17 @@ function renderVacationTeamImpact(request, requestedProfile, department, impact)
               <span>${profile.name}</span>
             </div>
             ${impact.rows.map((row) => {
-              const current = scheduleFor(profile.id, row.date);
+              const presentation = shiftPresentation(profile, row.date, department.id);
+              const current = presentation.schedule;
               const projected = profile.id === requestedProfile.id && request.status === "pending" && row.changesToVacation;
               const status = projected ? byId(state.statuses, "vacation") || current : current;
+              const visualId = projected ? status.id : presentation.visualId;
+              const icon = projected ? statusIcons[status.id] || icons.scheduler : presentation.icon;
+              const label = projected ? displayStatusLabel(status) : presentation.label;
               return `
-                <div class="leave-impact-shift ${status.id} ${projected ? "projected" : ""}" title="${profile.name}, ${formatDate(row.date)}: ${projected ? `${displayStatusLabel(current)} to Annual` : displayStatusLabel(status)}">
-                  <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
-                  <small>${displayStatusLabel(status)}</small>
+                <div class="leave-impact-shift ${visualId} ${projected ? "projected" : ""}" title="${profile.name}, ${formatDate(row.date)}: ${projected ? `${presentation.label} to Annual` : label}">
+                  <span class="shift-icon">${icon}</span>
+                  <small>${label}</small>
                 </div>
               `;
             }).join("")}
@@ -3499,16 +3530,18 @@ function renderVacationTeamImpact(request, requestedProfile, department, impact)
 }
 
 function renderVacationImpactRow(row, requestStatus, profileId) {
+  const profile = byId(state.profiles, profileId);
+  const presentation = shiftPresentation(profile, row.date, profile.departmentId);
   const isLowAfter = row.target > 0 && row.availableAfter < row.target;
   const afterText = requestStatus === "pending" && row.changesToVacation
     ? `${row.availableAfter}/${row.target || "-"} after`
     : `${row.coverage.available}/${row.target || "-"} available`;
   const impactText = row.changesToVacation
-    ? requestStatus === "pending" ? `${displayStatusLabel(row.schedule)} to Annual` : "Annual recorded"
-    : `${displayStatusLabel(row.schedule)} unchanged`;
+    ? requestStatus === "pending" ? `${presentation.label} to Annual` : "Annual recorded"
+    : `${presentation.label} unchanged`;
   return `
     <button type="button" class="impact-row ${row.changesToVacation ? "changes" : ""} ${isLowAfter ? "low" : ""}" data-open-drawer="shift" data-profile-id="${profileId}" data-date="${row.date}">
-      <span class="shift-icon">${statusIcons[row.schedule.id] || icons.scheduler}</span>
+      <span class="shift-icon">${presentation.icon}</span>
       <div>
         <strong>${formatDay(row.date)} ${formatDate(row.date)}</strong>
         <span>${impactText}</span>
@@ -3621,7 +3654,7 @@ function leadDrawer() {
 function renderBulkShiftRow(profile, date, canEdit) {
   const schedule = scheduleFor(profile.id, date);
   const existingOverride = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
-  const pendingVacation = vacationRequestForDate(profile.id, date, "pending");
+  const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, schedule);
   const availabilityLabel = schedule.id === "ground" ? "Away" : schedule.kind === "working" ? "Available" : "Unavailable";
   const sourceClass = schedule.source.toLowerCase().replace(/\s+/g, "-");
   const rotationStatusId = schedule.rotationStatus?.id || schedule.id;
