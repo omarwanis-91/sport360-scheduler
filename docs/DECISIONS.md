@@ -425,3 +425,12 @@ The underlying rotation result remains authoritative for availability, coverage,
 Weekend, Annual, and Sick cells sit noticeably behind working shifts at rest through lower opacity, reduced brightness and saturation, and only a minimal softness. Their text, icons, and interaction remain available; hover and keyboard focus restore full clarity and a brighter semantic surface instead of leaving off days permanently low-contrast.
 
 Each Monday begins after a deliberate dark gutter with a restrained red edge that continues through the date, coverage, and employee rows. This week boundary must remain visible in dense two-week and month Scheduler ranges without introducing a competing accent color.
+
+## D-056 - Week Bands And Annual Eligibility Are Explicit
+
+**Date:** 2026-11-07
+**Status:** Accepted
+
+The Scheduler labels each visible ISO week with one closed, numbered band above its dates. Monday row seams stay quiet and neutral; they align content beneath the band instead of repeating curved red dividers through every row.
+
+Weekend, Sick, and existing Annual days are never eligible for another Annual write. Mixed requests affect only remaining eligible working days, while requests with no eligible days are rejected. Eligibility is recalculated at approval so schedule changes or overlapping pending requests cannot cause duplicate deductions or overwrite protected daily statuses. On Ground remains eligible because it is a working-day exception.

@@ -3,11 +3,14 @@ import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
 import {
   addDays as addDaysLogic,
+  annualEligibleDates as annualEligibleDatesLogic,
   byId,
   dateDiff as dateDiffLogic,
   datesBetween as datesBetweenLogic,
   departmentLeadForDate as departmentLeadForDateLogic,
   latestRotationForProfile as latestRotationForProfileLogic,
+  isAnnualEligibleSchedule,
+  isoWeekInfo,
   normalizeWeekPattern as normalizeWeekPatternLogic,
   parseDate as parseDateLogic,
   roleForProfile as roleForProfileLogic,
@@ -759,7 +762,7 @@ function shiftPresentation(profile, dateIso, departmentId = "") {
 }
 
 function pendingAnnualForWorkingDate(profileId, dateIso, schedule = scheduleFor(profileId, dateIso)) {
-  if (!isScheduleLeadAvailable(schedule)) return null;
+  if (!isAnnualEligibleSchedule(schedule)) return null;
   return vacationRequestForDate(profileId, dateIso, "pending");
 }
 
@@ -781,6 +784,36 @@ function activeDrawerDepartmentId() {
 
 function workdayCount(profileId, startIso, endIso) {
   return workdayCountLogic(state, profileId, startIso, endIso);
+}
+
+function annualEligibleDates(profileId, startIso, endIso) {
+  return annualEligibleDatesLogic(state, profileId, startIso, endIso);
+}
+
+function schedulerWeekGroups(dates) {
+  return dates.reduce((groups, date) => {
+    const info = isoWeekInfo(date);
+    const last = groups.at(-1);
+    if (last?.week === info.week && last?.year === info.year) {
+      last.count += 1;
+      last.endDate = date;
+      return groups;
+    }
+    groups.push({ ...info, count: 1, startDate: date, endDate: date });
+    return groups;
+  }, []);
+}
+
+function renderSchedulerWeekBands(dates) {
+  return `
+    <div class="week-band-corner"><span>Weeks</span></div>
+    ${schedulerWeekGroups(dates).map((group) => `
+      <div class="week-band" style="grid-column: span ${group.count}" aria-label="Week ${group.week}, ${group.year}">
+        <span>Week</span>
+        <strong>${group.week}</strong>
+      </div>
+    `).join("")}
+  `;
 }
 
 function coverageForDate(profiles, date) {
@@ -1603,6 +1636,7 @@ function renderScheduler() {
             <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
           ` : `<button class="primary" id="toggle-scheduler-edit">${icons.plus} Edit Schedule</button>` : ""}
         </div>
+        ${renderSchedulerWeekBands(dates)}
         <div class="employee-head">
           <span>People</span>
           <strong>${profiles.length} profiles</strong>
@@ -3403,7 +3437,7 @@ function vacationImpactForRequest(request, profile) {
     const coverage = coverageForDate(departmentProfilesList, date);
     const target = coverageTargetForDepartment(department);
     const changesToVacation = request.status === "pending"
-      ? schedule.kind === "working"
+      ? isAnnualEligibleSchedule(schedule)
       : schedule.id === "vacation";
     const availableAfter = request.status === "pending" && changesToVacation && schedule.id !== "ground"
       ? Math.max(0, coverage.available - 1)
@@ -4981,6 +5015,11 @@ async function saveVacationRequest(event) {
   const form = new FormData(event.currentTarget);
   const profile = byId(state.profiles, form.get("profileId"));
   if (!canRequestVacationFor(profile)) return;
+  const eligibleDates = annualEligibleDates(profile.id, form.get("startDate"), form.get("endDate"));
+  if (!eligibleDates.length) {
+    notify("This range has no eligible working days. Weekend, Sick, and existing Annual days are excluded.", "error");
+    return;
+  }
   const request = {
     id: makeId("vac"),
     profileId: form.get("profileId"),
@@ -5012,10 +5051,14 @@ async function decideRequest(requestId, decision) {
   const request = byId(state.vacationRequests, requestId);
   const profile = byId(state.profiles, request.profileId);
   if (!request || !profile || request.status !== "pending" || !canManageProfileDepartment(profile)) return;
-  const days = workdayCount(profile.id, request.startDate, request.endDate);
-  const requestDates = datesBetween(request.startDate, request.endDate);
+  const eligibleDates = annualEligibleDates(profile.id, request.startDate, request.endDate);
+  const days = eligibleDates.length;
+  if (decision === "approved" && !days) {
+    notify("No eligible working days remain. Weekend, Sick, and existing Annual days cannot be approved again.", "error");
+    return;
+  }
   const leadAssignmentsToReplace = decision === "approved"
-    ? assignedLeadDatesForProfile(profile.id, requestDates).filter((assignment) => isScheduleLeadAvailable(scheduleFor(profile.id, assignment.date)))
+    ? assignedLeadDatesForProfile(profile.id, eligibleDates).filter((assignment) => isScheduleLeadAvailable(scheduleFor(profile.id, assignment.date)))
     : [];
   await runMutation("vacation-decision", {
     pending: decision === "approved" ? "Approving request..." : "Rejecting request...",
@@ -5041,9 +5084,7 @@ async function decideRequest(requestId, decision) {
 
     if (decision === "approved") {
       profile.remainingVacationDays -= days;
-      for (let offset = 0; offset <= dateDiff(request.startDate, request.endDate); offset += 1) {
-        const date = addDays(request.startDate, offset);
-        if (scheduleFor(profile.id, date).kind !== "working") continue;
+      for (const date of eligibleDates) {
         const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
         const payload = { id: existing?.id || makeId("ovr"), profileId: profile.id, date, statusId: "vacation", note: `Vacation request ${request.id}` };
         if (existing) Object.assign(existing, payload);

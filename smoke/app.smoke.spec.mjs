@@ -402,16 +402,22 @@ test("lead shifts replace their underlying rotation and non-working states stay 
   expect(weekendTexture).toContain("repeating-linear-gradient");
   const restingOffDay = await weekendCell.evaluate((element) => ({
     opacity: Number(getComputedStyle(element).opacity),
-    filter: getComputedStyle(element).filter
+    railOpacity: Number(getComputedStyle(element, "::before").opacity),
+    railColor: getComputedStyle(element, "::before").backgroundColor,
+    labelOpacity: Number(getComputedStyle(element.querySelector(".shift-label")).opacity),
+    labelFilter: getComputedStyle(element.querySelector(".shift-label")).filter
   }));
-  expect(restingOffDay.opacity).toBeLessThanOrEqual(0.55);
-  expect(restingOffDay.filter).toContain("blur");
-  expect(restingOffDay.filter).toContain("brightness");
+  expect(restingOffDay.opacity).toBe(1);
+  expect(restingOffDay.railOpacity).toBeGreaterThanOrEqual(0.9);
+  expect(restingOffDay.railColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(restingOffDay.labelOpacity).toBeLessThanOrEqual(0.5);
+  expect(restingOffDay.labelFilter).toContain("blur");
+  expect(restingOffDay.labelFilter).toContain("brightness");
 
   await weekendCell.hover();
-  await expect.poll(() => weekendCell.evaluate((element) => Number(getComputedStyle(element).opacity))).toBe(1);
-  const activeOffDayFilter = await weekendCell.evaluate((element) => getComputedStyle(element).filter);
-  expect(activeOffDayFilter).toContain("brightness(1.14)");
+  await expect.poll(() => weekendCell.locator(".shift-label").evaluate((element) => Number(getComputedStyle(element).opacity))).toBe(1);
+  const activeOffDayFilter = await weekendCell.locator(".shift-label").evaluate((element) => getComputedStyle(element).filter);
+  expect(activeOffDayFilter).toContain("brightness(1.08)");
   expect(activeOffDayFilter).toContain("blur(0px)");
 
   await page.locator("#department-select").selectOption("support");
@@ -421,15 +427,27 @@ test("lead shifts replace their underlying rotation and non-working states stay 
   await expect(sickShift).toHaveClass(/sick/);
   expect(await sickShift.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("repeating-linear-gradient");
 
+  const weekBands = page.locator(".week-band");
+  await expect(weekBands).toHaveCount(2);
+  await expect(weekBands.first()).toContainText(/Week\s+21/);
+  await expect(weekBands.nth(1)).toContainText(/Week\s+22/);
+  const weekBandStyle = await weekBands.first().evaluate((element) => ({
+    borderLeftWidth: getComputedStyle(element).borderLeftWidth,
+    borderRightWidth: getComputedStyle(element).borderRightWidth,
+    borderRadius: parseFloat(getComputedStyle(element).borderRadius)
+  }));
+  expect(weekBandStyle.borderLeftWidth).toBe("1px");
+  expect(weekBandStyle.borderRightWidth).toBe("1px");
+  expect(weekBandStyle.borderRadius).toBeGreaterThan(0);
+
   const weekSeparator = page.locator(".date-head.week-start").first();
-  await expect(weekSeparator).toBeVisible();
   const weekSeparatorStyle = await weekSeparator.evaluate((element) => ({
     marginLeft: getComputedStyle(element).marginLeft,
     borderLeftWidth: getComputedStyle(element).borderLeftWidth,
     boxShadow: getComputedStyle(element).boxShadow
   }));
-  expect(weekSeparatorStyle.marginLeft).toBe("8px");
-  expect(weekSeparatorStyle.borderLeftWidth).toBe("2px");
+  expect(weekSeparatorStyle.marginLeft).toBe("6px");
+  expect(weekSeparatorStyle.borderLeftWidth).toBe("1px");
   expect(weekSeparatorStyle.boxShadow).not.toBe("none");
 
   await page.locator("#user-switcher").selectOption("user-lead");
@@ -455,6 +473,19 @@ test("pending annual appears only on affected working days and stays on one line
   await expect(saturday.locator(".cell-alert")).toHaveCount(0);
   await expect(sunday.locator(".cell-alert")).toHaveCount(0);
   expect(await workingDay.locator(".cell-alert").evaluate((element) => getComputedStyle(element).whiteSpace)).toBe("nowrap");
+});
+
+test("annual requests reject ranges containing only protected non-working days", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Requests", exact: true }).click();
+  await page.getByRole("button", { name: "New Request", exact: true }).click();
+  await page.locator('#request-form select[name="profileId"]').selectOption("emp-004");
+  await page.locator('#request-form input[name="startDate"]').fill("2026-05-18");
+  await page.locator('#request-form input[name="endDate"]').fill("2026-05-18");
+  await page.getByRole("button", { name: "Submit Request", exact: true }).click();
+
+  await expect(page.locator(".app-notice.error")).toContainText("no eligible working days");
+  await expect(page.locator("#request-form")).toBeVisible();
 });
 
 test("missing-lead alerts stay in date headers while coverage keeps coverage details", async ({ page }) => {
