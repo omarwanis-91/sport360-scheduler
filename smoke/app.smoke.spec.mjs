@@ -397,8 +397,22 @@ test("lead shifts replace their underlying rotation and non-working states stay 
   const nightRail = await page.locator(".shift-cell.night").first().evaluate((element) => getComputedStyle(element, "::before").backgroundColor);
   expect(morningRail).not.toBe(nightRail);
 
-  const weekendTexture = await page.locator(".shift-cell.weekend").first().evaluate((element) => getComputedStyle(element).backgroundImage);
+  const weekendCell = page.locator(".shift-cell.weekend").first();
+  const weekendTexture = await weekendCell.evaluate((element) => getComputedStyle(element).backgroundImage);
   expect(weekendTexture).toContain("repeating-linear-gradient");
+  const restingOffDay = await weekendCell.evaluate((element) => ({
+    opacity: Number(getComputedStyle(element).opacity),
+    filter: getComputedStyle(element).filter
+  }));
+  expect(restingOffDay.opacity).toBeLessThanOrEqual(0.55);
+  expect(restingOffDay.filter).toContain("blur");
+  expect(restingOffDay.filter).toContain("brightness");
+
+  await weekendCell.hover();
+  await expect.poll(() => weekendCell.evaluate((element) => Number(getComputedStyle(element).opacity))).toBe(1);
+  const activeOffDayFilter = await weekendCell.evaluate((element) => getComputedStyle(element).filter);
+  expect(activeOffDayFilter).toContain("brightness(1.14)");
+  expect(activeOffDayFilter).toContain("blur(0px)");
 
   await page.locator("#department-select").selectOption("support");
   await page.locator("#schedule-start-date").fill("2026-05-18");
@@ -409,7 +423,14 @@ test("lead shifts replace their underlying rotation and non-working states stay 
 
   const weekSeparator = page.locator(".date-head.week-start").first();
   await expect(weekSeparator).toBeVisible();
-  expect(await weekSeparator.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe("none");
+  const weekSeparatorStyle = await weekSeparator.evaluate((element) => ({
+    marginLeft: getComputedStyle(element).marginLeft,
+    borderLeftWidth: getComputedStyle(element).borderLeftWidth,
+    boxShadow: getComputedStyle(element).boxShadow
+  }));
+  expect(weekSeparatorStyle.marginLeft).toBe("8px");
+  expect(weekSeparatorStyle.borderLeftWidth).toBe("2px");
+  expect(weekSeparatorStyle.boxShadow).not.toBe("none");
 
   await page.locator("#user-switcher").selectOption("user-lead");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();

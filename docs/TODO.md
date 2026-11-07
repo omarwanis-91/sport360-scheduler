@@ -38,6 +38,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Strengthened Monday week boundaries and made Weekend/Annual/Sick cells recede at rest while restoring full clarity and brightness on hover or keyboard focus.
 - [x] Made Lead replace the underlying working shift across schedule surfaces, added subdued hatching for Weekend/Annual/Sick, limited Pending Annual to working days, strengthened semantic scan cues, and added clear Monday week separators.
 - [x] Unified People, Hierarchy, and Departments into one Team workspace, moved annual-request review into a centered impact modal, added restrained status tinting across operational calendars, and placed weekly lead selection as a red star inside rotation shifts.
 - [x] Restored direct one-time shift editing, added a team rotation preview to annual approvals, bundled People/Hierarchy/Departments into Team navigation, refined Scheduler controls, and removed full-shell redraws from rotation pattern choices.
