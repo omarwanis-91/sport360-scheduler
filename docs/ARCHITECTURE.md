@@ -48,14 +48,14 @@ The application uses view-level render functions rather than routes. Primary vie
 - My Profile
 - Scheduler
 - Annual Requests
-- Team, presented as one compact navigation group containing People, Hierarchy, and Departments
+- Team, one integrated workspace for department context, hierarchy, and people management
 - Rotations
 - Activity
 - Settings
 
 Settings also contains the Admin-only Role Preview launcher. Preview mode is intentionally session-local and UI-only; production authorization remains enforced and tested through Supabase RLS/RPCs.
 
-Right-side drawers handle focused tasks such as shift edits, daily bulk editing, request review, profile editing, department details, and rotation editing. Authorized Scheduler cell clicks open one-time daily overrides directly; Scheduler edit mode remains reserved for staged day-lead changes. Annual-request review includes a compact team schedule preview across the affected dates. Full employee profile and calendar experiences use the main content area.
+Right-side drawers handle focused tasks such as shift edits, daily bulk editing, profile editing, department details, and rotation editing. Annual-request review opens as a centered wide modal so its compact team schedule preview and decision impact remain readable across the affected dates. Authorized Scheduler cell clicks open one-time daily overrides directly; Scheduler edit mode remains reserved for staged day-lead changes. Full employee profile and calendar experiences use the main content area.
 
 Rotation pattern choices update their existing editor controls in place instead of rebuilding the application shell, preserving focus and unsaved form content during rapid pattern editing.
 
@@ -102,6 +102,8 @@ For a person and date:
 
 Employee profiles also carry `seniority_level`, now simplified to `manager`, `lead`, or `artist`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; any current department member can be selected as a day lead. `user_roles.lead` remains the separate authorization role for application permissions.
 
+Weekly lead assignment is edited directly inside the rotation grid through a red star on each person's weekday shift. This is a scheduling affordance over the existing effective-dated lead-rotation data; it does not create a fifth shift status or couple lead scheduling to profile seniority.
+
 Parent-department lead assignments use the full descendant department scope. A daily override or weekly lead rotation stored on a parent can therefore resolve to a profile assigned to one of its sub-departments. In Scheduler edit mode, an existing parent daily override reopens the parent lead editor so it can be returned to the weekly rotation without direct database cleanup.
 
 ## Authorization Model
@@ -122,10 +124,10 @@ Parent-department lead assignments use the full descendant department scope. A d
 - The app uses layered translucent black surfaces, toned crimson gradients, white edge highlights, and selective red glows while preserving the core red/black/white identity.
 - Shared motion tokens drive hover elevation, press feedback, navigation-triggered staggered view entrances, and drawer/modal transitions. Motion uses transforms and opacity, remains interruptible, does not replay for ordinary in-view updates, and is disabled through `prefers-reduced-motion`.
 - The app should feel like a polished operational tech workspace: subtle animated background lines, restrained glows, layered gradients, and satisfying hover feedback are preferred when they do not reduce scan speed or legibility.
-- Shift-specific colors are confined to icons and compact markers so schedule and calendar surfaces remain neutral and consistent with the red/black/white workspace.
+- Shift-specific colors remain strongest on icons and compact markers. Related schedule, rotation, profile-calendar, request-impact, and status-choice surfaces may carry a restrained semantic tint capped around 20% so the status is visible without competing with the red/black/white workspace.
 - Scheduler timelines and profile month calendars use a shared separated-card rhythm: compact gaps, rounded charcoal cells, subtle white inner edges, and red-only today/selection emphasis inspired by modern calendar dashboards without adopting their blue palette.
 - Unavailable states remain quieter than working states.
-- Scheduler cells use a neutral vertical bar as the primary working/non-working signal; individual status type is secondary through its colored icon and text label rather than a tinted cell surface.
+- Scheduler cells use a restrained semantic tint together with the colored icon and text label; working/non-working structure and warnings remain distinguishable without relying on color alone.
 - Scheduler filtering can narrow the current range by availability, rotational shift, daily exception, or manual change while keeping the date timeline visible.
 - Cards are used for repeated entities and focused tools, not every page section.
 - Icons and concise status tags carry repeated information.

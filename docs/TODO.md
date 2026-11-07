@@ -38,6 +38,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Unified People, Hierarchy, and Departments into one Team workspace, moved annual-request review into a centered impact modal, added restrained status tinting across operational calendars, and placed weekly lead selection as a red star inside rotation shifts.
 - [x] Restored direct one-time shift editing, added a team rotation preview to annual approvals, bundled People/Hierarchy/Departments into Team navigation, refined Scheduler controls, and removed full-shell redraws from rotation pattern choices.
 - [x] Reworked Scheduler and profile calendars into separated rounded charcoal cards, removed every status tint from their surfaces, and kept shift identity exclusively on icons and compact markers.
 - [x] Completed the second cinematic interior pass with navigation-only staggered entrances, a floating glass workspace hierarchy, richer panel and list depth, and neutral schedule/calendar surfaces that confine shift colors to icons.

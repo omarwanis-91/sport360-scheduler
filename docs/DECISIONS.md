@@ -380,3 +380,30 @@ Employees and read-only role previews continue to receive the day-detail view wi
 **Status:** Accepted
 
 People, Hierarchy, and Departments remain distinct operational views but are bundled into one compact Team group in the primary navigation. This keeps each established workflow intact while reducing top-level navigation noise and making the relationship between people, structure, and departments explicit.
+
+## D-051 - Operational Status Surfaces Use A Restrained Tint
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+Scheduler cells, rotation cells, profile-calendar days, request-impact cells, and status choices may use a subtle semantic tint capped around 20%. Icons and text labels remain the primary status identifiers, so color is never the only signal.
+
+This supersedes the no-tint portions of D-047 and D-048 while preserving their compact separated-card layout, restrained palette, and red emphasis for selection, editing, warnings, and brand actions.
+
+## D-052 - Team Is One Integrated Workspace
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+People, hierarchy, and department management share one Team destination and one department context. The workspace combines department selection, organization summary, hierarchy, and the existing people presentations without adding internal People, Hierarchy, or Departments tabs.
+
+This supersedes D-050's decision to retain three distinct operational views. Existing permission boundaries, profile drawers, department actions, and people presentation modes remain intact.
+
+## D-053 - Weekly Lead Assignment Lives In Rotation Cells
+
+**Date:** 2026-11-05
+**Status:** Accepted
+
+The weekly lead control is represented by a red star inside each person's weekday rotation shift. Authorized users choose the lead in the same grid where the weekly pattern is understood instead of using a separate lead panel above it.
+
+The star writes to the existing effective-dated department lead rotation and is not a fifth rotational status. Morning, Mid-day, Night, and Weekend remain the only rotation-template states.
