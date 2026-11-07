@@ -4,6 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
+- [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
 - [x] Apply `026_self_service_profile_onboarding.sql`, pass audit 014, deploy the reviewed onboarding UI, enable prelaunch signup, and verify the public isolation page in Chrome, Edge, and Firefox.
@@ -38,6 +39,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added numbered closed week bands, kept Weekend/Annual/Sick rails visible at rest, and enforced non-overlapping Annual eligibility in the UI and database migration.
 - [x] Strengthened Monday week boundaries and made Weekend/Annual/Sick cells recede at rest while restoring full clarity and brightness on hover or keyboard focus.
 - [x] Made Lead replace the underlying working shift across schedule surfaces, added subdued hatching for Weekend/Annual/Sick, limited Pending Annual to working days, strengthened semantic scan cues, and added clear Monday week separators.
 - [x] Unified People, Hierarchy, and Departments into one Team workspace, moved annual-request review into a centered impact modal, added restrained status tinting across operational calendars, and placed weekly lead selection as a red star inside rotation shifts.

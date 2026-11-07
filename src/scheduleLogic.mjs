@@ -34,6 +34,17 @@ export function datesBetween(startIso, endIso) {
   return Array.from({ length: days + 1 }, (_, index) => addDays(startIso, index));
 }
 
+export function isoWeekInfo(dateIso) {
+  const localDate = parseDate(dateIso);
+  const weekDate = new Date(Date.UTC(localDate.getFullYear(), localDate.getMonth(), localDate.getDate()));
+  const isoDay = weekDate.getUTCDay() || 7;
+  weekDate.setUTCDate(weekDate.getUTCDate() + 4 - isoDay);
+  const year = weekDate.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil((((weekDate - yearStart) / 86400000) + 1) / 7);
+  return { week, year };
+}
+
 export function normalizeWeekPattern(pattern, defaultWeekPattern) {
   if (pattern?.length === 7) return [...pattern];
   return Array.from({ length: 7 }, (_, index) => pattern?.[index % pattern.length] || defaultWeekPattern[index]);
@@ -126,8 +137,19 @@ export function scheduleFor(state, profileId, dateIso) {
   return { ...rotationStatus, source: "Rotation", rotation, rotationStatus };
 }
 
+export function isAnnualEligibleSchedule(schedule) {
+  return Boolean(
+    schedule?.kind === "working"
+    && !["weekend", "sick", "vacation"].includes(schedule.id)
+  );
+}
+
+export function annualEligibleDates(state, profileId, startIso, endIso) {
+  if (!startIso || !endIso || endIso < startIso) return [];
+  return datesBetween(startIso, endIso)
+    .filter((date) => isAnnualEligibleSchedule(scheduleFor(state, profileId, date)));
+}
+
 export function workdayCount(state, profileId, startIso, endIso) {
-  const days = dateDiff(startIso, endIso) + 1;
-  return Array.from({ length: days }, (_, index) => addDays(startIso, index))
-    .filter((date) => scheduleFor(state, profileId, date).kind === "working").length;
+  return annualEligibleDates(state, profileId, startIso, endIso).length;
 }

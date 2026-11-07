@@ -4,7 +4,7 @@ This document is the durable phased plan for Sport360 Scheduler. It records what
 
 ## Current Position
 
-Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 026 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 026 passed audit 014 with email auto-claim disabled and Admin approval required. The Admin-approved self-service account page is active in production, and its public isolation checks pass in Chrome, Edge, and Firefox. Migration 027 and audit 015 are prepared to enforce the final sole-Admin, direct-department Lead, and direct-department Employee boundaries. A credential-injected, read-only three-browser role verifier is ready; applying and verifying those boundaries, the full backup/restore gate, and the first real submission/approval round trip remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
+Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Release. The Vercel internal preview is live, and migrations 022 through 027 have been applied. Admin production checks pass in Chrome, Edge, and Firefox. Migration 026 passed audit 014 with email auto-claim disabled and Admin approval required, and migration 027 passed audit 015 for the final sole-Admin and direct-department Lead/Employee boundaries. The Admin-approved self-service account page is active in production, and its public isolation checks pass in Chrome, Edge, and Firefox. Migration 028 and audit 016 are prepared to enforce exclusive Annual eligibility against Weekend, Sick, and existing Annual days. Applying and verifying that guard, the full backup/restore gate, and the first real submission/approval round trip remain open. Phases 5-6 remain intentionally non-blocking for the first production release.
 
 ## Phase 0 - Product Foundation
 
@@ -105,6 +105,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Build the Admin-approved self-service onboarding replacement: name/photo-only submissions, no email auto-claim, and explicit Admin link-or-create review.
 - ✅ Apply migration 026, pass audit 014, restore the production prelaunch flags, and verify the public replacement page in Chrome, Edge, and Firefox.
 - ✅ Apply migration 027 and pass audit 015 for the sole-Admin and direct-department Lead/Employee boundaries.
+- ⏳ Apply migration 028 and pass audit 016 for exclusive Annual eligibility and overlap protection.
 - ✅ Add an Admin-only, read-only Role Preview for inspecting department-scoped Lead and Employee interfaces without fake accounts.
 - ✅ Refine the existing red/black/white interface with layered glass surfaces, restrained crimson glows, stronger primary actions, and consistent reduced-motion-aware transitions.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.

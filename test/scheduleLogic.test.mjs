@@ -2,8 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   addDays,
+  annualEligibleDates,
   datesBetween,
   departmentLeadForDate,
+  isAnnualEligibleSchedule,
+  isoWeekInfo,
   latestRotationForProfile,
   roleForProfile,
   sanitizeRotationPattern,
@@ -23,6 +26,7 @@ function testState() {
       { id: "night", label: "Night", kind: "working" },
       { id: "weekend", label: "Weekend", kind: "off" },
       { id: "vacation", label: "Vacation", kind: "leave" },
+      { id: "sick", label: "Sick", kind: "leave" },
       { id: "ground", label: "On Ground", kind: "working" }
     ],
     departments: [
@@ -42,7 +46,8 @@ function testState() {
     ],
     scheduleOverrides: [
       { id: "ovr-1", profileId: "emp-1", date: "2026-05-21", statusId: "vacation", note: "Approved request" },
-      { id: "ovr-2", profileId: "emp-1", date: "2026-05-22", statusId: "ground", note: "On site" }
+      { id: "ovr-2", profileId: "emp-1", date: "2026-05-22", statusId: "ground", note: "On site" },
+      { id: "ovr-3", profileId: "emp-1", date: "2026-05-25", statusId: "sick", note: "Sick day" }
     ],
     profiles: [
       { id: "lead-weekday", departmentId: "ops", leadEligible: true },
@@ -70,6 +75,11 @@ test("date helpers use local calendar days", () => {
   assert.deepEqual(datesBetween("2026-06-01", "2026-06-03"), ["2026-06-01", "2026-06-02", "2026-06-03"]);
 });
 
+test("ISO week labels stay correct across year boundaries", () => {
+  assert.deepEqual(isoWeekInfo("2026-01-01"), { week: 1, year: 2026 });
+  assert.deepEqual(isoWeekInfo("2027-01-01"), { week: 53, year: 2026 });
+});
+
 test("rotation patterns reject non-rotational statuses", () => {
   assert.deepEqual(
     sanitizeRotationPattern(["morning", "vacation", "sick"], rotationStatusIds, defaultWeekPattern),
@@ -90,6 +100,18 @@ test("schedule uses latest effective rotation and keeps override context", () =>
 
 test("workday count includes working exceptions and excludes leave/off days", () => {
   assert.equal(workdayCount(testState(), "emp-1", "2026-05-20", "2026-05-24"), 2);
+});
+
+test("annual eligibility excludes Weekend, Sick, and existing Annual without excluding On Ground", () => {
+  const state = testState();
+  assert.deepEqual(
+    annualEligibleDates(state, "emp-1", "2026-05-20", "2026-05-25"),
+    ["2026-05-20", "2026-05-22"]
+  );
+  assert.equal(isAnnualEligibleSchedule(scheduleFor(state, "emp-1", "2026-05-21")), false);
+  assert.equal(isAnnualEligibleSchedule(scheduleFor(state, "emp-1", "2026-05-23")), false);
+  assert.equal(isAnnualEligibleSchedule(scheduleFor(state, "emp-1", "2026-05-25")), false);
+  assert.equal(isAnnualEligibleSchedule(scheduleFor(state, "emp-1", "2026-05-22")), true);
 });
 
 test("role lookup prefers stored user role, falls back to user, then unclaimed", () => {

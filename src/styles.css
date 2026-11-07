@@ -8149,27 +8149,99 @@ select:focus {
   line-height: 1;
 }
 
-/* A stronger gutter at every Monday makes each week readable as a distinct block. */
+/* One closed band names and outlines each visible ISO week. */
+.week-band-corner,
+.week-band {
+  min-height: 30px;
+  border: 1px solid rgba(238, 104, 130, 0.24);
+  background:
+    linear-gradient(145deg, rgba(174, 37, 64, 0.09), rgba(255, 255, 255, 0.012) 64%),
+    rgba(12, 12, 15, 0.97);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 5px 16px rgba(0, 0, 0, 0.16);
+}
+
+.week-band-corner {
+  position: sticky;
+  left: 8px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  border-radius: 9px;
+  color: #777780;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.week-band {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 999px;
+  color: #aaaab3;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.week-band strong {
+  color: #f1f1f4;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+/* Monday uses one quiet seam; the week band above carries the visible outline. */
 .date-head.week-start,
 .coverage-cell.week-start,
 .schedule-grid .shift-cell.week-start {
-  margin-left: 8px;
-  border-left-width: 2px;
-  border-left-color: rgba(244, 112, 138, 0.76);
+  margin-left: 6px;
+  border-left-width: 1px;
+  border-left-color: rgba(255, 255, 255, 0.12);
   box-shadow:
-    -8px 0 0 rgba(4, 4, 6, 1),
-    -10px 0 0 rgba(226, 73, 104, 0.72),
-    -11px 0 0 rgba(255, 255, 255, 0.13),
+    -6px 0 0 rgba(4, 4, 6, 1),
     inset 0 1px 0 rgba(255, 255, 255, 0.035),
-    -3px 0 18px rgba(213, 57, 88, 0.16),
     0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
-/* Off days recede as one quiet layer, then return to full clarity on interaction. */
-.shift-cell.state-off,
-.shift-cell:is(.weekend, .vacation, .sick),
-.schedule-grid .shift-cell.state-off,
-.schedule-grid .shift-cell:is(.weekend, .vacation, .sick),
+/* Non-working text recedes while its semantic status rail stays visible at rest. */
+.shift-cell:is(.state-off, .weekend, .vacation, .sick),
+.schedule-grid .shift-cell:is(.state-off, .weekend, .vacation, .sick) {
+  opacity: 1;
+  filter: none;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgb(var(--status-rgb, 196 198 207) / 0.06) 8px 10px, transparent 10px 18px),
+    linear-gradient(145deg, rgb(var(--status-rgb, 196 198 207) / 0.07), rgb(var(--status-rgb, 196 198 207) / 0.018) 62%, transparent 86%),
+    rgba(11, 11, 14, 0.99);
+}
+
+.shift-cell:is(.state-off, .weekend, .vacation, .sick) :is(.shift-icon, .shift-label, small, .cell-alert),
+.schedule-grid .shift-cell:is(.state-off, .weekend, .vacation, .sick) :is(.shift-icon, .shift-label, small, .cell-alert) {
+  opacity: 0.46;
+  filter: brightness(0.7) saturate(0.72) blur(0.18px);
+  transition: opacity 0.22s ease, filter 0.22s ease;
+}
+
+.shift-cell:is(.state-off, .weekend, .vacation, .sick)::before,
+.schedule-grid .shift-cell:is(.state-off, .weekend, .vacation, .sick)::before {
+  opacity: 0.96;
+  filter: none;
+  background: rgb(var(--status-rgb, 196 198 207) / 0.96);
+  box-shadow: 0 0 12px rgb(var(--status-rgb, 196 198 207) / 0.3);
+}
+
+.shift-cell:is(.state-off, .weekend, .vacation, .sick):is(:hover, :focus-visible) :is(.shift-icon, .shift-label, small, .cell-alert),
+.schedule-grid .shift-cell:is(.state-off, .weekend, .vacation, .sick):is(:hover, :focus-visible) :is(.shift-icon, .shift-label, small, .cell-alert) {
+  opacity: 1;
+  filter: brightness(1.08) saturate(1.04) blur(0);
+}
+
+/* Other compact calendar views retain the same subdued off-day hierarchy. */
 .month-day:is(.off, .weekend, .weekend-day, .leave, .vacation, .approved-vacation, .sick),
 .my-shifts .request-row:is(.weekend, .vacation, .sick),
 .leave-impact-shift:is(.weekend, .vacation, .sick) {
