@@ -46,7 +46,10 @@ for (const width of widths) {
     await expect(page.getByRole("heading", { name: "Operations", exact: true })).toBeVisible();
     await expect(page.locator(".scheduler-month-bar")).toBeVisible();
     await expect(page.locator("#department-select")).toBeVisible();
-    await expect(page.locator("#schedule-status-filter")).toBeVisible();
+    await expect(page.getByLabel("Schedule zoom level", { exact: true })).toBeInViewport();
+    await page.locator(".scheduler-shell").evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+    await expect(page.getByTitle("Zoom in", { exact: true })).toBeInViewport();
+    await expect(page.getByTitle("Zoom out", { exact: true })).toBeInViewport();
     await expect(page.locator(".schedule-grid")).toBeVisible();
 
     await page.getByRole("button", { name: "My Profile", exact: true }).click();

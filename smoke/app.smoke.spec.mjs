@@ -158,8 +158,7 @@ test("demo workspace loads and primary navigation works", async ({ page }) => {
   await expect(page.getByText("Sport360", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Scheduler", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("button", { name: "All people", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Leads", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("region", { name: "Schedule controls", exact: true })).toBeVisible();
 
   const destinations = [
     ["Team", "Team"],
@@ -384,7 +383,7 @@ test("schedule, rotation, and profile surfaces keep a restrained status tint", a
 test("lead shifts replace their underlying rotation and non-working states stay subdued", async ({ page }) => {
   await page.goto("/");
 
-  const leadHeader = page.locator(".date-head").filter({ hasText: "Lead: Mona" }).first();
+  const leadHeader = page.locator('.date-head[aria-label*="Lead: Mona"]').first();
   await expect(leadHeader).toBeVisible();
   const leadDate = await leadHeader.getAttribute("data-date");
   const schedulerLead = page.locator(`.shift-cell[data-profile-id="emp-002"][data-date="${leadDate}"]`);
@@ -425,6 +424,7 @@ test("lead shifts replace their underlying rotation and non-working states stay 
   await page.locator("#schedule-start-date").press("Tab");
   const sickShift = page.locator('.shift-cell[data-profile-id="emp-004"][data-date="2026-05-18"]');
   await expect(sickShift).toHaveClass(/sick/);
+  await page.mouse.move(0, 0);
   expect(await sickShift.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("repeating-linear-gradient");
 
   const weekBands = page.locator(".week-band");
@@ -488,19 +488,14 @@ test("annual requests reject ranges containing only protected non-working days",
   await expect(page.locator("#request-form")).toBeVisible();
 });
 
-test("missing-lead alerts stay in date headers while coverage keeps coverage details", async ({ page }) => {
+test("scheduler headers stay concise and keep lead context accessible", async ({ page }) => {
   await page.goto("/");
 
   const missingLeadHeader = page.locator(".date-head.lead-missing").first();
   await expect(missingLeadHeader).toBeVisible();
-  await expect(missingLeadHeader).toContainText("Lead missing");
   await expect(missingLeadHeader).toHaveAccessibleName(/Lead missing/);
-
-  const date = await missingLeadHeader.getAttribute("data-date");
-  expect(date).toBeTruthy();
-  const coverageCell = page.locator(`.coverage-cell[data-date="${date}"]`);
-  await expect(coverageCell).not.toHaveClass(/lead-missing/);
-  await expect(coverageCell.locator("small")).toHaveText(/^\d+ off - \d+ ground$/);
+  await expect(page.locator(".date-head em")).toHaveCount(0);
+  await expect(page.locator(".coverage-cell, .coverage-head, #schedule-status-filter, [data-filter]")).toHaveCount(0);
 });
 
 test("creation opens centered while editing stays in the right sidebar", async ({ page }) => {
@@ -562,12 +557,26 @@ test("authorized scheduler clicks open one-time shift editing without lead edit 
   await page.goto("/");
 
   const shift = page.locator('.schedule-grid .shift-cell[data-profile-id="emp-001"]').first();
+  const date = await shift.getAttribute("data-date");
+  const originalLabel = await shift.locator(".shift-label").textContent();
   await expect(shift).toHaveAttribute("data-open-drawer", "shift");
   await shift.click();
 
   await expect(page.getByRole("heading", { name: "Shift Override", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save Daily Change", exact: true })).toBeEnabled();
   await expect(page.getByText("Saving creates a manual daily change.", { exact: false })).toBeVisible();
+  await page.locator('#shift-form .status-choice.sick').click();
+  await expect(page.locator('#shift-form input[name="statusId"][value="sick"]')).toBeChecked();
+  await page.getByRole("button", { name: "Save Daily Change", exact: true }).click();
+  await expect(page.locator(".app-notice.success")).toContainText("Daily change saved.");
+  await page.reload();
+  const savedShift = page.locator(`.schedule-grid .shift-cell[data-profile-id="emp-001"][data-date="${date}"]`);
+  await expect(savedShift.locator(".shift-label")).toHaveText("Sick");
+  await savedShift.click();
+  await page.getByRole("button", { name: "Clear Override", exact: true }).click();
+  await expect(page.locator(".app-notice.success")).toContainText("Daily change cleared.");
+  await page.reload();
+  await expect(savedShift.locator(".shift-label")).toHaveText(originalLabel);
 });
 
 test("annual request review includes the affected team rotation mini view", async ({ page }) => {
@@ -636,10 +645,10 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
   if (weekend) {
-    await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText("Lead missing");
+    await expect(page.locator(`.date-head[data-date="${today}"]`)).toHaveAccessibleName(/Lead missing/);
     await expect(page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"] .lead-marker`)).toHaveCount(0);
   } else {
-    await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText(`Lead: ${expectedLead}`);
+    await expect(page.locator(`.date-head[data-date="${today}"]`)).toHaveAccessibleName(new RegExp(`Lead: ${expectedLead}`));
     const scheduledLeadCell = page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"]`);
     await expect(scheduledLeadCell).toHaveClass(/lead/);
     await expect(scheduledLeadCell.locator(".shift-label")).toHaveText("Lead");
@@ -704,11 +713,7 @@ test("scheduler zoom switches week, two-week, and month density", async ({ page 
   await page.goto("/");
 
   await expect(page.locator(".scheduler-month-bar")).toContainText(currentMonthLabel());
-  await page.locator("#schedule-status-filter").selectOption("night");
-  await expect(page.locator("#schedule-status-filter")).toHaveValue("night");
-  await expect(page.locator(".shift-cell.night").first()).toBeVisible();
-  await expect(page.locator(".shift-cell.filtered-out").first()).toBeVisible();
-  await page.locator("#schedule-status-filter").selectOption("all");
+  await expect(page.locator('#schedule-status-filter, #range-select, [data-filter]')).toHaveCount(0);
   await expect(page.getByRole("button", { name: /New Profile/, exact: false })).toHaveCount(0);
   await expect(page.locator(".schedule-grid.range-two-weeks")).toBeVisible();
   await page.getByTitle("Zoom in").click();
@@ -716,7 +721,12 @@ test("scheduler zoom switches week, two-week, and month density", async ({ page 
   await page.getByTitle("Zoom out").click();
   await page.getByTitle("Zoom out").click();
   await expect(page.locator(".schedule-grid.range-month")).toBeVisible();
-  await expect(page.locator("#range-select")).toHaveValue("30");
+  await expect(page.getByLabel("Schedule zoom level", { exact: true })).toHaveText("50%");
+  const toolbarBefore = await page.locator(".scheduler-toolbar").boundingBox();
+  await page.locator(".scheduler-shell").evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+  const toolbarAfter = await page.locator(".scheduler-toolbar").boundingBox();
+  expect(toolbarAfter.x).toBe(toolbarBefore.x);
+  await expect(page.getByTitle("Zoom in", { exact: true })).toBeInViewport();
   await page.locator("#schedule-start-date").fill("2026-07-15");
   await expect(page.locator('.date-head[data-date="2026-07-15"]')).toBeVisible();
   await page.getByRole("button", { name: "Month Start", exact: true }).click();

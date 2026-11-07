@@ -8149,6 +8149,99 @@ select:focus {
   line-height: 1;
 }
 
+/* Controls belong to the viewport, outside the horizontally scrolling timeline. */
+.scheduler-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px;
+  margin-bottom: 6px;
+  border: 1px solid var(--glass-line);
+  border-radius: 13px;
+  background: var(--tech-surface);
+}
+
+.scheduler-toolbar .month-corner {
+  position: static;
+  flex: 0 1 220px;
+  min-width: 140px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+}
+
+.scheduler-toolbar .scheduler-month-bar {
+  flex: 1 1 620px;
+  flex-wrap: wrap;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0;
+  gap: 6px;
+  border: 0;
+  box-shadow: none;
+  background: none;
+}
+
+.scheduler-toolbar :is(button, input, select, output, strong) {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.scheduler-toolbar :is(button, input, select) {
+  min-height: 32px;
+  height: 32px;
+}
+
+.scheduler-toolbar .month-title-control {
+  grid-template-columns: 30px minmax(115px, auto) 30px auto;
+  gap: 5px;
+}
+
+.scheduler-toolbar .month-title-control strong {
+  font-size: 12px;
+}
+
+.scheduler-toolbar .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+
+.scheduler-toolbar .icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.schedule-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--glass-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.schedule-zoom output {
+  min-width: 40px;
+  color: var(--text);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-grid .date-head {
+  min-height: 54px;
+}
+
 /* One closed band names and outlines each visible ISO week. */
 .week-band-corner,
 .week-band {

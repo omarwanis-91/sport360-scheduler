@@ -434,3 +434,10 @@ Each Monday begins after a deliberate dark gutter with a restrained red edge tha
 The Scheduler labels each visible ISO week with one closed, numbered band above its dates. Monday row seams stay quiet and neutral; they align content beneath the band instead of repeating curved red dividers through every row.
 
 Weekend, Sick, and existing Annual days are never eligible for another Annual write. Mixed requests affect only remaining eligible working days, while requests with no eligible days are rejected. Eligibility is recalculated at approval so schedule changes or overlapping pending requests cannot cause duplicate deductions or overwrite protected daily statuses. On Ground remains eligible because it is a working-day exception.
+
+## D-057 - Scheduler Controls Stay With The Viewport
+
+**Date:** 2026-11-07
+**Status:** Accepted
+
+The Scheduler toolbar lives outside the horizontal timeline scroller and uses compact shared typography. Zoom uses minus/plus buttons with a percentage indicator. People and shift filters, per-date lead-name subtitles, and the coverage summary row are removed from the board to prioritize the shift cards. Date details and Annual approval retain coverage calculations and focused information. Authorized daily changes and clearing overrides work directly from a shift card without enabling the staged lead-edit mode.
