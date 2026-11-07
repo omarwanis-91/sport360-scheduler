@@ -128,7 +128,7 @@ Parent-department lead assignments use the full descendant department scope. A d
 - Scheduler timelines and profile month calendars use a shared separated-card rhythm: compact gaps, rounded charcoal cells, subtle white inner edges, and red-only today/selection emphasis inspired by modern calendar dashboards without adopting their blue palette.
 - Unavailable states remain quieter than working states.
 - Scheduler cells use a restrained semantic tint together with the colored icon and text label; working/non-working structure and warnings remain distinguishable without relying on color alone.
-- Weekend, Annual, and Sick surfaces use a quiet diagonal hatch and reduced emphasis. Pending Annual markers appear only on working days, status rails inherit the same semantic hue as their card, and Monday gutters visibly separate weeks without adding another palette color.
+- Weekend, Annual, and Sick surfaces use a quiet diagonal hatch, reduced brightness/saturation, and a minimal softness so working shifts dominate the resting scan state. Hover and keyboard focus restore full clarity and a brighter semantic tint. Pending Annual markers appear only on working days, status rails inherit the same semantic hue as their card, and a wide dark Monday gutter with a restrained red edge visibly separates weeks without adding another palette color.
 - Scheduler filtering can narrow the current range by availability, rotational shift, daily exception, or manual change while keeping the date timeline visible.
 - Cards are used for repeated entities and focused tools, not every page section.
 - Icons and concise status tags carry repeated information.

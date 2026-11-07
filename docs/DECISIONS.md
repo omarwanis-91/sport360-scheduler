@@ -416,3 +416,12 @@ The star writes to the existing effective-dated department lead rotation and is 
 When a working person is the resolved department lead for a date or weekday, Scheduler, Rotations, profile calendars, upcoming shifts, and request-impact previews display Lead as the primary shift with the red star icon. Morning, Mid-day, or Night must not remain visible beneath a separate lead badge.
 
 The underlying rotation result remains authoritative for availability, coverage, leave deductions, effective-dated history, and persistence. Weekend, Sick, and Annual are not eligible Lead presentations. Those non-working states use a subdued diagonal hatch, and Pending Annual appears only on affected working days. Semantic tints remain restrained, while status-matched left rails and Monday week gutters improve one-glance scanning without introducing a louder palette.
+
+## D-055 - Resting Contrast Separates Work From Off Days
+
+**Date:** 2026-11-07
+**Status:** Accepted
+
+Weekend, Annual, and Sick cells sit noticeably behind working shifts at rest through lower opacity, reduced brightness and saturation, and only a minimal softness. Their text, icons, and interaction remain available; hover and keyboard focus restore full clarity and a brighter semantic surface instead of leaving off days permanently low-contrast.
+
+Each Monday begins after a deliberate dark gutter with a restrained red edge that continues through the date, coverage, and employee rows. This week boundary must remain visible in dense two-week and month Scheduler ranges without introducing a competing accent color.
