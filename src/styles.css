@@ -7573,6 +7573,15 @@ select:focus {
   --status-rgb: 121 217 197;
 }
 
+.shift-cell.lead,
+.month-day.lead,
+.request-row.lead,
+.leave-impact-shift.lead,
+.calendar-day-summary.lead {
+  --status-accent: #ff7895;
+  --status-rgb: 255 120 149;
+}
+
 .shift-cell .shift-icon,
 .month-day em,
 .request-row .shift-icon,
@@ -8038,6 +8047,19 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(208, 48, 79, 0.06);
 }
 
+.rotation-cell.can-assign-lead .lead-shift-button {
+  opacity: 0;
+  transform: translateY(3px) scale(0.92);
+  transition: opacity var(--motion-fast), transform var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.rotation-cell.can-assign-lead:hover .lead-shift-button,
+.rotation-cell.can-assign-lead:focus-within .lead-shift-button,
+.rotation-cell.can-assign-lead .lead-shift-button:focus-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
 .lead-shift-button svg,
 .lead-shift-marker svg {
   width: 13px;
@@ -8058,39 +8080,83 @@ select:focus {
   transform: scale(0.9);
 }
 
-/* Status surfaces receive a restrained tint capped below twenty percent. */
-.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground),
-.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) {
-  border-color: rgb(var(--status-rgb, 213 213 220) / 0.16);
+/* Status surfaces remain restrained, but carry enough hue for one-glance scanning. */
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead),
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead) {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.2);
   background:
-    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.18), rgb(var(--status-rgb, 213 213 220) / 0.045) 58%, transparent 82%),
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.21), rgb(var(--status-rgb, 213 213 220) / 0.06) 58%, transparent 82%),
     rgba(16, 16, 19, 0.97);
 }
 
-.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
-.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible,
-.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):hover,
-.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground):focus-visible {
-  border-color: rgb(var(--status-rgb, 213 213 220) / 0.28);
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead):hover,
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead):focus-visible,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead):hover,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead):focus-visible {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.32);
   background:
-    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.2), rgb(var(--status-rgb, 213 213 220) / 0.065) 58%, transparent 84%),
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.24), rgb(var(--status-rgb, 213 213 220) / 0.08) 58%, transparent 84%),
     rgba(21, 21, 24, 0.98);
 }
 
-.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground),
-.my-shifts .request-row:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground),
-.leave-impact-shift:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground) {
-  border-color: rgb(var(--status-rgb, 213 213 220) / 0.15);
+.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground, .lead),
+.my-shifts .request-row:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead),
+.leave-impact-shift:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead) {
+  border-color: rgb(var(--status-rgb, 213 213 220) / 0.19);
   background:
-    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.17), rgb(var(--status-rgb, 213 213 220) / 0.04) 62%, transparent 86%),
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.2), rgb(var(--status-rgb, 213 213 220) / 0.055) 62%, transparent 86%),
     rgba(15, 15, 18, 0.97);
 }
 
-.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground):hover,
-.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground):focus-visible {
+.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground, .lead):hover,
+.month-day:is(.morning, .midday, .night, .weekend-day, .vacation, .approved-vacation, .sick, .ground, .lead):focus-visible {
   background:
-    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.2), rgb(var(--status-rgb, 213 213 220) / 0.06) 62%, transparent 86%),
+    linear-gradient(145deg, rgb(var(--status-rgb, 213 213 220) / 0.23), rgb(var(--status-rgb, 213 213 220) / 0.075) 62%, transparent 86%),
     rgba(20, 20, 23, 0.98);
+}
+
+/* Non-working states use a quiet diagonal hatch so they recede without losing meaning. */
+.shift-cell:is(.weekend, .vacation, .sick),
+.schedule-grid .shift-cell:is(.weekend, .vacation, .sick),
+.month-day:is(.weekend, .vacation, .approved-vacation, .sick),
+.my-shifts .request-row:is(.weekend, .vacation, .sick),
+.leave-impact-shift:is(.weekend, .vacation, .sick) {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgb(var(--status-rgb, 196 198 207) / 0.085) 8px 10px, transparent 10px 18px),
+    linear-gradient(145deg, rgb(var(--status-rgb, 196 198 207) / 0.13), rgb(var(--status-rgb, 196 198 207) / 0.03) 62%, transparent 86%),
+    rgba(14, 14, 17, 0.98);
+}
+
+.shift-cell:is(.weekend, .vacation, .sick) .shift-label,
+.shift-cell:is(.weekend, .vacation, .sick) small {
+  color: #a5a5ae;
+}
+
+/* Every status rail inherits the same hue as its card rather than a neutral gray. */
+.shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead)::before,
+.schedule-grid .shift-cell:is(.morning, .midday, .night, .weekend, .vacation, .sick, .ground, .lead)::before {
+  width: 3px;
+  opacity: 0.82;
+  background: rgb(var(--status-rgb, 213 213 220) / 0.82);
+  box-shadow: 0 0 10px rgb(var(--status-rgb, 213 213 220) / 0.18);
+}
+
+.cell-alert {
+  grid-column: 2 / -1;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* A stronger gutter at every Monday makes each week readable as a distinct block. */
+.date-head.week-start,
+.coverage-cell.week-start,
+.schedule-grid .shift-cell.week-start {
+  border-left-color: rgba(239, 96, 124, 0.48);
+  box-shadow:
+    -6px 0 0 rgba(5, 5, 7, 0.98),
+    -7px 0 0 rgba(230, 78, 108, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
 .pattern-chip:is(.morning, .midday, .night, .weekend),

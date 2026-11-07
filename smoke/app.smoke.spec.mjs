@@ -381,6 +381,61 @@ test("schedule, rotation, and profile surfaces keep a restrained status tint", a
     .not.toBe(await rotationNight.evaluate((element) => getComputedStyle(element).backgroundImage));
 });
 
+test("lead shifts replace their underlying rotation and non-working states stay subdued", async ({ page }) => {
+  await page.goto("/");
+
+  const leadHeader = page.locator(".date-head").filter({ hasText: "Lead: Mona" }).first();
+  await expect(leadHeader).toBeVisible();
+  const leadDate = await leadHeader.getAttribute("data-date");
+  const schedulerLead = page.locator(`.shift-cell[data-profile-id="emp-002"][data-date="${leadDate}"]`);
+  await expect(schedulerLead).toHaveClass(/lead/);
+  await expect(schedulerLead.locator(".shift-label")).toHaveText("Lead");
+  await expect(schedulerLead).not.toContainText("Morning");
+  await expect(schedulerLead.locator(".lead-marker")).toHaveCount(0);
+
+  const morningRail = await page.locator(".shift-cell.morning").first().evaluate((element) => getComputedStyle(element, "::before").backgroundColor);
+  const nightRail = await page.locator(".shift-cell.night").first().evaluate((element) => getComputedStyle(element, "::before").backgroundColor);
+  expect(morningRail).not.toBe(nightRail);
+
+  const weekendTexture = await page.locator(".shift-cell.weekend").first().evaluate((element) => getComputedStyle(element).backgroundImage);
+  expect(weekendTexture).toContain("repeating-linear-gradient");
+
+  await page.locator("#department-select").selectOption("support");
+  await page.locator("#schedule-start-date").fill("2026-05-18");
+  await page.locator("#schedule-start-date").press("Tab");
+  const sickShift = page.locator('.shift-cell[data-profile-id="emp-004"][data-date="2026-05-18"]');
+  await expect(sickShift).toHaveClass(/sick/);
+  expect(await sickShift.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("repeating-linear-gradient");
+
+  const weekSeparator = page.locator(".date-head.week-start").first();
+  await expect(weekSeparator).toBeVisible();
+  expect(await weekSeparator.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe("none");
+
+  await page.locator("#user-switcher").selectOption("user-lead");
+  await page.getByRole("button", { name: "My Profile", exact: true }).click();
+  await expect(page.locator(".my-shifts .request-row.lead").first()).toContainText("Lead - Department lead");
+
+  await page.getByRole("button", { name: "Rotations", exact: true }).click();
+  const rotationLead = page.locator('.rotation-cell[data-profile-id="emp-002"][data-weekday="4"]');
+  await expect(rotationLead).toHaveClass(/lead/);
+  await expect(rotationLead.locator(".shift-label")).toHaveText("Lead");
+  await expect(rotationLead).not.toContainText("Night");
+});
+
+test("pending annual appears only on affected working days and stays on one line", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#schedule-start-date").fill("2026-05-22");
+  await page.locator("#schedule-start-date").press("Tab");
+
+  const workingDay = page.locator('.shift-cell[data-profile-id="emp-003"][data-date="2026-05-22"]');
+  const saturday = page.locator('.shift-cell[data-profile-id="emp-003"][data-date="2026-05-23"]');
+  const sunday = page.locator('.shift-cell[data-profile-id="emp-003"][data-date="2026-05-24"]');
+  await expect(workingDay.locator(".cell-alert")).toHaveText("Pending annual");
+  await expect(saturday.locator(".cell-alert")).toHaveCount(0);
+  await expect(sunday.locator(".cell-alert")).toHaveCount(0);
+  expect(await workingDay.locator(".cell-alert").evaluate((element) => getComputedStyle(element).whiteSpace)).toBe("nowrap");
+});
+
 test("missing-lead alerts stay in date headers while coverage keeps coverage details", async ({ page }) => {
   await page.goto("/");
 
@@ -478,7 +533,9 @@ test("annual request review includes the affected team rotation mini view", asyn
   await expect(page.getByText("Team Rotation Impact", { exact: true })).toBeVisible();
   await expect(page.locator(".leave-team-impact")).toContainText("Operations team");
   await expect(page.locator(".leave-impact-person.requested")).toContainText("Karim Adel");
-  await expect(page.locator(".leave-impact-shift.projected").first()).toBeVisible();
+  const projectedAnnual = page.locator(".leave-impact-shift.projected").first();
+  await expect(projectedAnnual).toBeVisible();
+  expect(await projectedAnnual.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("repeating-linear-gradient");
 });
 
 test("rotation pattern choices update in place without refreshing the workspace", async ({ page }) => {
@@ -516,12 +573,14 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
 
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Rotations", exact: true }).click();
-  await expect(page.locator('.rotation-cell[data-profile-id="emp-003"][data-weekday="5"] .lead-shift-marker.active')).toBeVisible();
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-002"][data-weekday="0"]')).toHaveClass(/lead/);
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-002"][data-weekday="0"] .shift-label')).toHaveText("Lead");
   await page.getByRole("button", { name: "Edit Rotation", exact: true }).click();
-  const newSaturdayLead = page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="5"] .lead-shift-button');
-  await newSaturdayLead.click();
-  await expect(newSaturdayLead).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator('.rotation-cell[data-profile-id="emp-003"][data-weekday="5"] .lead-shift-button')).toHaveAttribute("aria-pressed", "false");
+  const newMondayLead = page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .lead-shift-button');
+  await newMondayLead.click();
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"]')).toHaveClass(/lead/);
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .shift-label')).toHaveText("Lead");
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-002"][data-weekday="0"]')).toHaveClass(/morning/);
 
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
   if (weekend) {
@@ -529,7 +588,10 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
     await expect(page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"] .lead-marker`)).toHaveCount(0);
   } else {
     await expect(page.locator(`.date-head[data-date="${today}"]`)).toContainText(`Lead: ${expectedLead}`);
-    await expect(page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"] .lead-marker`)).toBeVisible();
+    const scheduledLeadCell = page.locator(`.shift-cell[data-profile-id="${expectedLeadProfileId}"][data-date="${today}"]`);
+    await expect(scheduledLeadCell).toHaveClass(/lead/);
+    await expect(scheduledLeadCell.locator(".shift-label")).toHaveText("Lead");
+    await expect(scheduledLeadCell.locator(".lead-marker")).toHaveCount(0);
   }
   await expect(page.locator(".date-head.today")).toContainText("Today");
   if (weekend) {

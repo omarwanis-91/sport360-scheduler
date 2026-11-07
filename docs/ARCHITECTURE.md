@@ -102,7 +102,7 @@ For a person and date:
 
 Employee profiles also carry `seniority_level`, now simplified to `manager`, `lead`, or `artist`. Department lead scheduling uses department membership plus the weekly/daily lead assignment tables; any current department member can be selected as a day lead. `user_roles.lead` remains the separate authorization role for application permissions.
 
-Weekly lead assignment is edited directly inside the rotation grid through a red star on each person's weekday shift. This is a scheduling affordance over the existing effective-dated lead-rotation data; it does not create a fifth shift status or couple lead scheduling to profile seniority.
+Weekly lead assignment is edited directly inside the rotation grid through a red star on each eligible person's weekday shift. Once assigned, Lead replaces the underlying Morning, Mid-day, or Night label in Scheduler, Rotations, profile calendars, upcoming-shift lists, and request-impact previews. The underlying rotation remains authoritative for calculations, coverage, leave deductions, and history; Lead is a primary presentation of the existing effective-dated lead assignment rather than a fifth stored rotation-template status.
 
 Parent-department lead assignments use the full descendant department scope. A daily override or weekly lead rotation stored on a parent can therefore resolve to a profile assigned to one of its sub-departments. In Scheduler edit mode, an existing parent daily override reopens the parent lead editor so it can be returned to the weekly rotation without direct database cleanup.
 
@@ -128,6 +128,7 @@ Parent-department lead assignments use the full descendant department scope. A d
 - Scheduler timelines and profile month calendars use a shared separated-card rhythm: compact gaps, rounded charcoal cells, subtle white inner edges, and red-only today/selection emphasis inspired by modern calendar dashboards without adopting their blue palette.
 - Unavailable states remain quieter than working states.
 - Scheduler cells use a restrained semantic tint together with the colored icon and text label; working/non-working structure and warnings remain distinguishable without relying on color alone.
+- Weekend, Annual, and Sick surfaces use a quiet diagonal hatch and reduced emphasis. Pending Annual markers appear only on working days, status rails inherit the same semantic hue as their card, and Monday gutters visibly separate weeks without adding another palette color.
 - Scheduler filtering can narrow the current range by availability, rotational shift, daily exception, or manual change while keeping the date timeline visible.
 - Cards are used for repeated entities and focused tools, not every page section.
 - Icons and concise status tags carry repeated information.
