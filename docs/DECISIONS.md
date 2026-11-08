@@ -450,3 +450,12 @@ The Scheduler toolbar lives outside the horizontal timeline scroller and uses co
 Authorized users open a person's weekly rotation from any populated or empty rotation cell or the person's row, without an Edit Rotation or Continue step. Copy/paste carries only the seven weekday shifts. Individual paste opens the editor for review; department paste shows its target people, pattern, and effective start before one atomic save. Access roles, lead identities, balances, requests, and daily exceptions are never copied.
 
 The chosen effective date identifies a version: saving again on that date updates it, while a different date creates another version. The default start is today, or the future date of the opened version; earlier versions remain unchanged unless the Admin explicitly chooses their date. Leads cannot save into the past. Weekly lead stars retain an independent Save leads action.
+
+## D-059 - Explicit Lead Choices And Full Person Rotation Reset
+
+**Date:** 2026-11-08
+**Status:** Accepted
+
+Weekly lead slots may be unassigned and must never fall back to the first department member. Each day in the person rotation editor offers Lead as a red-star choice alongside the four ordinary shifts. Selecting it presents Lead as the day's primary shift; choosing an ordinary shift clears that person's lead for that weekday. Pattern and lead choices persist together through one authorized transaction, while other people's assignments remain intact unless explicitly replaced by a selected Lead.
+
+An Admin may deliberately reset a person's rotation to No Template. The confirmation states that all weekly versions, including historical/future versions across departments, and that person's weekly lead references will be removed. This is an explicit exception to normal history preservation. Leads cannot perform this full reset because they cannot delete historical versions. Daily exceptions, daily lead overrides, requests, balances, accounts, and existing activity remain preserved.

@@ -1,5 +1,6 @@
 import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
+import { weeklyLeadPattern, applyExplicitLeadDays } from "./scheduleLogic.mjs";
 
 const profilePhotoPrefix = "storage:profile-photos/";
 const onboardingPhotoPrefix = "storage:profile-onboarding-photos/";
@@ -56,6 +57,16 @@ function createLocalStore() {
     async deleteDailyLead() {},
     async upsertDepartmentLeadRotation() {},
     async upsertRotation() {},
+    async savePersonRotation(departmentId, profileId, effectiveStart, pattern, leadDays) {
+      const stored = await this.load();
+      const [rotation] = await this.applyRotationPatterns(departmentId, effectiveStart, [{ profileId, pattern }]);
+      const before = weeklyLeadPattern(stored.departmentLeadRotations, departmentId, effectiveStart);
+      const after = applyExplicitLeadDays(before, profileId, leadDays);
+      const existing = stored.departmentLeadRotations.find(item => item.departmentId === departmentId && item.effectiveStart === effectiveStart);
+      return { rotation, leadRotation: before.some((id, day) => id !== after[day])
+        ? { id: existing?.id || crypto.randomUUID(), departmentId, effectiveStart, pattern: after } : null };
+    },
+    async resetPersonRotation() {},
     async applyRotationPatterns(departmentId, effectiveStart, patterns) {
       const stored = await this.load();
       return patterns.map((item) => ({
@@ -272,6 +283,17 @@ function createRemoteStore(client) {
     },
     async upsertRotation(rotation) {
       await client.upsert("rotation_versions", toDbRotation(rotation), "id");
+    },
+    async savePersonRotation(departmentId, profileId, effectiveStart, pattern, leadDays) {
+      const result = await client.rpc("save_person_rotation", {
+        p_department_id: departmentId, p_profile_id: profileId, p_effective_start: effectiveStart,
+        p_pattern: pattern, p_lead_days: leadDays
+      });
+      return { rotation: fromDbRotation(result.rotation),
+        leadRotation: result.lead_rotation ? fromDbLeadRotation(result.lead_rotation) : null };
+    },
+    async resetPersonRotation(profileId) {
+      return client.rpc("reset_person_rotation", { p_profile_id: profileId });
     },
     async applyRotationPatterns(departmentId, effectiveStart, patterns) {
       const rows = await client.rpc("apply_rotation_patterns", {

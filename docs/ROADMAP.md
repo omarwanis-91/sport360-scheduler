@@ -106,7 +106,8 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Apply migration 026, pass audit 014, restore the production prelaunch flags, and verify the public replacement page in Chrome, Edge, and Firefox.
 - ✅ Apply migration 027 and pass audit 015 for the sole-Admin and direct-department Lead/Employee boundaries.
 - ⏳ Apply migration 028 and pass audit 016 for exclusive Annual eligibility and overlap protection.
-- ⏳ Apply migration 029 and pass audit 017 for direct rotation edits and atomic individual/department pattern paste.
+- ✅ Apply migration 029 and pass audit 017 for direct rotation edits and atomic individual/department pattern paste.
+- ✅ Apply migration 030 and pass audit 018 for explicit weekly Lead choices and Admin-confirmed rotation reset.
 - ✅ Add an Admin-only, read-only Role Preview for inspecting department-scoped Lead and Employee interfaces without fake accounts.
 - ✅ Refine the existing red/black/white interface with layered glass surfaces, restrained crimson glows, stronger primary actions, and consistent reduced-motion-aware transitions.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
