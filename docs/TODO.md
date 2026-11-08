@@ -15,7 +15,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Next
 
-- [ ] Reconcile duplicate signup and operational profiles, agree the historical cutoff and opening Annual balances, and verify backups before a one-person backfill pilot using `docs/BACKFILL.md`.
+- [ ] Reconcile duplicate signup and operational profiles, start scheduling from November 2026, and set each person's allowance/current Annual remainder directly through Admin Edit Profile. Skip pre-November reconstruction and historical Annual requests; follow `docs/BACKFILL.md` for the opening-balance procedure.
 - [ ] Repair Docker/WSL or use another machine so `npm.cmd run backup:manual` can create a full Supabase SQL export.
 - [ ] Restore the verified export into a non-production Supabase project.
 - [ ] Pilot one department for five business days and record signoff.

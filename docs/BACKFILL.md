@@ -1,4 +1,19 @@
-# Historical Data Entry
+# Opening Balances and Historical Data Entry
+
+## Current plan: November onward, manual opening balances
+
+Do not reconstruct schedules or create Annual requests for dates before November 2026. Use the existing Admin balance fields instead:
+
+1. Open Team, select the employee, and choose Edit Profile.
+2. Set Annual allowance to the recurring entitlement, for example `15`.
+3. Set Annual days left to the actual current remainder, for example `5`.
+4. Save Profile and reopen it to verify `5 / 15`.
+
+This sets the balance directly. It does not create ten past Annual days, requests, or daily overrides, and it does not change rotations. The allowance persists until edited; the current balance is independently editable by Admin. Future approved Annual requests deduct their eligible days from this remainder.
+
+Record the date represented by the opening balance. Leave already accounted for in that balance must not be approved again as historical requests. The application currently has no automatic new-year balance reset or separate yearly ledger; retaining the allowance does not automatically reset the remainder each January.
+
+The historical-entry procedure below is optional reference for a later explicit change of plan; it is not the current setup task.
 
 Use the existing Admin workflows for a small, reviewed backfill. This guide does not run an import. There is currently no bulk importer, historical request-timestamp editor, or separate Annual balance ledger per year.
 

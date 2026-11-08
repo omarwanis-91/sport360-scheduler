@@ -490,3 +490,10 @@ Scheduler week spacing increases modestly while keeping week bands and cells ali
 Team remains one workspace with Hierarchy and Directory as switchable tabs sharing the selected department. The department rail nests saved parent/child relationships beneath All teams and folds independently of selection. Directory retains its existing four views. New Department and Member actions use centered icon/text alignment.
 
 Dragging a person between hierarchy rows changes only Manager / Lead / Artist through the existing authorized RPC. A level selector provides the same action for keyboard, touch, and non-drag pointer use. This does not assign a department, change sign-in permissions, or change scheduled Lead shifts. The onboarding placeholder Pending assignment means the job title has not been set; Team presents that clearer description without modifying records. Duplicate signup/operational identities require explicit reconciliation before historical data entry; no automatic merge or live backfill is part of this change.
+
+## D-063 - Manual Annual Opening Balances, November Schedule Cutoff
+
+**Date:** 2026-11-08
+**Status:** Accepted
+
+Skip schedule reconstruction before November 2026. Admin enters the recurring Annual allowance and current remainder separately through the existing Edit Profile controls: `15` allowance and `5` remaining displays `5 / 15`. Do not manufacture ten historical Annual days or requests to achieve that balance. The allowance remains configured until changed; future approved leave deducts from the current remainder. Leave already reflected in the manual balance must not be imported and deducted again. No automatic yearly reset or yearly ledger is introduced by this setup decision.
