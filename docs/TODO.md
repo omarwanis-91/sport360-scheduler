@@ -39,6 +39,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migration 031 and passed all five audit 019 checks for atomic rotation drafts and saved-date correction.
+- [x] Built immediate rotation/Lead previews, changed-person markers, account-scoped pending drafts, shared date inheritance, one atomic department save, and targeted Admin saved-date correction.
 - [x] Applied migration 030 and passed all five audit 018 checks for explicit Lead choices and Admin rotation reset.
 - [x] Applied migration 029, passed all five audit 017 checks, and merged/deployed PR #31 for direct rotation editing and copy/paste.
 - [x] Removed implicit first-person weekly leads, added Lead to each day's picker, and built an Admin-confirmed reset to No Template.

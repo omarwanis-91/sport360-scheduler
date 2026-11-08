@@ -90,6 +90,57 @@ export function applyExplicitLeadDays(pattern, profileId, leadDays) {
     : pattern[day] === profileId ? "" : pattern[day] || "");
 }
 
+// Used for unsaved previews and demo persistence; production validates again in the RPC.
+export function applyRotationDrafts(state, departmentId, changes, defaultStart) {
+  const rotationVersions = structuredClone(state.rotationVersions);
+  const departmentLeadRotations = structuredClone(state.departmentLeadRotations || []);
+  const ordered = changes.map(change => ({ ...change, effectiveStart: change.effectiveStart || defaultStart }))
+    .sort((a, b) => a.effectiveStart.localeCompare(b.effectiveStart) || a.profileId.localeCompare(b.profileId));
+  for (const change of ordered) {
+    if (change.action === "reset") {
+      for (let i = rotationVersions.length - 1; i >= 0; i--) {
+        if (rotationVersions[i].profileId === change.profileId) rotationVersions.splice(i, 1);
+      }
+      departmentLeadRotations.forEach(row => { row.pattern = row.pattern.map(id => id === change.profileId ? "" : id); });
+      continue;
+    }
+    let existing;
+    if (change.action === "move") {
+      existing = byId(rotationVersions, change.sourceVersionId);
+      if (!existing || existing.profileId !== change.profileId || existing.effectiveStart !== change.sourceEffectiveStart) {
+        throw new Error("This saved version changed. Reload before correcting its date.");
+      }
+      if (rotationVersions.some(row => row.profileId === change.profileId && row.effectiveStart === change.effectiveStart && row.id !== existing.id)) {
+        throw new Error("A rotation already exists on that date. Choose another date or edit that version.");
+      }
+      const previous = weeklyLeadPattern(departmentLeadRotations, departmentId, addDays(existing.effectiveStart, -1));
+      const sourceLead = departmentLeadRotations.find(row => row.departmentId === departmentId && row.effectiveStart === existing.effectiveStart);
+      if (sourceLead && change.effectiveStart > existing.effectiveStart) {
+        sourceLead.pattern = sourceLead.pattern.map((id, day) => id === change.profileId ? previous[day] : id);
+        if (JSON.stringify(sourceLead.pattern) === JSON.stringify(previous)) {
+          departmentLeadRotations.splice(departmentLeadRotations.indexOf(sourceLead), 1);
+        }
+      }
+      existing.effectiveStart = change.effectiveStart;
+    } else {
+      existing = rotationVersions.find(row => row.profileId === change.profileId && row.effectiveStart === change.effectiveStart);
+    }
+    if (existing) existing.pattern = [...change.pattern];
+    else rotationVersions.push({ id: `draft:${change.profileId}:${change.effectiveStart}`, profileId: change.profileId,
+      effectiveStart: change.effectiveStart, pattern: [...change.pattern] });
+    if (change.preserveLeads) continue;
+    const before = weeklyLeadPattern(departmentLeadRotations, departmentId, change.effectiveStart);
+    const after = applyExplicitLeadDays(before, change.profileId, change.leadDays);
+    if (before.some((id, day) => id !== after[day])) {
+      const lead = departmentLeadRotations.find(row => row.departmentId === departmentId && row.effectiveStart === change.effectiveStart);
+      if (lead) lead.pattern = after;
+      else departmentLeadRotations.push({ id: `draft-lead:${departmentId}:${change.effectiveStart}`, departmentId,
+        effectiveStart: change.effectiveStart, pattern: after });
+    }
+  }
+  return { rotationVersions, departmentLeadRotations };
+}
+
 function profileDepartmentIds(profile) {
   return Array.isArray(profile?.departmentIds) && profile.departmentIds.length
     ? profile.departmentIds

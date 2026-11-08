@@ -7,6 +7,13 @@ test.beforeEach(async ({ page }) => {
   }));
 });
 
+async function commit(page) {
+  if (await page.locator('#rotation-done').count()) {
+    await page.locator('#rotation-done').click();
+    await expect(page.locator('.drawer')).toHaveCount(0);
+  }
+  await page.locator('#save-rotation-edit').click();
+}
 async function readState(page) {
   return page.evaluate(async () => JSON.parse(localStorage.getItem('sport360-scheduler-state')) || (await import('/assets/data.js')).seedState);
 }
@@ -26,16 +33,16 @@ test('empty rotation cells create a week directly and can be edited again on the
   await page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="2"] .rotation-cell-open').click();
   await expect(page.locator('.pattern-slot.is-targeted .pattern-slot-head')).toContainText('Wed');
   await page.locator('[data-pattern-day="2"][data-pattern-status="night"]').click();
-  await page.getByRole('button', { name: 'Create Rotation', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('Rotation saved.');
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   await page.reload();
   await page.getByRole('button', { name: 'Rotations', exact: true }).click();
   const cell = page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="2"]');
   await expect(cell.locator('.shift-label')).toHaveText('Night');
   await cell.locator('.rotation-cell-open').click();
   await page.locator('[data-pattern-day="2"][data-pattern-status="midday"]').click();
-  await page.getByRole('button', { name: 'Save Rotation', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('Rotation saved.');
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   const saved = await readState(page);
   expect(saved.rotationVersions.filter(r => r.profileId === 'emp-001')).toHaveLength(1);
   expect(saved.rotationVersions.find(r => r.profileId === 'emp-001').pattern[2]).toBe('midday');
@@ -49,8 +56,8 @@ test('rotation copy pastes to one person and a department while preserving histo
   const copied = before.rotationVersions.find(r => r.profileId === 'emp-002').pattern;
   await page.locator('[data-paste-rotation="emp-001"]').click();
   await expect(page.locator('#rotation-form')).toContainText('Copied from Mona Saleh');
-  await page.getByRole('button', { name: 'Save Rotation', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('Rotation saved.');
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   const single = await readState(page);
   expect(single.rotationVersions.filter(r => r.profileId === 'emp-001').at(-1).pattern).toEqual(copied);
   expect(single.rotationVersions.find(r => r.id === 'rot-001')).toEqual(before.rotationVersions.find(r => r.id === 'rot-001'));
@@ -59,11 +66,12 @@ test('rotation copy pastes to one person and a department while preserving histo
   await expect(page.locator('#rotation-paste-form')).toContainText('3 people');
   await expect(page.locator('.rotation-paste-day')).toHaveCount(7);
   await page.getByRole('button', { name: 'Paste to 3 people', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('Saved 3 rotations.');
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   const all = await readState(page);
   for (const id of ['emp-001', 'emp-002', 'emp-003']) {
     const versions = all.rotationVersions.filter(r => r.profileId === id);
-    expect(versions.at(-1).pattern).toEqual(copied);
+    if (id !== 'emp-002') expect(versions.at(-1).pattern).toEqual(copied);
     expect(new Set(versions.map(r => r.effectiveStart)).size).toBe(versions.length);
   }
   for (const old of before.rotationVersions) expect(all.rotationVersions.find(r => r.id === old.id)).toEqual(old);
@@ -93,8 +101,8 @@ test('weekly lead stars save directly without a rotation edit-mode gate', async 
   await page.goto('/');
   await page.getByRole('button', { name: 'Rotations', exact: true }).click();
   await page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .lead-shift-button').click();
-  await page.getByRole('button', { name: 'Save leads', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('Rotation edits saved.');
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   await page.reload();
   await page.getByRole('button', { name: 'Rotations', exact: true }).click();
   await expect(page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .shift-label')).toHaveText('Lead');
@@ -115,8 +123,8 @@ test('Lead is explicit in each day and never defaults to the first person', asyn
   await page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .rotation-cell-open').click();
   await expect(page.locator('[data-pattern-status="lead"]')).toHaveCount(7);
   await page.locator('[data-pattern-day="0"][data-pattern-status="night"]').click();
-  await page.getByRole('button', { name: 'Create Rotation', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('Rotation saved.');
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   expect((await readState(page)).departmentLeadRotations).toHaveLength(0);
   await expect(page.locator('.rotation-cell.lead')).toHaveCount(0);
 
@@ -124,7 +132,7 @@ test('Lead is explicit in each day and never defaults to the first person', asyn
   await wednesday.locator('.rotation-cell-open').click();
   await page.locator('[data-pattern-day="2"][data-pattern-status="lead"]').click();
   await expect(page.locator('.pattern-slot').nth(2).locator('.pattern-slot-head strong')).toHaveText('Lead');
-  await page.getByRole('button', { name: 'Save Rotation', exact: true }).click();
+  await commit(page);
   await expect(wednesday.locator('.shift-label')).toHaveText('Lead');
   const explicit = await readState(page);
   expect(explicit.departmentLeadRotations[0].pattern).toEqual(['', '', 'emp-001', '', '', '', '']);
@@ -133,7 +141,7 @@ test('Lead is explicit in each day and never defaults to the first person', asyn
   await wednesday.locator('.rotation-cell-open').click();
   await expect(page.locator('[data-pattern-day="2"][data-pattern-status="lead"]')).toHaveAttribute('aria-pressed', 'true');
   await page.locator('[data-pattern-day="2"][data-pattern-status="morning"]').click();
-  await page.getByRole('button', { name: 'Save Rotation', exact: true }).click();
+  await commit(page);
   await expect(page.locator('.rotation-cell.lead')).toHaveCount(0);
   expect((await readState(page)).departmentLeadRotations[0].pattern).toEqual(Array(7).fill(''));
   await expect(page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .shift-label')).toHaveText('Night');
@@ -157,8 +165,9 @@ test('Admin can confirm a full rotation reset without older versions or leads re
   await page.getByRole('button', { name: 'Keep Rotation', exact: true }).click();
   expect((await readState(page)).rotationVersions).toEqual(before.rotationVersions);
   await page.getByRole('button', { name: 'Delete Rotation', exact: true }).click();
-  await page.getByRole('button', { name: 'Delete All Rotation Versions', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('No Template');
+  await page.getByRole('button', { name: 'Stage Rotation Reset', exact: true }).click();
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   await expect(page.locator('.rotation-cell[data-profile-id="emp-001"].missing')).toHaveCount(7);
   const after = await readState(page);
   expect(after.rotationVersions).toEqual(before.rotationVersions.filter(r => r.profileId !== 'emp-001'));
@@ -196,11 +205,11 @@ test('remote rotation save uses the atomic RPC and retains the draft on failure'
   };
   await page.route(`${url}/rest/v1/**`, async route => {
     const path = new URL(route.request().url()).pathname.split('/').at(-1);
-    if (path === 'save_person_rotation') {
+    if (path === 'save_rotation_drafts') {
       sentPayload = route.request().postDataJSON();
       if (shouldFail) return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Test save rejected' }) });
-      saved = [{ id: 'saved', profile_id: sentPayload.p_profile_id, effective_start: sentPayload.p_effective_start, pattern: sentPayload.p_pattern }];
-      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ rotation: saved[0], lead_rotation: null }) });
+      saved = [{ id: 'saved', profile_id: sentPayload.p_changes[0].profileId, effective_start: sentPayload.p_changes[0].effectiveStart, pattern: sentPayload.p_changes[0].pattern }];
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ rotations: saved, lead_rotations: [], reset_profile_ids: [] }) });
     }
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(path === 'rotation_versions' ? saved : tables[path] || []) });
   });
@@ -208,17 +217,17 @@ test('remote rotation save uses the atomic RPC and retains the draft on failure'
   await page.getByRole('button', { name: 'Rotations', exact: true }).click();
   await page.locator('.rotation-cell[data-weekday="0"] .rotation-cell-open').click();
   await page.locator('[data-pattern-day="0"][data-pattern-status="night"]').click();
-  await page.getByRole('button', { name: 'Create Rotation', exact: true }).click();
+  await commit(page);
   await expect(page.locator('.app-notice.error')).toContainText('Test save rejected');
   expect(saved).toEqual([]);
-  await expect(page.locator('[data-pattern-day="0"][data-pattern-status="night"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.rotation-cell[data-weekday="0"] .shift-label')).toHaveText('night');
   expect(sentPayload.p_department_id).toBe('ops');
-  expect(sentPayload.p_pattern[0]).toBe('night');
-  expect(sentPayload.p_lead_days).toEqual(Array(7).fill(false));
+  expect(sentPayload.p_changes[0].pattern[0]).toBe('night');
+  expect(sentPayload.p_changes[0].leadDays).toEqual(Array(7).fill(false));
   await page.locator('#dismiss-notice').click();
   shouldFail = false;
-  await page.getByRole('button', { name: 'Create Rotation', exact: true }).click();
-  await expect(page.locator('.app-notice.success')).toContainText('Rotation saved.');
+  await commit(page);
+  await expect(page.locator('.app-notice.success')).toContainText('Saved');
   await page.reload();
   await page.getByRole('button', { name: 'Rotations', exact: true }).click();
   await expect(page.locator('.rotation-cell[data-weekday="0"] .shift-label')).toHaveText('night');

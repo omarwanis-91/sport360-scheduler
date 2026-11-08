@@ -459,3 +459,14 @@ The chosen effective date identifies a version: saving again on that date update
 Weekly lead slots may be unassigned and must never fall back to the first department member. Each day in the person rotation editor offers Lead as a red-star choice alongside the four ordinary shifts. Selecting it presents Lead as the day's primary shift; choosing an ordinary shift clears that person's lead for that weekday. Pattern and lead choices persist together through one authorized transaction, while other people's assignments remain intact unless explicitly replaced by a selected Lead.
 
 An Admin may deliberately reset a person's rotation to No Template. The confirmation states that all weekly versions, including historical/future versions across departments, and that person's weekly lead references will be removed. This is an explicit exception to normal history preservation. Leads cannot perform this full reset because they cannot delete historical versions. Daily exceptions, daily lead overrides, requests, balances, accounts, and existing activity remain preserved.
+
+## D-060 - Preview Rotation Changes And Commit Together
+
+**Date:** 2026-11-08
+**Status:** Accepted
+
+Rotation edits, explicit Lead choices, shift paste, and confirmed resets become drafts, displayed immediately with a changed-person marker. The selected department has one Save Changes action that is disabled until something changes. Drawer Done only closes the editor. Per-person Undo and department Discard changes reverse unsaved edits. Pending drafts remain separate from stored operational state and survive navigation and reload for the signed-in account.
+
+Only changed people are submitted. Each inherits the page effective start unless their personal date overrides it. Moving the page date does not create versions for untouched people. The database commits the changed people together or rolls everything back, including all weekly Lead changes. Copy/paste carries shifts without mutating Lead identities. The board resolves Lead at the effective date being previewed and shows Lead separately in its summary instead of counting it as Morning or Night.
+
+For an incorrectly saved start date, Admin opens Saved versions / Correct date and moves that specific version through the shared save. A conflicting destination date or changed source version is rejected. This is a deliberate, audited exception to normal immutable-date history: other rotation versions, daily exceptions, requests, and balances stay intact. Full Delete Rotation remains the separate reset-to-No-Template workflow and is also staged for the overall save.
