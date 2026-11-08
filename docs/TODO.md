@@ -39,6 +39,9 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migration 032 and passed all five audit 020 checks for later-version review and scoped Apply onward.
+- [x] Confirmed the targeted empty November 8 Lead version cleanup restored continuing November 1 Lead assignments; built explicit review to prevent silent later-version cutoffs.
+- [x] Added a modest week-boundary gap and clarified Edit daily leads while retaining direct one-time Scheduler shift edits.
 - [x] Applied migration 031 and passed all five audit 019 checks for atomic rotation drafts and saved-date correction.
 - [x] Built immediate rotation/Lead previews, changed-person markers, account-scoped pending drafts, shared date inheritance, one atomic department save, and targeted Admin saved-date correction.
 - [x] Applied migration 030 and passed all five audit 018 checks for explicit Lead choices and Admin rotation reset.

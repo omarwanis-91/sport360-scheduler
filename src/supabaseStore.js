@@ -1,6 +1,6 @@
 import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
-import { weeklyLeadPattern, applyExplicitLeadDays, applyRotationDrafts } from "./scheduleLogic.mjs";
+import { weeklyLeadPattern, applyExplicitLeadDays, applyRotationDrafts, rotationFutureVersions } from "./scheduleLogic.mjs";
 
 const profilePhotoPrefix = "storage:profile-photos/";
 const onboardingPhotoPrefix = "storage:profile-onboarding-photos/";
@@ -69,10 +69,16 @@ function createLocalStore() {
     async resetPersonRotation() {},
     async saveRotationDrafts(departmentId, changes) {
       const before = await this.load();
+      for (const item of changes) {
+        const future = rotationFutureVersions(before, departmentId, item);
+        if ((future.rotations.length || future.leads.length) && !["keep", "replace"].includes(item.futurePolicy)) throw new Error("Later versions exist. Review their dates before saving.");
+        if (item.expectedFuture && JSON.stringify(future) !== JSON.stringify(item.expectedFuture)) throw new Error("Later versions changed. Reload and review the dates again.");
+      }
       const after = applyRotationDrafts(before, departmentId, changes);
       after.rotationVersions.forEach(row => { if (row.id.startsWith("draft:")) row.id = crypto.randomUUID(); });
       after.departmentLeadRotations.forEach(row => { if (row.id.startsWith("draft-lead:")) row.id = crypto.randomUUID(); });
-      return { rotations: after.rotationVersions.filter(row => changes.some(item => item.profileId === row.profileId && item.effectiveStart === row.effectiveStart && item.action !== "reset")),
+      return { removedRotationIds: before.rotationVersions.filter(row => !after.rotationVersions.some(saved => saved.id === row.id)).map(row => row.id),
+        rotations: after.rotationVersions.filter(row => changes.some(item => item.profileId === row.profileId && item.effectiveStart === row.effectiveStart && item.action !== "reset")),
         resetProfileIds: changes.filter(item => item.action === "reset").map(item => item.profileId),
         leadRotations: after.departmentLeadRotations.filter(row => row.departmentId === departmentId) };
     },
@@ -305,9 +311,9 @@ function createRemoteStore(client) {
       return client.rpc("reset_person_rotation", { p_profile_id: profileId });
     },
     async saveRotationDrafts(departmentId, changes) {
-      const result = await client.rpc("save_rotation_drafts", { p_department_id: departmentId, p_changes: changes });
+      const result = await client.rpc("save_reviewed_rotation_drafts", { p_department_id: departmentId, p_changes: changes });
       return { rotations: result.rotations.map(fromDbRotation), leadRotations: result.lead_rotations.map(fromDbLeadRotation),
-        resetProfileIds: result.reset_profile_ids };
+        resetProfileIds: result.reset_profile_ids, removedRotationIds: result.removed_rotation_ids || [] };
     },
     async applyRotationPatterns(departmentId, effectiveStart, patterns) {
       const rows = await client.rpc("apply_rotation_patterns", {

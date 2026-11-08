@@ -4,6 +4,7 @@ import {
   addDays,
   applyExplicitLeadDays,
   applyRotationDrafts,
+  rotationFutureVersions,
   annualEligibleDates,
   datesBetween,
   departmentLeadForDate,
@@ -20,6 +21,26 @@ import {
 
 const rotationStatusIds = ["morning", "midday", "night", "weekend"];
 const defaultWeekPattern = ["morning", "morning", "morning", "morning", "morning", "weekend", "weekend"];
+
+test("future rotation review identifies blank Lead cutoffs and Apply onward preserves other people", () => {
+  const state = { rotationVersions: [
+    { id: "old", profileId: "a", effectiveStart: "2026-11-08", pattern: Array(7).fill("night") },
+    { id: "other", profileId: "b", effectiveStart: "2026-11-08", pattern: Array(7).fill("morning") }
+  ], departmentLeadRotations: [
+    { id: "blank", departmentId: "ops", effectiveStart: "2026-11-08", pattern: ["", "b", "", "", "", "", ""] }
+  ] };
+  const change = { profileId: "a", effectiveStart: "2026-11-01", pattern: [...defaultWeekPattern], leadDays: [true, false, false, false, false, false, false] };
+  const future = rotationFutureVersions(state, "ops", change);
+  assert.equal(future.rotations[0].id, "old"); assert.equal(future.leads[0].id, "blank");
+  assert.deepEqual(rotationFutureVersions(state, "ops", { ...change, preserveLeads: true }).leads, []);
+  const after = applyRotationDrafts(state, "ops", [{ ...change, futurePolicy: "replace" }]);
+  assert.equal(after.rotationVersions.some(row => row.id === "old"), false);
+  assert.deepEqual(after.rotationVersions.find(row => row.id === "other"), state.rotationVersions[1]);
+  assert.deepEqual(weeklyLeadPattern(after.departmentLeadRotations, "ops", "2026-11-09"), ["a", "b", "", "", "", "", ""]);
+  const later = { ...change, profileId: "b", effectiveStart: "2026-11-15", futurePolicy: "replace" };
+  const mixed = applyRotationDrafts(state, "ops", [{ ...change, futurePolicy: "replace" }, later]);
+  assert.equal(weeklyLeadPattern(mixed.departmentLeadRotations, "ops", "2026-11-16")[0], "b");
+});
 
 test("rotation drafts preserve stored history, resolve dates, and move Lead earlier without stopping it at the old date", () => {
   const state = { rotationVersions: [

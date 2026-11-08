@@ -7062,6 +7062,7 @@ button:disabled {
 
 .schedule-grid {
   gap: 6px;
+  --week-boundary-inset: 12px;
   padding: 8px;
   background: transparent;
 }
@@ -8432,11 +8433,16 @@ select:focus {
   letter-spacing: 0;
 }
 
+.week-band.week-group-start { margin-left: var(--week-boundary-inset); }
+.rotation-future-list { display: grid; gap: 10px; max-height: 35vh; overflow: auto; }
+.rotation-future-list > div { display: grid; gap: 4px; padding: 10px; border-left: 2px solid #b45e75; background: rgba(164, 65, 90, .07); font-size: 12px; }
+.rotation-future-list small, .rotation-future-list span { color: var(--muted); }
+
 /* Monday uses one quiet seam; the week band above carries the visible outline. */
 .date-head.week-start,
 .coverage-cell.week-start,
 .schedule-grid .shift-cell.week-start {
-  margin-left: 6px;
+  margin-left: var(--week-boundary-inset);
   border-left-width: 1px;
   border-left-color: rgba(255, 255, 255, 0.12);
   box-shadow:

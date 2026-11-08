@@ -470,3 +470,14 @@ Rotation edits, explicit Lead choices, shift paste, and confirmed resets become 
 Only changed people are submitted. Each inherits the page effective start unless their personal date overrides it. Moving the page date does not create versions for untouched people. The database commits the changed people together or rolls everything back, including all weekly Lead changes. Copy/paste carries shifts without mutating Lead identities. The board resolves Lead at the effective date being previewed and shows Lead separately in its summary instead of counting it as Morning or Night.
 
 For an incorrectly saved start date, Admin opens Saved versions / Correct date and moves that specific version through the shared save. A conflicting destination date or changed source version is rejected. This is a deliberate, audited exception to normal immutable-date history: other rotation versions, daily exceptions, requests, and balances stay intact. Full Delete Rotation remains the separate reset-to-No-Template workflow and is also staged for the overall save.
+
+## D-061 - Review Later Versions Before Backdated Rotation Saves
+
+**Date:** 2026-11-08
+**Status:** Accepted
+
+An empty Lead version beginning November 8 superseded valid November 1 assignments. The user removed that specific empty version and confirmed restoration. Effective start remains a version boundary, but later shift/Lead boundaries must be visible before saving changed people. The review lists their dates and requires Keep later versions or Apply from these dates onward.
+
+Apply onward explicitly replaces later rotation versions for the edited people and merges their chosen Lead weekdays into subsequent department patterns. Other people, unrelated Lead slots/departments, earlier versions, and daily exceptions remain intact. Leads remain limited to direct departments and current/future dates. A locked snapshot comparison rejects concurrent changes so the reviewed outcome cannot silently change before commit; replacement is audited. Ordinary copy/paste still preserves Lead identities.
+
+Scheduler week spacing increases modestly while keeping week bands and cells aligned. Edit Schedule is renamed Edit daily leads to distinguish staged Lead assignments from direct one-time shift edits.
