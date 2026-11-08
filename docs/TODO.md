@@ -4,6 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
+- [ ] Apply `029_direct_rotation_patterns.sql`, pass audit 017, and deploy the direct rotation editing/copy-paste UI.
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
@@ -39,6 +40,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Built direct empty/populated rotation-cell editing, removed Edit Rotation/Continue, and added reviewed individual/department pattern copy-paste with atomic, effective-dated saves.
+- [x] Completed the approved scheduling reset; all six reset checks returned zero while profiles, departments, permissions, and activity were retained.
 - [x] Pinned Scheduler controls outside the horizontal scroller, simplified zoom to percentage/icons, removed board filters and redundant lead/coverage rows, and fixed saving/clearing daily changes without lead-edit mode.
 - [x] Added numbered closed week bands, kept Weekend/Annual/Sick rails visible at rest, and enforced non-overlapping Annual eligibility in the UI and database migration.
 - [x] Strengthened Monday week boundaries and made Weekend/Annual/Sick cells recede at rest while restoring full clarity and brightness on hover or keyboard focus.

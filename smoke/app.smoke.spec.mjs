@@ -602,7 +602,7 @@ test("annual request review includes the affected team rotation mini view", asyn
 test("rotation pattern choices update in place without refreshing the workspace", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Rotations", exact: true }).click();
-  await page.getByRole("button", { name: "Edit Rotation", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Edit Rotation", exact: true })).toHaveCount(0);
   await page.locator('.rotation-cell [data-open-drawer="rotation-detail"]').first().click();
 
   await page.getByPlaceholder("Preset name", { exact: true }).fill("Unsaved draft");
@@ -636,7 +636,7 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
   await page.getByRole("button", { name: "Rotations", exact: true }).click();
   await expect(page.locator('.rotation-cell[data-profile-id="emp-002"][data-weekday="0"]')).toHaveClass(/lead/);
   await expect(page.locator('.rotation-cell[data-profile-id="emp-002"][data-weekday="0"] .shift-label')).toHaveText("Lead");
-  await page.getByRole("button", { name: "Edit Rotation", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Edit Rotation", exact: true })).toHaveCount(0);
   const newMondayLead = page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .lead-shift-button');
   await newMondayLead.click();
   await expect(page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"]')).toHaveClass(/lead/);

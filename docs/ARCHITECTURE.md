@@ -22,6 +22,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `playwright.live.config.mjs` and `live/phase4-role-boundaries.spec.mjs` | Run credential-injected, read-only production role checks in Chrome, Edge, and Firefox without storing passwords in the repository. |
 | `scripts/verifyFreePlanBackup.js` | Verifies a manual export folder has the expected files before restore rehearsal. |
 | `scripts/phase4LocalVerify.js` | Runs local Phase 4 release checks: syntax, unit tests, build, and demo smoke tests. |
+| `test/rotationRpc.integration.mjs` | Runs migration 029 and audit 017 against isolated PostgreSQL using a temporary PGlite runtime; verifies authorization branches, rollback, and version preservation without production access. |
 | `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
 | `vercel.json` | Vercel build, output, and SPA rewrite settings. |
 | `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
@@ -57,7 +58,9 @@ Settings also contains the Admin-only Role Preview launcher. Preview mode is int
 
 Right-side drawers handle focused tasks such as shift edits, daily bulk editing, profile editing, department details, and rotation editing. Annual-request review opens as a centered wide modal so its compact team schedule preview and decision impact remain readable across the affected dates. Authorized Scheduler cell clicks open one-time daily overrides directly; Scheduler edit mode remains reserved for staged day-lead changes. Full employee profile and calendar experiences use the main content area.
 
-Rotation pattern choices update their existing editor controls in place instead of rebuilding the application shell, preserving focus and unsaved form content during rapid pattern editing.
+Rotation cells, including empty cells, and person rows open the weekly editor directly. There is no rotation edit-mode or person-selection gate. Pattern choices update their editor controls in place, preserving focus and form content. An in-session clipboard copies only the seven weekday shifts, with review before pasting to a person or the selected department. Lead stars remain independently staged with a compact Save leads action.
+
+Direct rotation saves and department paste use `apply_rotation_patterns`, an authorized atomic RPC introduced by migration 029. It updates a version on the chosen effective date or creates a new one, keeps earlier versions and daily exceptions intact, validates every target and shift, and serializes overlapping saves through profile locks. Clipboard contents are cleared on sign-out and role changes.
 
 ## Scheduling Model
 

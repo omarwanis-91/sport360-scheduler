@@ -441,3 +441,12 @@ Weekend, Sick, and existing Annual days are never eligible for another Annual wr
 **Status:** Accepted
 
 The Scheduler toolbar lives outside the horizontal timeline scroller and uses compact shared typography. Zoom uses minus/plus buttons with a percentage indicator. People and shift filters, per-date lead-name subtitles, and the coverage summary row are removed from the board to prioritize the shift cards. Date details and Annual approval retain coverage calculations and focused information. Authorized daily changes and clearing overrides work directly from a shift card without enabling the staged lead-edit mode.
+
+## D-058 - Direct Rotation Editing And Pattern Copy
+
+**Date:** 2026-11-08
+**Status:** Accepted
+
+Authorized users open a person's weekly rotation from any populated or empty rotation cell or the person's row, without an Edit Rotation or Continue step. Copy/paste carries only the seven weekday shifts. Individual paste opens the editor for review; department paste shows its target people, pattern, and effective start before one atomic save. Access roles, lead identities, balances, requests, and daily exceptions are never copied.
+
+The chosen effective date identifies a version: saving again on that date updates it, while a different date creates another version. The default start is today, or the future date of the opened version; earlier versions remain unchanged unless the Admin explicitly chooses their date. Leads cannot save into the past. Weekly lead stars retain an independent Save leads action.
