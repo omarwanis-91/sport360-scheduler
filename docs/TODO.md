@@ -4,7 +4,6 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Apply `032_rotation_future_version_review.sql`, pass audit 020, and deploy later-version review plus Scheduler week spacing/daily-lead labels.
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
@@ -40,6 +39,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migration 032 and passed all five audit 020 checks for later-version review and scoped Apply onward.
 - [x] Confirmed the targeted empty November 8 Lead version cleanup restored continuing November 1 Lead assignments; built explicit review to prevent silent later-version cutoffs.
 - [x] Added a modest week-boundary gap and clarified Edit daily leads while retaining direct one-time Scheduler shift edits.
 - [x] Applied migration 031 and passed all five audit 019 checks for atomic rotation drafts and saved-date correction.
