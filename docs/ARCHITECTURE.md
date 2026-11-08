@@ -22,7 +22,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `playwright.live.config.mjs` and `live/phase4-role-boundaries.spec.mjs` | Run credential-injected, read-only production role checks in Chrome, Edge, and Firefox without storing passwords in the repository. |
 | `scripts/verifyFreePlanBackup.js` | Verifies a manual export folder has the expected files before restore rehearsal. |
 | `scripts/phase4LocalVerify.js` | Runs local Phase 4 release checks: syntax, unit tests, build, and demo smoke tests. |
-| `test/rotationRpc.integration.mjs` | Runs migration 029 and audit 017 against isolated PostgreSQL using a temporary PGlite runtime; verifies authorization branches, rollback, and version preservation without production access. |
+| `test/rotationRpc.integration.mjs` | Runs migrations 029–030 and audits 017–018 against isolated PostgreSQL using a temporary PGlite runtime; verifies authorization, atomic saves, explicit leads, and person resets without production access. |
 | `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
 | `vercel.json` | Vercel build, output, and SPA rewrite settings. |
 | `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
@@ -61,6 +61,10 @@ Right-side drawers handle focused tasks such as shift edits, daily bulk editing,
 Rotation cells, including empty cells, and person rows open the weekly editor directly. There is no rotation edit-mode or person-selection gate. Pattern choices update their editor controls in place, preserving focus and form content. An in-session clipboard copies only the seven weekday shifts, with review before pasting to a person or the selected department. Lead stars remain independently staged with a compact Save leads action.
 
 Direct rotation saves and department paste use `apply_rotation_patterns`, an authorized atomic RPC introduced by migration 029. It updates a version on the chosen effective date or creates a new one, keeps earlier versions and daily exceptions intact, validates every target and shift, and serializes overlapping saves through profile locks. Clipboard contents are cleared on sign-out and role changes.
+
+Migration 030 adds `save_person_rotation` so one person's weekday pattern and explicit Lead choices save atomically. The red star is a fifth visible choice in each day picker, backed by the existing working-day pattern and weekly lead table; no new stored shift status is introduced. Blank lead slots stay unassigned. Choosing a normal shift clears only that person's lead assignment on that weekday. Department copy/paste continues to carry weekday shifts only.
+
+Admin-only Delete Rotation opens an in-app confirmation before `reset_person_rotation` removes all versions for the person and clears references to them in weekly lead patterns. This deliberate full reset guarantees No Template instead of falling back to an older version. Daily overrides, daily lead overrides, requests, balances, identities, and other people's patterns remain untouched; the reset is recorded in Activity.
 
 ## Scheduling Model
 

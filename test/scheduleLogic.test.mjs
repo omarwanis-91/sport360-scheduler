@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   addDays,
+  applyExplicitLeadDays,
   annualEligibleDates,
   datesBetween,
   departmentLeadForDate,
@@ -12,6 +13,7 @@ import {
   sanitizeRotationPattern,
   scheduleFor,
   weekdayIndex,
+  weeklyLeadPattern,
   workdayCount
 } from "../src/scheduleLogic.mjs";
 
@@ -73,6 +75,17 @@ test("date helpers use local calendar days", () => {
   assert.equal(addDays("2026-05-31", 1), "2026-06-01");
   assert.equal(weekdayIndex("2026-06-01"), 0);
   assert.deepEqual(datesBetween("2026-06-01", "2026-06-03"), ["2026-06-01", "2026-06-02", "2026-06-03"]);
+});
+
+test("unassigned weekly leads stay empty and explicit choices preserve other people", () => {
+  const empty = weeklyLeadPattern([], 'ops', '2026-11-08');
+  assert.deepEqual(empty, Array(7).fill(''));
+  const assigned = applyExplicitLeadDays(empty, 'person', [true, false, false, false, false, false, false]);
+  assert.deepEqual(assigned, ['person', '', '', '', '', '', '']);
+  const another = applyExplicitLeadDays(assigned, 'other', [false, true, false, false, false, false, false]);
+  assert.deepEqual(another, ['person', 'other', '', '', '', '', '']);
+  assert.deepEqual(applyExplicitLeadDays(another, 'person', Array(7).fill(false)), ['', 'other', '', '', '', '', '']);
+  assert.deepEqual(weeklyLeadPattern([{ departmentId: 'ops', effectiveStart: '2027-01-01', pattern: assigned }], 'ops', '2026-11-08'), empty);
 });
 
 test("ISO week labels stay correct across year boundaries", () => {

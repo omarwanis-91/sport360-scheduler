@@ -100,6 +100,81 @@ test('weekly lead stars save directly without a rotation edit-mode gate', async 
   await expect(page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .shift-label')).toHaveText('Lead');
 });
 
+test('Lead is explicit in each day and never defaults to the first person', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const { seedState } = await import('/assets/data.js');
+    const clean = structuredClone(seedState);
+    clean.rotationVersions = [];
+    clean.departmentLeadRotations = [];
+    clean.departmentLeads = [];
+    localStorage.setItem('sport360-scheduler-state', JSON.stringify(clean));
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Rotations', exact: true }).click();
+  await page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .rotation-cell-open').click();
+  await expect(page.locator('[data-pattern-status="lead"]')).toHaveCount(7);
+  await page.locator('[data-pattern-day="0"][data-pattern-status="night"]').click();
+  await page.getByRole('button', { name: 'Create Rotation', exact: true }).click();
+  await expect(page.locator('.app-notice.success')).toContainText('Rotation saved.');
+  expect((await readState(page)).departmentLeadRotations).toHaveLength(0);
+  await expect(page.locator('.rotation-cell.lead')).toHaveCount(0);
+
+  const wednesday = page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="2"]');
+  await wednesday.locator('.rotation-cell-open').click();
+  await page.locator('[data-pattern-day="2"][data-pattern-status="lead"]').click();
+  await expect(page.locator('.pattern-slot').nth(2).locator('.pattern-slot-head strong')).toHaveText('Lead');
+  await page.getByRole('button', { name: 'Save Rotation', exact: true }).click();
+  await expect(wednesday.locator('.shift-label')).toHaveText('Lead');
+  const explicit = await readState(page);
+  expect(explicit.departmentLeadRotations[0].pattern).toEqual(['', '', 'emp-001', '', '', '', '']);
+  await page.reload();
+  await page.getByRole('button', { name: 'Rotations', exact: true }).click();
+  await wednesday.locator('.rotation-cell-open').click();
+  await expect(page.locator('[data-pattern-day="2"][data-pattern-status="lead"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-pattern-day="2"][data-pattern-status="morning"]').click();
+  await page.getByRole('button', { name: 'Save Rotation', exact: true }).click();
+  await expect(page.locator('.rotation-cell.lead')).toHaveCount(0);
+  expect((await readState(page)).departmentLeadRotations[0].pattern).toEqual(Array(7).fill(''));
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-001"][data-weekday="0"] .shift-label')).toHaveText('Night');
+});
+
+test('Admin can confirm a full rotation reset without older versions or leads resurfacing', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const { seedState } = await import('/assets/data.js');
+    const setup = structuredClone(seedState);
+    setup.rotationVersions.push({ id: 'future', profileId: 'emp-001', effectiveStart: '2099-01-01', pattern: Array(7).fill('morning') });
+    setup.departmentLeadRotations[0].pattern = ['emp-001', 'emp-002', 'emp-001', 'emp-002', 'emp-002', 'emp-003', 'emp-003'];
+    localStorage.setItem('sport360-scheduler-state', JSON.stringify(setup));
+  });
+  await page.reload();
+  const before = await readState(page);
+  await page.getByRole('button', { name: 'Rotations', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit rotation for Omar Wanis', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete Rotation', exact: true }).click();
+  await expect(page.locator('.drawer')).toContainText('all 2 weekly rotation versions');
+  await page.getByRole('button', { name: 'Keep Rotation', exact: true }).click();
+  expect((await readState(page)).rotationVersions).toEqual(before.rotationVersions);
+  await page.getByRole('button', { name: 'Delete Rotation', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete All Rotation Versions', exact: true }).click();
+  await expect(page.locator('.app-notice.success')).toContainText('No Template');
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-001"].missing')).toHaveCount(7);
+  const after = await readState(page);
+  expect(after.rotationVersions).toEqual(before.rotationVersions.filter(r => r.profileId !== 'emp-001'));
+  expect(after.departmentLeadRotations[0].pattern).toEqual(['', 'emp-002', '', 'emp-002', 'emp-002', 'emp-003', 'emp-003']);
+  expect(after.scheduleOverrides).toEqual(before.scheduleOverrides);
+  expect(after.vacationRequests).toEqual(before.vacationRequests);
+  expect(after.profiles).toEqual(before.profiles);
+  await page.reload();
+  await page.getByRole('button', { name: 'Rotations', exact: true }).click();
+  await expect(page.locator('.rotation-cell[data-profile-id="emp-001"].missing')).toHaveCount(7);
+  await page.locator('#user-switcher').selectOption('user-lead');
+  await page.getByRole('button', { name: 'Rotations', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit rotation for Mona Saleh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Delete Rotation', exact: true })).toHaveCount(0);
+});
+
 test('remote rotation save uses the atomic RPC and retains the draft on failure', async ({ page }) => {
   const url = 'https://rotations-test.supabase.co';
   await page.route('**/runtime-config.js', route => route.fulfill({
@@ -121,11 +196,11 @@ test('remote rotation save uses the atomic RPC and retains the draft on failure'
   };
   await page.route(`${url}/rest/v1/**`, async route => {
     const path = new URL(route.request().url()).pathname.split('/').at(-1);
-    if (path === 'apply_rotation_patterns') {
+    if (path === 'save_person_rotation') {
       sentPayload = route.request().postDataJSON();
       if (shouldFail) return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Test save rejected' }) });
-      saved = sentPayload.p_patterns_json.map(item => ({ id: 'saved', profile_id: item.profileId, effective_start: sentPayload.p_effective_start, pattern: item.pattern }));
-      return route.fulfill({ contentType: 'application/json', body: JSON.stringify(saved) });
+      saved = [{ id: 'saved', profile_id: sentPayload.p_profile_id, effective_start: sentPayload.p_effective_start, pattern: sentPayload.p_pattern }];
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ rotation: saved[0], lead_rotation: null }) });
     }
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(path === 'rotation_versions' ? saved : tables[path] || []) });
   });
@@ -138,7 +213,8 @@ test('remote rotation save uses the atomic RPC and retains the draft on failure'
   expect(saved).toEqual([]);
   await expect(page.locator('[data-pattern-day="0"][data-pattern-status="night"]')).toHaveAttribute('aria-pressed', 'true');
   expect(sentPayload.p_department_id).toBe('ops');
-  expect(sentPayload.p_patterns_json[0].pattern[0]).toBe('night');
+  expect(sentPayload.p_pattern[0]).toBe('night');
+  expect(sentPayload.p_lead_days).toEqual(Array(7).fill(false));
   await page.locator('#dismiss-notice').click();
   shouldFail = false;
   await page.getByRole('button', { name: 'Create Rotation', exact: true }).click();

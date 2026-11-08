@@ -8150,6 +8150,26 @@ select:focus {
 }
 
 /* Direct rotation editing and an in-session weekday-pattern clipboard. */
+.pattern-chip.lead {
+  --status-accent: #ff7895;
+  --status-rgb: 255 120 149;
+  color: var(--status-accent);
+}
+
+.pattern-chip.lead.active {
+  border-color: rgb(var(--status-rgb) / 0.55);
+  background: rgb(var(--status-rgb) / 0.18);
+  box-shadow: 0 0 15px rgb(var(--status-rgb) / 0.15);
+}
+
+.pattern-chip.lead svg {
+  color: var(--status-accent);
+}
+
+.pattern-slot .pattern-chip-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .rotation-direct-toolbar {
   display: flex;
   flex-wrap: wrap;

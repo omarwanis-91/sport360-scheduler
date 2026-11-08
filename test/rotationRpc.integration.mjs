@@ -94,5 +94,67 @@ checks++;
 const audit = await db.exec(readFileSync(new URL('../supabase/audit/017_direct_rotation_patterns_audit.sql', import.meta.url), 'utf8'));
 for (const result of audit) for (const row of result.rows) assert.equal(row.passed, true, row.check_name);
 checks++;
+await db.exec(`
+  create table public.departments(id uuid primary key);
+  insert into public.departments values ('${dept}'), ('${otherDept}');
+  create table public.department_lead_rotation_versions (
+    id uuid primary key default gen_random_uuid(), department_id uuid not null,
+    effective_start date not null, pattern jsonb not null, created_by uuid,
+    created_at timestamptz default now(), unique(department_id, effective_start)
+  );
+  create table public.audit_log (
+    id uuid default gen_random_uuid(), actor_id uuid, action text, entity_type text,
+    entity_id text, detail jsonb, created_at timestamptz default now()
+  );
+  create table public.schedule_overrides(id integer primary key, profile_id uuid, status_id text);
+  insert into public.schedule_overrides values (1, '${person}', 'sick');
+`);
+await db.exec(readFileSync(new URL('../supabase/migrations/030_explicit_rotation_leads_and_reset.sql', import.meta.url), 'utf8'));
+await db.exec('create trigger validate_leads before insert or update on public.department_lead_rotation_versions for each row execute function public.validate_department_lead_rotation()');
+const noLeads = Array(7).fill(false);
+const leadMonday = [true, ...noLeads.slice(1)];
+async function personSave(id, pattern, days, date = '2099-01-01', department = dept) {
+  return (await db.query('select public.save_person_rotation($1::uuid,$2::uuid,$3::date,$4::text[],$5::boolean[]) as result',
+    [department, id, date, `{${pattern.join(',')}}`, `{${days.join(',')}}`])).rows[0].result;
+}
+await personSave(person, morning, noLeads);
+assert.equal((await db.query('select count(*)::int as n from public.department_lead_rotation_versions')).rows[0].n, 0);
+checks++;
+await personSave(person, morning, leadMonday);
+let leadRow = (await db.query('select * from public.department_lead_rotation_versions')).rows[0];
+assert.deepEqual(leadRow.pattern, [person, '', '', '', '', '', '']);
+await personSave(second, night, noLeads);
+assert.deepEqual((await db.query('select * from public.department_lead_rotation_versions')).rows[0].pattern, leadRow.pattern);
+checks++;
+await personSave(second, night, [false, true, ...noLeads.slice(2)]);
+await personSave(person, morning, noLeads);
+assert.deepEqual((await db.query('select * from public.department_lead_rotation_versions')).rows[0].pattern, ['', second, '', '', '', '', '']);
+checks++;
+const priorRotations = (await db.query('select * from public.rotation_versions order by id')).rows;
+await assert.rejects(() => personSave(person, Array(7).fill('weekend'), leadMonday), /working day/);
+await assert.rejects(() => personSave(person, morning, [true]), /seven explicit/);
+assert.deepEqual((await db.query('select * from public.rotation_versions order by id')).rows, priorRotations);
+checks++;
+await db.exec("set app.role = 'lead'");
+await assert.rejects(() => personSave(outsider, morning, leadMonday), /direct members/);
+await assert.rejects(() => personSave(person, morning, noLeads, '2000-01-01'), /past rotation/);
+await assert.rejects(() => db.query('select public.reset_person_rotation($1::uuid)', [person]), /Only Admin/);
+await db.exec("set app.role = 'employee'");
+await assert.rejects(() => personSave(person, morning, leadMonday), /Not allowed/);
+await assert.rejects(() => db.query('select public.reset_person_rotation($1::uuid)', [person]), /Only Admin/);
+checks++;
+await db.exec("set app.role = 'admin'");
+await personSave(person, morning, leadMonday);
+const otherVersions = (await db.query('select * from public.rotation_versions where profile_id <> $1 order by id', [person])).rows;
+await db.query('select public.reset_person_rotation($1::uuid)', [person]);
+assert.equal((await db.query('select count(*)::int as n from public.rotation_versions where profile_id = $1', [person])).rows[0].n, 0);
+assert.deepEqual((await db.query('select * from public.rotation_versions where profile_id <> $1 order by id', [person])).rows, otherVersions);
+assert.deepEqual((await db.query('select * from public.department_lead_rotation_versions')).rows[0].pattern, ['', second, '', '', '', '', '']);
+assert.equal((await db.query('select count(*)::int as n from public.schedule_overrides')).rows[0].n, 1);
+assert.equal((await db.query("select count(*)::int as n from public.audit_log where action = 'rotation.reset'")).rows[0].n, 1);
+checks++;
+const explicitAudit = await db.exec(readFileSync(new URL('../supabase/audit/018_explicit_rotation_leads_and_reset_audit.sql', import.meta.url), 'utf8'));
+for (const result of explicitAudit) for (const row of result.rows) assert.equal(row.passed, true, row.check_name);
+checks++;
 await db.close();
-console.log(`${checks} isolated PostgreSQL checks passed, including audit 017.`);
+console.log(`${checks} isolated PostgreSQL checks passed, including audits 017 and 018.`);

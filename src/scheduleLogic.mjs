@@ -79,6 +79,17 @@ export function activeLeadRotation(leadRotations, departmentId, dateIso) {
     .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
 }
 
+export function weeklyLeadPattern(leadRotations, departmentId, dateIso) {
+  const rotation = activeLeadRotation(leadRotations || [], departmentId, dateIso);
+  return Array.from({ length: 7 }, (_, day) => rotation?.pattern?.[day] || "");
+}
+
+export function applyExplicitLeadDays(pattern, profileId, leadDays) {
+  return Array.from({ length: 7 }, (_, day) => leadDays[day]
+    ? profileId
+    : pattern[day] === profileId ? "" : pattern[day] || "");
+}
+
 function profileDepartmentIds(profile) {
   return Array.isArray(profile?.departmentIds) && profile.departmentIds.length
     ? profile.departmentIds

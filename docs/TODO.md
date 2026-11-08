@@ -4,7 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Apply `029_direct_rotation_patterns.sql`, pass audit 017, and deploy the direct rotation editing/copy-paste UI.
+- [ ] Apply `030_explicit_rotation_leads_and_reset.sql`, pass audit 018, and deploy explicit Lead choices plus Admin rotation reset.
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
@@ -40,6 +40,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migration 029, passed all five audit 017 checks, and merged/deployed PR #31 for direct rotation editing and copy/paste.
+- [x] Removed implicit first-person weekly leads, added Lead to each day's picker, and built an Admin-confirmed reset to No Template.
 - [x] Built direct empty/populated rotation-cell editing, removed Edit Rotation/Continue, and added reviewed individual/department pattern copy-paste with atomic, effective-dated saves.
 - [x] Completed the approved scheduling reset; all six reset checks returned zero while profiles, departments, permissions, and activity were retained.
 - [x] Pinned Scheduler controls outside the horizontal scroller, simplified zoom to percentage/icons, removed board filters and redundant lead/coverage rows, and fixed saving/clearing daily changes without lead-edit mode.
