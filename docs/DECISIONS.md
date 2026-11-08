@@ -497,3 +497,14 @@ Dragging a person between hierarchy rows changes only Manager / Lead / Artist th
 **Status:** Accepted
 
 Skip schedule reconstruction before November 2026. Admin enters the recurring Annual allowance and current remainder separately through the existing Edit Profile controls: `15` allowance and `5` remaining displays `5 / 15`. Do not manufacture ten historical Annual days or requests to achieve that balance. The allowance remains configured until changed; future approved leave deducts from the current remainder. Leave already reflected in the manual balance must not be imported and deducted again. No automatic yearly reset or yearly ledger is introduced by this setup decision.
+
+## D-064 - Automatic Annual Renewal With Preserved Year Records
+
+**Date:** 2026-11-08
+**Status:** Accepted; production activation awaits migration 033 and audit 021
+
+At the start of each calendar year in Africa/Cairo, each person's Annual budget renews from their saved allowance without carrying unused days forward. Keep the prior year's allowance, remaining balance, requests, deductions, and schedule records. Current manual opening balances are imported unchanged; first renewal after activation in November 2026 is January 1, 2027. A database job performs renewal even when no app is open; scoped startup catch-up handles missed jobs or a paused project after resumption.
+
+Approval charges eligible dates to their own years atomically. Already approved next-year leave remains reserved, so a 15-day allowance with two booked next-year days opens at 13 available days, not 15 free days. Saved allowance changes adjust future-year budgets while leaving archived years intact and cannot undercut already approved future bookings. Current-year manual adjustment remains independent and Admin-only. A stale profile form cannot overwrite a renewed balance or concurrent deduction. No client can force a future-year reset.
+
+Requests predating yearly tracking cannot infer an opening balance from unknown history. Installation preserves existing current remainders and identifiable future reservations; inconsistent future Annual records fail preflight for explicit review instead of guessing. Rollover and manual adjustments are audited. Automatic renewal does not cancel requests, clear exceptions, rewrite rotations, or import pre-November schedules.

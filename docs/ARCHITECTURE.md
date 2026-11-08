@@ -14,6 +14,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `src/main.js` | UI state, rendering, event binding, permissions, and workflows. |
 | `src/styles.css` | Full visual system and responsive layout. |
 | `src/supabaseStore.js` | Supabase REST/Auth client and persistence adapter. |
+| `src/annualBalances.mjs` | Cairo year calculation, per-year approval preview, and isolated demo renewal/deductions. |
 | `src/data.js` | Seed/demo state and initial domain data. |
 | `src/config.js` | Supabase and application configuration. |
 | `scripts/localServer.js` | Local static file server. |
@@ -23,6 +24,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `scripts/verifyFreePlanBackup.js` | Verifies a manual export folder has the expected files before restore rehearsal. |
 | `scripts/phase4LocalVerify.js` | Runs local Phase 4 release checks: syntax, unit tests, build, and demo smoke tests. |
 | `test/rotationRpc.integration.mjs` | Runs migrations 029–032 and audits 017–020 against isolated PostgreSQL using a temporary PGlite runtime; verifies authorization, atomic saves, effective-date review, explicit leads, date corrections, and resets without production access. |
+| `test/annualRollover.integration.mjs` | Verifies migration 033, year-scoped approval/profile RPCs, history preservation, RLS, stale edits and atomic failures in isolated PostgreSQL. Actual Cron activation is checked by live audit 021. |
 | `netlify.toml` | Netlify build, publish, and SPA fallback settings. |
 | `vercel.json` | Vercel build, output, and SPA rewrite settings. |
 | `supabase/migrations/` | Database schema, RLS, and RPC evolution. |
@@ -60,7 +62,13 @@ Team uses one shared department selection, a foldable parent/child department na
 
 Authorized hierarchy cards can be dragged between Manager, Lead, and Artist rows or moved through their accessible level menu. Both use the existing `update_profile_hierarchy` RPC from migration 027 and update only seniority after success. Access roles, department memberships, and scheduled Lead shifts are separate. Employees and read-only Role Preview have no move controls. The legacy onboarding job-title placeholder `Pending assignment` displays as `Job title not set` in Team without rewriting stored profiles.
 
-The current setup starts scheduling from November 2026 and skips earlier history. Admin sets recurring Annual allowance and actual current remaining days independently in Edit Profile, without creating historical requests or daily overrides. Future approved Annual deducts from that remainder. `docs/BACKFILL.md` documents this opening-balance procedure and retains optional historical-entry guidance. There is no bulk historical importer, automatic new-year balance reset, or annual balance ledger per year in the current application.
+The current setup starts scheduling from November 2026 and skips earlier history. Admin sets recurring Annual allowance and actual current remaining days independently in Edit Profile, without creating historical requests or daily overrides. `docs/BACKFILL.md` documents opening balances and retains optional historical-entry guidance. Migration 033 adds automatic Cairo calendar-year renewal and separate yearly balance records; deployment requires migration 033 and audit 021 first.
+
+`annual_balance_years` preserves each profile/year's allowance and remainder. The existing profile fields mirror only the active year for compatibility with the compact UI. An hourly Supabase Cron job checks for a year change (including Cairo midnight on January 1); `refresh_annual_balances` catches up visible profiles before loading app data if a job was missed or the project was paused. Private helpers lock the profile before the year's row, renew once per year without carryover, preserve advance bookings, and record system audit entries. Missing intermediate years are retained when catching up. Browser callers cannot choose a rollover year or invoke the global reset/helper functions.
+
+Annual approval snapshots eligible dates, splits deductions by calendar year in one transaction, stores `deducted_days_by_year` on the request, and changes only those yearly balances and date overrides. A December/January request therefore cannot charge the whole range against one year or regain booked days after renewal. Historical approvals in tracked years charge their own archived year; years before tracking require Admin review. Existing balances and approved requests remain unchanged on installation; identifiable legacy future Annual overrides reserve the actual future-year budget without silently refunding today's manually entered remainder.
+
+Admin profile edits use `save_admin_profile_annual` with the displayed year and original allowance/remainder. The server rejects a stale form after a renewal or concurrent current-year deduction. Triggers synchronize the ledger, audit manual adjustments, block unsafe legacy balance writes, and keep future entitlements aligned with saved allowance changes without rewriting previous years. Opening-balance editing remains Admin-only. `src/annualBalances.mjs` mirrors renewal, per-year preview and deductions for demo mode; PostgreSQL is authoritative in production. The app refreshes at a detected year boundary or on return to a tab, deferring while a drawer is open so unsaved edits are not silently replaced.
 
 Right-side drawers handle focused tasks such as shift edits, daily bulk editing, profile editing, department details, and rotation editing. Annual-request review opens as a centered wide modal so its compact team schedule preview and decision impact remain readable across the affected dates. Authorized Scheduler cell clicks open one-time daily overrides directly; Scheduler edit mode remains reserved for staged day-lead changes. Full employee profile and calendar experiences use the main content area.
 
@@ -108,6 +116,7 @@ For a person and date:
 ## Main Domain Data
 
 - `profiles`: employee identity, role-related details, compatibility department anchor, leave balance, and optional auth link.
+- `annual_balance_years`: scoped per-person/year allowance and remaining balance, including archived years and advance-year reservations.
 - `employee_profile_departments`: equal operational department memberships.
 - `departments`: organizational grouping and minimum coverage target.
 - `statuses`: schedule labels, kinds, and visual metadata.

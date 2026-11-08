@@ -48,7 +48,7 @@ Reads personal and directly assigned department schedules, rotations, profiles, 
 - Department coverage targets and warnings.
 - Versioned weekly rotations.
 - Daily manual overrides and exceptions.
-- Annual balances and approval workflows.
+- Annual balances, automatic calendar-year renewal from each person's saved allowance, retained yearly records, and approval workflows.
 - Profile, department, role, and membership management.
 - Activity/audit visibility.
 - Desktop-first responsive web UI.

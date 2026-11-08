@@ -4,6 +4,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
+- [ ] Apply `033_annual_year_rollover.sql` and pass all five audit 021 checks before deploying the yearly-balance client. Confirm the named Cron job is active; do not test renewal by changing production dates or balances.
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
@@ -40,6 +41,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Built automatic Cairo calendar-year Annual renewal, retained per-year balances, year-scoped atomic deductions, stale-edit protection, and isolated database/browser tests. Production activation awaits migration 033 and audit 021.
 - [x] Added foldable department nesting, separate Hierarchy/Directory tabs, drag/drop and keyboard-accessible level editing, clearer unset job titles, and centered Team action buttons. No new migration or production-data changes.
 - [x] Applied migration 032 and passed all five audit 020 checks for later-version review and scoped Apply onward.
 - [x] Confirmed the targeted empty November 8 Lead version cleanup restored continuing November 1 Lead assignments; built explicit review to prevent silent later-version cutoffs.

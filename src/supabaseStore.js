@@ -1,6 +1,7 @@
 import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
 import { weeklyLeadPattern, applyExplicitLeadDays, applyRotationDrafts, rotationFutureVersions } from "./scheduleLogic.mjs";
+import { annualYear, syncDemoAnnualBalances } from "./annualBalances.mjs";
 
 const profilePhotoPrefix = "storage:profile-photos/";
 const onboardingPhotoPrefix = "storage:profile-onboarding-photos/";
@@ -22,10 +23,12 @@ function createLocalStore() {
     mode: "demo",
     async load() {
       const stored = localStorage.getItem(storageKey);
-      return stored ? JSON.parse(stored) : structuredClone(seedState);
+      const state = syncDemoAnnualBalances(stored ? JSON.parse(stored) : structuredClone(seedState));
+      localStorage.setItem(storageKey, JSON.stringify(state));
+      return state;
     },
     async persist(state) {
-      localStorage.setItem(storageKey, JSON.stringify(state));
+      localStorage.setItem(storageKey, JSON.stringify(syncDemoAnnualBalances(state)));
     },
     async reset() {
       localStorage.removeItem(storageKey);
@@ -188,40 +191,23 @@ function createRemoteStore(client) {
       await client.insert("employee_profiles", toDbProfile(profile));
     },
     async updateProfile(profile) {
-      try {
-        const row = await client.rpc("save_admin_profile", {
-          p_profile_id: profile.id,
-          p_employee_code: profile.employeeId,
-          p_email: profile.email,
-          p_full_name: profile.name,
-          p_title: profile.title,
-          p_seniority_level: profile.seniorityLevel || "artist",
-          p_department_ids: profile.departmentIds || [],
-          p_photo_url: profile.photoRef || profile.photo || null,
-          p_yearly_vacation_days: profile.yearlyVacationDays,
-          p_remaining_vacation_days: profile.remainingVacationDays,
-          p_user_id: profile.userId || null
-        });
-        return row ? fromDbProfile(row) : null;
-      } catch (error) {
-        if (!/schema cache|Could not find the function|save_admin_profile/i.test(error.message || "")) throw error;
-        const row = await client.rpc("update_admin_profile", {
-          p_profile_id: profile.id,
-          p_employee_code: profile.employeeId,
-          p_email: profile.email,
-          p_full_name: profile.name,
-          p_title: profile.title,
-          p_seniority_level: profile.seniorityLevel || "artist",
-          p_is_department_lead: false,
-          p_department_id: profile.departmentId || null,
-          p_photo_url: profile.photoRef || profile.photo || null,
-          p_yearly_vacation_days: profile.yearlyVacationDays,
-          p_remaining_vacation_days: profile.remainingVacationDays,
-          p_user_id: profile.userId || null
-        });
-        await saveProfileMemberships(client, profile);
-        return row ? fromDbProfile(row) : null;
-      }
+      const row = await client.rpc("save_admin_profile_annual", {
+        p_profile_id: profile.id,
+        p_employee_code: profile.employeeId,
+        p_email: profile.email,
+        p_full_name: profile.name,
+        p_title: profile.title,
+        p_seniority_level: profile.seniorityLevel || "artist",
+        p_department_ids: profile.departmentIds || [],
+        p_photo_url: profile.photoRef || profile.photo || null,
+        p_yearly_vacation_days: profile.yearlyVacationDays,
+        p_remaining_vacation_days: profile.remainingVacationDays,
+        p_user_id: profile.userId || null,
+        p_expected_balance_year: profile.expectedAnnualYear ?? profile.annualBalanceYear,
+        p_expected_allowance: profile.expectedAnnualAllowance ?? profile.yearlyVacationDays,
+        p_expected_remaining: profile.expectedAnnualRemaining ?? profile.remainingVacationDays
+      });
+      return row ? fromDbProfile(row) : null;
     },
     async updateOwnProfile(profile) {
       await client.rpc("update_own_profile", {
@@ -743,7 +729,8 @@ function emptyState() {
 }
 
 async function loadRemoteState(client, session) {
-  const [departments, profiles, profileDepartments, statuses, rotations, overrides, leads, leadRotations, requests, roles] = await Promise.all([
+  await client.rpc("refresh_annual_balances");
+  const [departments, profiles, profileDepartments, statuses, rotations, overrides, leads, leadRotations, requests, roles, annualBalances] = await Promise.all([
     client.select("departments", "created_at"),
     client.select("employee_profiles", "full_name"),
     safeSelect(client, "employee_profile_departments", "profile_id"),
@@ -753,7 +740,8 @@ async function loadRemoteState(client, session) {
     client.select("department_daily_leads", "lead_date"),
     safeSelect(client, "department_lead_rotation_versions", "effective_start"),
     client.select("vacation_requests", "requested_at", false),
-    client.select("user_roles", "created_at")
+    client.select("user_roles", "created_at"),
+    client.select("annual_balance_years", "balance_year")
   ]);
 
   const mappedProfiles = await Promise.all(profiles.map(async (row) => {
@@ -786,6 +774,7 @@ async function loadRemoteState(client, session) {
     userRoles: roles.map(fromDbUserRole),
     onboardingSubmissions,
     profiles: mappedProfiles,
+    annualBalances: annualBalances.map(row => ({ profileId: row.profile_id, year: row.balance_year, allowance: row.allowance_days, remaining: row.remaining_days, source: row.source })),
     statuses: statuses.map(fromDbStatus),
     rotationVersions: rotations.map(fromDbRotation),
     scheduleOverrides: overrides.map(fromDbOverride),
@@ -888,6 +877,7 @@ function fromDbProfile(row) {
     photoRef,
     yearlyVacationDays: row.yearly_vacation_days,
     remainingVacationDays: row.remaining_vacation_days,
+    annualBalanceYear: row.annual_balance_year ?? annualYear(),
     userId: row.user_id
   };
 }
@@ -978,7 +968,8 @@ function fromDbVacationRequest(row) {
     requestedAt: row.requested_at,
     decidedBy: row.decided_by,
     decidedAt: row.decided_at,
-    deductedDays: row.deducted_days
+    deductedDays: row.deducted_days,
+    deductedDaysByYear: row.deducted_days_by_year || {}
   };
 }
 
