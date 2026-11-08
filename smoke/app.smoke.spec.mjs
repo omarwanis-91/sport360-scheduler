@@ -184,6 +184,7 @@ test("Lead sees and manages only the directly assigned department", async ({ pag
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.getByRole("tab", { name: "Directory", exact: true }).click();
   await expect(page.locator(".person-card")).toHaveCount(3);
   await expect(page.locator(".person-card").filter({ hasText: "Omar Wanis" })).toBeVisible();
   await expect(page.locator(".person-card").filter({ hasText: "Mona Saleh" })).toBeVisible();
@@ -215,6 +216,7 @@ test("Employee has department read access and own identity editing only", async 
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.getByRole("tab", { name: "Directory", exact: true }).click();
   await expect(page.locator(".person-card")).toHaveCount(1);
   await expect(page.locator(".person-card").filter({ hasText: "Youssef Nabil" })).toBeVisible();
   await expect(page.getByText("Omar Wanis", { exact: true })).toHaveCount(0);
@@ -279,6 +281,7 @@ test("Admin can preview Lead scope for one selected department", async ({ page }
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.getByRole("tab", { name: "Directory", exact: true }).click();
   await expect(page.locator(".person-card")).toHaveCount(3);
   await expect(page.getByText("Youssef Nabil", { exact: true })).toHaveCount(0);
 });
@@ -300,6 +303,7 @@ test("compact controls expose names, selected state, and reduced-motion behavior
   expect(ambientAnimationNames).toEqual({ bodyBefore: "none", bodyAfter: "none", workspaceBefore: "none" });
 
   await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.getByRole("tab", { name: "Directory", exact: true }).click();
   await expect(page.getByRole("button", { name: "Default", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Kanban", exact: true })).toHaveAttribute("aria-pressed", "false");
 
@@ -314,8 +318,8 @@ test("primary views reveal their panels and cards with a staggered entrance", as
 
   const stage = page.locator('.view-stage[data-active-view="team"]');
   await expect(stage).toHaveClass(/is-entering/);
-  await expect(page.locator(".person-card").first()).toBeVisible();
-  const animationName = await page.locator(".person-card").first().evaluate((element) => getComputedStyle(element).animationName);
+  await expect(page.locator(".hierarchy-level").first()).toBeVisible();
+  const animationName = await page.locator(".hierarchy-level").first().evaluate((element) => getComputedStyle(element).animationName);
   expect(animationName).toContain("sport360CascadeIn");
 
   await page.locator("#team-department-select").selectOption("all");
@@ -509,7 +513,7 @@ test("creation opens centered while editing stays in the right sidebar", async (
   await page.getByRole("combobox", { name: "Parent department", exact: true }).selectOption("ops");
   await page.getByRole("button", { name: "Create Department", exact: true }).click();
   const subDepartmentOption = page.locator(".team-department-option").filter({ hasText: "Motion Graphics" });
-  await expect(subDepartmentOption).toContainText("Operations");
+  await expect(page.locator('[data-team-tree-node="ops"] > ul').getByRole("button", { name: /Motion Graphics/ })).toBeVisible();
   await expect(subDepartmentOption).toContainText("0");
 
   await page.locator("#close-drawer").click();
@@ -769,6 +773,7 @@ test("profile title and multiple department memberships persist in the UI", asyn
 test("admins can delete pseudo profiles", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.getByRole("tab", { name: "Directory", exact: true }).click();
 
   await page.locator('.person-card[data-profile-id="emp-003"]').click();
   await expect(page.getByRole("button", { name: "Delete Profile", exact: true })).toBeVisible();
@@ -793,9 +798,9 @@ test("unified Team workspace groups people as managers, leads, and artists", asy
   await page.locator("#team-department-select").selectOption("ops");
   const operations = page.locator('[data-hierarchy-department="ops"]');
   await expect(operations).toBeVisible();
-  await expect(operations.getByText("Manager", { exact: true })).toBeVisible();
-  await expect(operations.getByText("Lead", { exact: true })).toBeVisible();
-  await expect(operations.getByText("Artist", { exact: true })).toBeVisible();
+  await expect(operations.locator(".hierarchy-level-head").getByText("Manager", { exact: true })).toBeVisible();
+  await expect(operations.locator(".hierarchy-level-head").getByText("Lead", { exact: true })).toBeVisible();
+  await expect(operations.locator(".hierarchy-level-head").getByText("Artist", { exact: true })).toBeVisible();
   await expect(operations.getByText("Omar Wanis", { exact: true })).toBeVisible();
   await page.locator("#team-department-select").selectOption("support");
   const support = page.locator('[data-hierarchy-department="support"]');

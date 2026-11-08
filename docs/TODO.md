@@ -15,6 +15,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Next
 
+- [ ] Reconcile duplicate signup and operational profiles, start scheduling from November 2026, and set each person's allowance/current Annual remainder directly through Admin Edit Profile. Skip pre-November reconstruction and historical Annual requests; follow `docs/BACKFILL.md` for the opening-balance procedure.
 - [ ] Repair Docker/WSL or use another machine so `npm.cmd run backup:manual` can create a full Supabase SQL export.
 - [ ] Restore the verified export into a non-production Supabase project.
 - [ ] Pilot one department for five business days and record signoff.
@@ -39,6 +40,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Added foldable department nesting, separate Hierarchy/Directory tabs, drag/drop and keyboard-accessible level editing, clearer unset job titles, and centered Team action buttons. No new migration or production-data changes.
 - [x] Applied migration 032 and passed all five audit 020 checks for later-version review and scoped Apply onward.
 - [x] Confirmed the targeted empty November 8 Lead version cleanup restored continuing November 1 Lead assignments; built explicit review to prevent silent later-version cutoffs.
 - [x] Added a modest week-boundary gap and clarified Edit daily leads while retaining direct one-time Scheduler shift edits.

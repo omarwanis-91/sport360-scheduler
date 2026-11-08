@@ -112,6 +112,8 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Apply migration 032 and pass audit 020 for explicit later-version review, scoped Apply onward, and stale-review protection.
 - ✅ Add an Admin-only, read-only Role Preview for inspecting department-scoped Lead and Employee interfaces without fake accounts.
 - ✅ Refine the existing red/black/white interface with layered glass surfaces, restrained crimson glows, stronger primary actions, and consistent reduced-motion-aware transitions.
+- ✅ Refine Team with foldable parent/child departments, Hierarchy/Directory tabs, and authorized drag/menu hierarchy moves using the existing RPC. Document the historical-entry procedure without importing production data.
+- ✅ Confirm the existing Admin allowance/remainder fields support manual opening balances without fabricated leave. Current setup skips pre-November 2026 schedules; automatic annual balance rollover remains outside this change.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
