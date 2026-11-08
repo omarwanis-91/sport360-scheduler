@@ -941,6 +941,15 @@ function render() {
   }
 
   try {
+    if (ui.drawer?.type === "rotation-detail") {
+      const rotationProfile = byId(state.profiles, ui.drawer.profileId || byId(state.rotationVersions, ui.drawer.rotationId)?.profileId);
+      if (rotationProfile && canManageProfileDepartment(rotationProfile)) {
+        ui.activeView = "rotations";
+        if (!profileBelongsToDepartment(rotationProfile, ui.selectedDepartmentId) || !canManageDepartment(ui.selectedDepartmentId)) {
+          ui.selectedDepartmentId = profileDepartmentIds(rotationProfile).find(canManageDepartment) || ui.selectedDepartmentId;
+        }
+      }
+    }
     app.innerHTML = `
     <aside class="sidebar">
       <div class="brand">

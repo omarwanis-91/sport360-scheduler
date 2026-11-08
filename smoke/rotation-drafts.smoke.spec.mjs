@@ -33,6 +33,17 @@ test('Lead previews before save, changed person is marked, and unchanged state r
   await expect(page.locator('#save-rotation-edit')).toBeDisabled();
 });
 
+test('opening a weekly rotation from Scheduler brings its shared Save into view', async ({ page }) => {
+  await page.getByRole('button', { name: 'Scheduler', exact: true }).click();
+  await page.locator('.shift-cell[data-open-drawer="shift"][data-profile-id="emp-001"]').first().click();
+  await page.getByRole('button', { name: 'Edit Weekly Rotation', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Rotations', exact: true })).toBeVisible();
+  await page.locator('[data-pattern-day="0"][data-pattern-status="night"]').click();
+  await done(page);
+  await expect(page.locator('#save-rotation-edit')).toBeEnabled();
+  await save(page);
+});
+
 test('page date follows changed people while personal dates win and untouched people stay intact', async ({ page }) => {
   const before = await state(page);
   await page.locator('#rotation-edit-effective-start').fill('2099-01-01');
