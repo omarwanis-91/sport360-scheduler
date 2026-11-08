@@ -56,6 +56,15 @@ function createLocalStore() {
     async deleteDailyLead() {},
     async upsertDepartmentLeadRotation() {},
     async upsertRotation() {},
+    async applyRotationPatterns(departmentId, effectiveStart, patterns) {
+      const stored = await this.load();
+      return patterns.map((item) => ({
+        id: stored.rotationVersions.find((rotation) => rotation.profileId === item.profileId && rotation.effectiveStart === effectiveStart)?.id || crypto.randomUUID(),
+        profileId: item.profileId,
+        effectiveStart,
+        pattern: [...item.pattern]
+      }));
+    },
     async saveDepartmentRotations(departmentId, effectiveStart, patterns) {
       return patterns.map((item) => ({
         id: crypto.randomUUID ? crypto.randomUUID() : `rot-${Math.random().toString(36).slice(2, 8)}`,
@@ -263,6 +272,14 @@ function createRemoteStore(client) {
     },
     async upsertRotation(rotation) {
       await client.upsert("rotation_versions", toDbRotation(rotation), "id");
+    },
+    async applyRotationPatterns(departmentId, effectiveStart, patterns) {
+      const rows = await client.rpc("apply_rotation_patterns", {
+        p_department_id: departmentId,
+        p_effective_start: effectiveStart,
+        p_patterns_json: patterns
+      });
+      return rows.map(fromDbRotation);
     },
     async saveDepartmentRotations(departmentId, effectiveStart, patterns) {
       const rows = await client.rpc("save_department_rotation_versions", {

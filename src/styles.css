@@ -8149,6 +8149,105 @@ select:focus {
   line-height: 1;
 }
 
+/* Direct rotation editing and an in-session weekday-pattern clipboard. */
+.rotation-direct-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  background: var(--tech-surface);
+}
+
+.rotation-direct-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.rotation-direct-toolbar input {
+  width: 140px;
+  min-height: 32px;
+}
+
+.rotation-direct-toolbar > span {
+  flex: 1 1 160px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.rotation-person-direct {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rotation-person-open {
+  display: flex;
+  flex: 1 1 130px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  box-shadow: none;
+}
+
+.rotation-person-open mark {
+  display: none;
+}
+
+.rotation-copy-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.rotation-copy-actions .icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 5px;
+}
+
+.pattern-slot.is-targeted {
+  border-color: var(--red-border);
+  box-shadow: 0 0 14px var(--red-soft);
+}
+
+.rotation-paste-preview {
+  display: grid;
+  gap: 6px;
+}
+
+.rotation-paste-day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.rotation-paste-day .pattern-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 110px;
+  padding: 5px 8px;
+}
+
 /* Controls belong to the viewport, outside the horizontally scrolling timeline. */
 .scheduler-toolbar {
   display: flex;
