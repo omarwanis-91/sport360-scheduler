@@ -87,6 +87,12 @@ const ui = {
   selectedDepartmentId: state.departments[0]?.id,
   peopleDepartmentId: "all",
   peopleView: "default",
+  teamTab: "hierarchy",
+  teamTabAnimate: false,
+  collapsedTeamDepartmentIds: [],
+  teamTreeCollapsed: false,
+  hierarchyDragProfileId: null,
+  hierarchySuppressClickUntil: 0,
   departmentView: "tiles",
   departmentFocusId: state.departments[0]?.id,
   expandedDepartmentIds: [],
@@ -1016,7 +1022,9 @@ function focusAppShell() {
   const app = document.querySelector("#app");
   const activeTag = document.activeElement?.tagName;
   if (!app || ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(activeTag)) return;
-  requestAnimationFrame(() => app.focus({ preventScroll: true }));
+  requestAnimationFrame(() => {
+    if (!["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(document.activeElement?.tagName)) app.focus({ preventScroll: true });
+  });
 }
 
 document.querySelector("#page-focus-sentinel")?.addEventListener("focus", () => {
@@ -1794,18 +1802,15 @@ function renderTeam() {
     ["lead", "Lead"],
     ["artist", "Artist"]
   ];
+  const activeTab = ui.teamTab;
+  const panelMotion = ui.teamTabAnimate ? " team-panel-enter" : "";
+  ui.teamTabAnimate = false;
   const actions = `
     <div class="top-actions team-top-actions">
       <select id="team-department-select" aria-label="Team department">
         <option value="all" ${selectedDepartment ? "" : "selected"}>All teams</option>
         ${departments.map((department) => `<option value="${department.id}" ${department.id === selectedDepartment?.id ? "selected" : ""}>${departmentLabel(department)}</option>`).join("")}
       </select>
-      <div class="people-view-switch" aria-label="People view">
-        ${peopleViewButton("default", "Default")}
-        ${peopleViewButton("kanban", "Kanban")}
-        ${peopleViewButton("list", "List")}
-        ${peopleViewButton("tiles", "Tiles")}
-      </div>
       ${canManageProfiles() ? `<button class="primary" data-open-drawer="profile">${icons.plus} New Profile</button>` : ""}
       ${canManageDepartments() ? `<button class="ghost" data-open-drawer="department">${icons.plus} New Department</button>` : ""}
     </div>
@@ -1819,25 +1824,15 @@ function renderTeam() {
           <span class="eyebrow">Departments</span>
           <strong>${departments.length}</strong>
         </div>
-        <button class="team-department-option ${selectedDepartment ? "" : "active"}" data-team-department="all" aria-pressed="${!selectedDepartment}">
-          <span>All teams</span>
-          <strong>${visibleProfiles().length}</strong>
-        </button>
-        ${departments.map((department) => {
-          const stats = departmentStats(department);
-          const parent = byId(state.departments, department.parentDepartmentId);
-          return `
-            <button class="team-department-option ${department.id === selectedDepartment?.id ? "active" : ""} ${parent ? "is-child" : ""}" data-team-department="${department.id}" aria-pressed="${department.id === selectedDepartment?.id}">
-              <span>${department.name}</span>
-              <strong>${stats.members.length}</strong>
-              <small>${parent ? parent.name : `${stats.target} coverage target`}</small>
-            </button>
-          `;
-        }).join("")}
+        ${renderTeamDepartmentTree(departments, selectedDepartment?.id)}
       </aside>
       <div class="team-workspace-main">
         ${renderTeamDepartmentOverview(selectedDepartment, departments, profiles)}
-        <section class="team-structure-panel" aria-labelledby="team-structure-title">
+        <div class="team-tabs" role="tablist" aria-label="Team workspace">
+          <button role="tab" id="team-hierarchy-tab" data-team-tab="hierarchy" aria-selected="${activeTab === "hierarchy"}" aria-controls="team-hierarchy-panel" tabindex="${activeTab === "hierarchy" ? 0 : -1}">Hierarchy</button>
+          <button role="tab" id="team-directory-tab" data-team-tab="directory" aria-selected="${activeTab === "directory"}" aria-controls="team-directory-panel" tabindex="${activeTab === "directory" ? 0 : -1}">Directory</button>
+        </div>
+        ${activeTab === "hierarchy" ? `<section class="team-structure-panel${panelMotion}" id="team-hierarchy-panel" role="tabpanel" aria-labelledby="team-hierarchy-tab">
           <div class="team-section-head">
             <div>
               <span class="eyebrow">Hierarchy</span>
@@ -1848,20 +1843,71 @@ function renderTeam() {
           <div class="hierarchy-board compact">
             ${renderHierarchyDepartment(hierarchySection, levels)}
           </div>
-        </section>
-        <section class="team-directory-panel" aria-labelledby="team-directory-title">
+          ${profiles.some(canEditHierarchy) && !isRolePreviewActive() ? `<p class="hint hierarchy-edit-hint">Drag between levels, or use a person's level menu. Hierarchy does not change sign-in permissions.</p>` : ""}
+        </section>` : `<section class="team-directory-panel${panelMotion}" id="team-directory-panel" role="tabpanel" aria-labelledby="team-directory-tab">
           <div class="team-section-head">
             <div>
               <span class="eyebrow">People</span>
               <h2 id="team-directory-title">Directory</h2>
             </div>
-            <span>${selectedDepartment?.name || "All departments"}</span>
+            <div class="people-view-switch" aria-label="People view">
+              ${peopleViewButton("default", "Default")}${peopleViewButton("kanban", "Kanban")}${peopleViewButton("list", "List")}${peopleViewButton("tiles", "Tiles")}
+            </div>
           </div>
           ${renderPeopleView(profiles)}
-        </section>
+        </section>`}
       </div>
     </section>
   `;
+}
+
+function renderTeamDepartmentTree(departments, selectedId) {
+  const ids = new Set(departments.map(row => row.id));
+  const visited = new Set();
+  const renderNode = department => {
+    if (visited.has(department.id)) return "";
+    visited.add(department.id);
+    const children = departments.filter(row => row.parentDepartmentId === department.id && !visited.has(row.id));
+    const collapsed = ui.collapsedTeamDepartmentIds.includes(department.id);
+    const childTree = children.map(renderNode).join("");
+    return `<li data-team-tree-node="${department.id}">
+      <div class="team-tree-row">
+        ${children.length ? `<button class="team-tree-toggle" data-team-collapse="${department.id}" aria-label="${collapsed ? "Expand" : "Collapse"} ${escapeHtml(department.name)}" aria-expanded="${!collapsed}" aria-controls="team-children-${department.id}">${icons.chevron}</button>` : `<span class="team-tree-spacer" aria-hidden="true"></span>`}
+        <button class="team-department-option ${department.id === selectedId ? "active" : ""}" data-team-department="${department.id}" title="${escapeHtml(department.name)}" aria-pressed="${department.id === selectedId}"><span>${escapeHtml(department.name)}</span><strong>${departmentStats(department).members.length}</strong></button>
+      </div>
+      ${children.length ? `<ul id="team-children-${department.id}" ${collapsed ? "hidden" : ""}>${childTree}</ul>` : ""}
+    </li>`;
+  };
+  const roots = departments.filter(row => !ids.has(row.parentDepartmentId));
+  const tree = roots.map(renderNode).join("") + departments.filter(row => !visited.has(row.id)).map(renderNode).join("");
+  return `<nav class="team-department-tree" aria-label="Department structure">
+    <div class="team-tree-row">
+      <button class="team-tree-toggle" data-team-collapse="all" aria-label="${ui.teamTreeCollapsed ? "Expand" : "Collapse"} all departments" aria-expanded="${!ui.teamTreeCollapsed}" aria-controls="team-department-tree-root">${icons.chevron}</button>
+      <button class="team-department-option ${selectedId ? "" : "active"}" data-team-department="all" aria-pressed="${!selectedId}"><span>All teams</span><strong>${visibleProfiles().length}</strong></button>
+    </div>
+    <ul id="team-department-tree-root" ${ui.teamTreeCollapsed ? "hidden" : ""}>${tree}</ul>
+  </nav>`;
+}
+
+function selectTeamDepartment(id) {
+  ui.peopleDepartmentId = id;
+  ui.departmentFocusId = id === "all" ? visibleDepartments()[0]?.id || "" : id;
+  if (id !== "all") {
+    ui.teamTreeCollapsed = false;
+    const visible = visibleDepartments();
+    const seen = new Set();
+    let node = byId(visible, id);
+    while (node?.parentDepartmentId && !seen.has(node.id)) {
+      seen.add(node.id);
+      ui.collapsedTeamDepartmentIds = ui.collapsedTeamDepartmentIds.filter(parent => parent !== node.parentDepartmentId);
+      node = byId(visible, node.parentDepartmentId);
+    }
+  }
+  render();
+}
+
+function teamJobTitle(profile) {
+  return profile.title === "Pending assignment" || !profile.title ? "Job title not set" : profile.title;
 }
 
 function renderTeamDepartmentOverview(department, departments, profiles) {
@@ -2040,7 +2086,7 @@ function renderPersonCard(profile, department = byId(state.departments, profile.
     <button class="person-card" data-open-drawer="person" data-profile-id="${profile.id}">
       <div class="avatar large">${avatar(profile)}</div>
       <strong>${profile.name}</strong>
-      <span>${profile.title}</span>
+      <span>${escapeHtml(teamJobTitle(profile))}</span>
       <em class="department-name">${department?.name || "Unassigned"}</em>
       <mark class="${profile.userId ? "claimed" : "unclaimed"}">${profile.userId ? roleForProfile(profile) : "Unclaimed"}</mark>
     </button>
@@ -2053,7 +2099,7 @@ function renderPersonKanbanCard(profile, department = byId(state.departments, pr
       <div class="avatar">${avatar(profile)}</div>
       <div>
         <strong>${profile.name}</strong>
-        <span>${profile.title}</span>
+        <span>${escapeHtml(teamJobTitle(profile))}</span>
       </div>
       <mark class="${profile.userId ? "claimed" : "unclaimed"}">${profile.userId ? roleForProfile(profile) : "Unclaimed"}</mark>
     </button>
@@ -2069,7 +2115,7 @@ function renderPersonListRow(profile) {
         <strong>${profile.name}</strong>
         <span>${profile.email}</span>
       </div>
-      <span>${profile.title}</span>
+      <span>${escapeHtml(teamJobTitle(profile))}</span>
       <em>${department?.name || "Unassigned"}</em>
       <mark class="${profile.userId ? "claimed" : "unclaimed"}">${profile.userId ? roleForProfile(profile) : "Unclaimed"}</mark>
       <small>${profile.remainingVacationDays}/${profile.yearlyVacationDays} days</small>
@@ -2084,7 +2130,7 @@ function renderPersonTile(profile) {
       <div class="avatar">${avatar(profile)}</div>
       <div>
         <strong>${profile.name}</strong>
-        <span>${profile.title}</span>
+        <span>${escapeHtml(teamJobTitle(profile))}</span>
       </div>
       <em>${department?.name || "Unassigned"}</em>
     </button>
@@ -2525,6 +2571,7 @@ function renderHierarchy() {
 }
 
 function renderHierarchyDepartment(section, levels) {
+  const canDrop = section.profiles.some(canEditHierarchy) && !isRolePreviewActive();
   return `
     <section class="hierarchy-department" data-hierarchy-department="${section.id}">
       <div class="hierarchy-department-head">
@@ -2536,7 +2583,7 @@ function renderHierarchyDepartment(section, levels) {
         ${levels.map(([level, label], index) => {
           const profiles = section.profiles.filter((profile) => normalizeHierarchyLevel(profile.seniorityLevel) === level);
           return `
-            <section class="hierarchy-level level-${level}">
+            <section class="hierarchy-level level-${level}" ${canDrop ? `data-hierarchy-drop-level="${level}"` : ""}>
               <div class="hierarchy-level-head">
                 <span>${String(index + 1).padStart(2, "0")}</span>
                 <div>
@@ -2556,22 +2603,81 @@ function renderHierarchyDepartment(section, levels) {
 }
 
 function renderHierarchyPerson(profile, activeDepartmentId) {
+  const editable = canEditHierarchy(profile) && !isRolePreviewActive();
   const departments = profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
   const activeDepartmentName = byId(state.departments, activeDepartmentId)?.name;
   const otherDepartments = activeDepartmentName ? departments.filter((department) => department !== activeDepartmentName) : departments;
   return `
-    <button class="hierarchy-person" data-open-drawer="person" data-profile-id="${profile.id}">
+    <div class="hierarchy-person-card">
+    <button class="hierarchy-person" data-open-drawer="person" data-profile-id="${profile.id}" draggable="${editable}" ${editable ? `data-hierarchy-drag="${profile.id}" title="Drag ${escapeHtml(profile.name)} to another hierarchy level"` : ""}>
       <div class="avatar">${avatar(profile)}</div>
       <div>
         <strong>${profile.name}</strong>
-        <span>${profile.title}</span>
+        <span>${escapeHtml(teamJobTitle(profile))}</span>
       </div>
       <div class="hierarchy-departments">
         ${activeDepartmentName ? `<em>${activeDepartmentName}</em>` : ""}
         ${otherDepartments.length ? otherDepartments.map((department) => `<em>${department}</em>`).join("") : activeDepartmentName ? "" : `<em>Unassigned</em>`}
       </div>
     </button>
+    ${editable ? `<div class="hierarchy-card-actions"><select data-hierarchy-level-picker="${profile.id}" aria-label="Hierarchy level for ${escapeHtml(profile.name)}">${seniorityLevels.map(([value, label]) => `<option value="${value}" ${normalizeHierarchyLevel(profile.seniorityLevel) === value ? "selected" : ""}>${label}</option>`).join("")}</select></div>` : ""}
+    </div>
   `;
+}
+
+async function moveHierarchyPerson(profileId, level) {
+  const profile = byId(state.profiles, profileId);
+  if (!profile || !seniorityLevels.some(([value]) => value === level) || !canEditHierarchy(profile) || isRolePreviewActive()
+    || isMutationPending() || normalizeHierarchyLevel(profile.seniorityLevel) === level) return;
+  const keyboardMove = document.activeElement?.hasAttribute("data-hierarchy-level-picker");
+  await runMutation("hierarchy-move", {
+    pending: "Updating hierarchy...", success: `${profile.name} moved to ${hierarchyLevelLabel(level)}.`,
+    failure: "The hierarchy change could not be saved."
+  }, async () => {
+    await dataStore.updateProfileHierarchy({ ...profile, seniorityLevel: level });
+    profile.seniorityLevel = level;
+    if (dataStore.mode === "demo") audit("profile.hierarchy_updated", "profile", profile.id, `${profile.name}: ${hierarchyLevelLabel(level)}`);
+    await saveState();
+  });
+  document.querySelector(`[${keyboardMove ? "data-hierarchy-level-picker" : "data-hierarchy-drag"}="${CSS.escape(profileId)}"]`)?.focus();
+}
+
+function bindHierarchyEditing() {
+  const clearDrag = () => {
+    ui.hierarchyDragProfileId = null;
+    ui.hierarchySuppressClickUntil = performance.now() + 200;
+    document.querySelectorAll(".hierarchy-level.is-drop-target").forEach(row => row.classList.remove("is-drop-target"));
+  };
+  document.querySelectorAll("[data-hierarchy-drag]").forEach(card => {
+    card.addEventListener("dragstart", event => {
+      const profile = byId(state.profiles, card.dataset.hierarchyDrag);
+      if (!canEditHierarchy(profile) || isRolePreviewActive() || isMutationPending()) { event.preventDefault(); return; }
+      ui.hierarchyDragProfileId = profile.id;
+      event.dataTransfer.setData("application/x-sport360-profile", profile.id);
+      event.dataTransfer.setData("text/plain", profile.id);
+      event.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", clearDrag);
+  });
+  document.querySelectorAll("[data-hierarchy-drop-level]").forEach(row => {
+    row.addEventListener("dragover", event => {
+      const profile = byId(state.profiles, ui.hierarchyDragProfileId);
+      if (!profile || !canEditHierarchy(profile) || isRolePreviewActive() || isMutationPending()) return;
+      event.preventDefault(); event.dataTransfer.dropEffect = "move";
+      document.querySelectorAll(".hierarchy-level.is-drop-target").forEach(other => other.classList.toggle("is-drop-target", other === row));
+      row.classList.add("is-drop-target");
+    });
+    row.addEventListener("dragleave", event => { if (!row.contains(event.relatedTarget)) row.classList.remove("is-drop-target"); });
+    row.addEventListener("drop", event => {
+      const profileId = ui.hierarchyDragProfileId;
+      if (!profileId) return;
+      event.preventDefault(); clearDrag();
+      void moveHierarchyPerson(profileId, row.dataset.hierarchyDropLevel);
+    });
+  });
+  document.querySelectorAll("[data-hierarchy-level-picker]").forEach(picker => picker.addEventListener("change", () => {
+    void moveHierarchyPerson(picker.dataset.hierarchyLevelPicker, picker.value);
+  }));
 }
 
 function renderLeadRotationPanel(department) {
@@ -3852,6 +3958,7 @@ function refreshRotationWorkspace() {
 function wireDrawerButtons(root = document) {
   root.querySelectorAll("[data-open-drawer]").forEach(button => {
     button.onclick = () => {
+      if (button.hasAttribute("data-hierarchy-drag") && performance.now() < ui.hierarchySuppressClickUntil) return;
       if (button.dataset.openDrawer === "profile") { ui.pendingPhotoFile = null; ui.pendingPhotoDataUrl = ""; }
       if (button.dataset.openDrawer === "lead" && button.dataset.departmentId) ui.selectedDepartmentId = button.dataset.departmentId;
       ui.drawer = { type: button.dataset.openDrawer, ...button.dataset };
@@ -4052,18 +4159,35 @@ function bindEvents() {
   });
 
   document.querySelector("#team-department-select")?.addEventListener("change", (event) => {
-    ui.peopleDepartmentId = event.target.value;
-    ui.departmentFocusId = event.target.value === "all" ? visibleDepartments()[0]?.id || "" : event.target.value;
-    render();
+    selectTeamDepartment(event.target.value);
   });
 
   document.querySelectorAll("[data-team-department]").forEach((button) => {
     button.addEventListener("click", () => {
-      ui.peopleDepartmentId = button.dataset.teamDepartment;
-      ui.departmentFocusId = button.dataset.teamDepartment === "all" ? visibleDepartments()[0]?.id || "" : button.dataset.teamDepartment;
-      render();
+      selectTeamDepartment(button.dataset.teamDepartment);
     });
   });
+  document.querySelectorAll("[data-team-collapse]").forEach(button => button.addEventListener("click", () => {
+    const id = button.dataset.teamCollapse;
+    if (id === "all") ui.teamTreeCollapsed = !ui.teamTreeCollapsed;
+    else if (ui.collapsedTeamDepartmentIds.includes(id)) ui.collapsedTeamDepartmentIds = ui.collapsedTeamDepartmentIds.filter(item => item !== id);
+    else ui.collapsedTeamDepartmentIds.push(id);
+    render();
+    document.querySelector(`[data-team-collapse="${CSS.escape(id)}"]`)?.focus();
+  }));
+  document.querySelectorAll("[data-team-tab]").forEach(button => {
+    const activate = tab => {
+      if (ui.teamTab !== tab) { ui.teamTab = tab; ui.teamTabAnimate = true; render(); }
+      document.querySelector(`[data-team-tab="${tab}"]`)?.focus();
+    };
+    button.addEventListener("click", () => activate(button.dataset.teamTab));
+    button.addEventListener("keydown", event => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      activate(event.key === "Home" ? "hierarchy" : event.key === "End" ? "directory" : ui.teamTab === "hierarchy" ? "directory" : "hierarchy");
+    });
+  });
+  bindHierarchyEditing();
 
   document.querySelectorAll("[data-people-view]").forEach((button) => {
     button.addEventListener("click", () => {

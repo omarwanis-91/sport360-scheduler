@@ -7773,6 +7773,44 @@ select:focus {
   min-width: 180px;
 }
 
+.team-top-actions > button,
+.team-overview-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  line-height: 1.2;
+  align-self: center;
+}
+
+.team-overview-actions { align-items: center; align-self: center; }
+.team-department-tree { min-width: 0; grid-column: 1 / -1; }
+.team-department-tree ul { display: grid; gap: 4px; list-style: none; margin: 3px 0 0 11px; padding: 0 0 0 12px; border-left: 1px solid rgba(255,255,255,.09); }
+.team-department-tree ul[hidden] { display: none; }
+.team-tree-row { display: grid; grid-template-columns: 24px minmax(0,1fr); align-items: center; gap: 3px; }
+.team-tree-toggle { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 28px; padding: 0; border-color: transparent; background: transparent; }
+.team-tree-toggle svg { width: 12px; height: 12px; transition: transform 160ms var(--ease-out); }
+.team-tree-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.team-tree-spacer { width: 24px; }
+.team-tree-row .team-department-option { min-width: 0; min-height: 34px; width: 100%; padding: 7px 8px; align-items: center; }
+.team-tabs { display: flex; gap: 5px; border-bottom: 1px solid var(--line-soft); padding-bottom: 7px; }
+.team-tabs [role="tab"] { min-height: 32px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 9px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--muted); background: rgba(255,255,255,.025); }
+.team-tabs [role="tab"]:hover { color: var(--text); border-color: rgba(244,244,245,.28); }
+.team-tabs [aria-selected="true"] { color: var(--text); border-color: var(--red-border); background: rgba(169,47,72,.14); }
+.team-panel-enter { animation: teamPanelEnter 180ms var(--ease-out) both; }
+@keyframes teamPanelEnter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .team-panel-enter { animation: none; } }
+.hierarchy-person-card { min-width: 0; border: 1px solid var(--line-soft); border-radius: 8px; background: #111; }
+.hierarchy-person-card .hierarchy-person { width: 100%; border: 0; box-shadow: none; background: transparent; }
+.hierarchy-person[draggable="true"] { cursor: grab; }
+.hierarchy-person[draggable="true"]:active { cursor: grabbing; }
+.hierarchy-card-actions { display: flex; justify-content: flex-end; padding: 0 8px 7px; }
+.hierarchy-card-actions select { width: 100px; min-height: 26px; padding-top: 3px; padding-bottom: 3px; font-size: 10px; }
+.hierarchy-person-card:hover, .hierarchy-person-card:focus-within { border-color: rgba(244,244,245,.28); }
+.hierarchy-level.is-drop-target { outline: 1px solid rgba(226,89,121,.65); outline-offset: -2px; background: rgba(169,47,72,.09); }
+.hierarchy-edit-hint { margin: 0; font-size: 11px; }
+
 .team-department-rail,
 .team-overview-card,
 .team-structure-panel,
@@ -8528,7 +8566,7 @@ select:focus {
 
   .team-department-rail {
     position: static;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .team-rail-head {

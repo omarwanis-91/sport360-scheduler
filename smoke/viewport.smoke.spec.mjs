@@ -60,11 +60,28 @@ for (const width of widths) {
     await page.getByRole("button", { name: "Team", exact: true }).click();
     await expectMainShellHealthy(page);
     await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
+    await expect(page.locator(".team-structure-panel")).toBeVisible();
+    await expect(page.locator(".team-directory-panel")).toHaveCount(0);
+    await page.locator('#team-department-select').selectOption('ops');
+    for (const name of ['New Department', 'New Profile', 'Member']) {
+      const control = page.getByRole('button', { name, exact: true });
+      await expect(control).toBeVisible();
+      const alignment = await control.evaluate(button => {
+        const style = getComputedStyle(button), icon = button.querySelector('svg').getBoundingClientRect(), box = button.getBoundingClientRect();
+        return { display: style.display, align: style.alignItems, centerOffset: Math.abs((icon.top + icon.bottom - box.top - box.bottom) / 2) };
+      });
+      expect(['inline-flex', 'flex']).toContain(alignment.display);
+      expect(alignment.align).toBe('center');
+      expect(alignment.centerOffset).toBeLessThan(1);
+    }
+    await page.locator('#team-department-select').selectOption('all');
+    if ([1280, 1920].includes(width)) await page.screenshot({ path: `test-results/team-hierarchy-${width}.png`, fullPage: true });
+    await page.getByRole("tab", { name: "Directory", exact: true }).click();
     await expect(page.locator("[data-people-view]")).toHaveCount(4);
     await expect(page.getByRole("button", { name: "Default", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Tiles", exact: true })).toBeVisible();
     await expect(page.locator(".team-department-rail")).toBeVisible();
-    await expect(page.locator(".team-structure-panel")).toBeVisible();
+    await expect(page.locator(".team-structure-panel")).toHaveCount(0);
     await expect(page.locator(".team-directory-panel")).toBeVisible();
 
     await page.getByRole("button", { name: "Rotations", exact: true }).click();

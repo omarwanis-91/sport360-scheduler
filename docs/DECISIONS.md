@@ -481,3 +481,12 @@ An empty Lead version beginning November 8 superseded valid November 1 assignmen
 Apply onward explicitly replaces later rotation versions for the edited people and merges their chosen Lead weekdays into subsequent department patterns. Other people, unrelated Lead slots/departments, earlier versions, and daily exceptions remain intact. Leads remain limited to direct departments and current/future dates. A locked snapshot comparison rejects concurrent changes so the reviewed outcome cannot silently change before commit; replacement is audited. Ordinary copy/paste still preserves Lead identities.
 
 Scheduler week spacing increases modestly while keeping week bands and cells aligned. Edit Schedule is renamed Edit daily leads to distinguish staged Lead assignments from direct one-time shift edits.
+
+## D-062 - Foldable Department Navigation And Direct Hierarchy Moves
+
+**Date:** 2026-11-08
+**Status:** Accepted
+
+Team remains one workspace with Hierarchy and Directory as switchable tabs sharing the selected department. The department rail nests saved parent/child relationships beneath All teams and folds independently of selection. Directory retains its existing four views. New Department and Member actions use centered icon/text alignment.
+
+Dragging a person between hierarchy rows changes only Manager / Lead / Artist through the existing authorized RPC. A level selector provides the same action for keyboard, touch, and non-drag pointer use. This does not assign a department, change sign-in permissions, or change scheduled Lead shifts. The onboarding placeholder Pending assignment means the job title has not been set; Team presents that clearer description without modifying records. Duplicate signup/operational identities require explicit reconciliation before historical data entry; no automatic merge or live backfill is part of this change.
