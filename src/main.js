@@ -12,6 +12,7 @@ import {
   isAnnualEligibleSchedule,
   isoWeekInfo,
   weeklyLeadPattern,
+  applyRotationDrafts,
   normalizeWeekPattern as normalizeWeekPatternLogic,
   parseDate as parseDateLogic,
   roleForProfile as roleForProfileLogic,
@@ -99,6 +100,8 @@ const ui = {
   rotationLeadDraftPattern: null,
   rotationLeadEffectiveStart: todayIso,
   rotationClipboard: null,
+  rotationDrafts: [],
+  rotationDraftsOwner: null,
   schedulerEditMode: false,
   schedulerLeadDrafts: [],
   pendingPhotoFile: null,
@@ -329,8 +332,7 @@ function leadForWeekday(departmentId, weekday) {
   if (ui.rotationLeadDraftPattern && departmentId === ui.selectedDepartmentId) {
     return byId(state.profiles, rotationLeadPatternDraft(departmentId)[weekday]);
   }
-  const rotation = latestLeadRotation(departmentId);
-  return byId(state.profiles, rotation?.pattern?.[weekday]);
+  return byId(state.profiles, weeklyLeadPattern(state.departmentLeadRotations, departmentId, ui.rotationLeadEffectiveStart)[weekday]);
 }
 
 function leadForProfileWeekday(profile, departmentId, weekday) {
@@ -2321,18 +2323,60 @@ function renderDepartmentDetailRow(department, dates, depth = 0) {
 }
 
 function renderRotations() {
+  restoreRotationDrafts();
   const department = byId(state.departments, ui.selectedDepartmentId);
+  return `
+    ${renderTopbar("Rotations", "Weekly rotation templates by department. Each column maps to a real weekday.", `<div class="top-actions"><select id="department-select">${departmentOptions(ui.selectedDepartmentId)}</select></div>`)}
+    <div class="rotation-workspace">${renderRotationWorkspace(department)}</div>
+  `;
+}
+
+function rotationDraftKey() { return `sport360-rotation-drafts:${state.currentUserId}`; }
+function restoreRotationDrafts() {
+  if (ui.rotationDraftsOwner === state.currentUserId) return;
+  ui.rotationDraftsOwner = state.currentUserId;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(rotationDraftKey()) || "null");
+    ui.rotationDrafts = Array.isArray(saved?.changes) ? saved.changes : [];
+    if (saved?.date) ui.rotationLeadEffectiveStart = saved.date;
+  } catch { ui.rotationDrafts = []; }
+}
+function persistRotationDrafts() {
+  sessionStorage.setItem(rotationDraftKey(), JSON.stringify({ changes: ui.rotationDrafts, date: ui.rotationLeadEffectiveStart }));
+}
+function departmentRotationDrafts() {
+  if (isRolePreviewActive()) return [];
+  return ui.rotationDrafts.filter(item => item.departmentId === ui.selectedDepartmentId);
+}
+function personRotationDraft(profileId) {
+  return departmentRotationDrafts().find(item => item.profileId === profileId);
+}
+function previewRotations() {
+  return applyRotationDrafts(state, ui.selectedDepartmentId, departmentRotationDrafts(), ui.rotationLeadEffectiveStart);
+}
+function displayedRotation(profileId) {
+  const draft = personRotationDraft(profileId);
+  if (draft?.action === "reset") return null;
+  if (draft) return { id: draft.sourceVersionId || "", profileId,
+    effectiveStart: draft.effectiveStart || ui.rotationLeadEffectiveStart, pattern: draft.pattern };
+  return latestRotationForProfile(profileId);
+}
+function rotationPreviewDate(profileId, rotation) {
+  const draft = personRotationDraft(profileId);
+  if (draft) return draft.effectiveStart || ui.rotationLeadEffectiveStart;
+  return rotation?.effectiveStart > ui.rotationLeadEffectiveStart ? rotation.effectiveStart : ui.rotationLeadEffectiveStart;
+}
+
+function renderRotationWorkspace(department = byId(state.departments, ui.selectedDepartmentId)) {
+  let previewError = "";
+  try { ui.rotationPreview = previewRotations(); }
+  catch (error) { ui.rotationPreview = state; previewError = error.message; }
   const profiles = departmentProfiles();
   const canEditDepartmentRotations = canManageDepartment(ui.selectedDepartmentId) && !isRolePreviewActive();
   const stats = rotationStats(profiles);
+  const changes = departmentRotationDrafts();
   return `
-    ${renderTopbar("Rotations", "Weekly rotation templates by department. Each column maps to a real weekday.", `
-      <div class="top-actions">
-        <select id="department-select">
-        ${departmentOptions(ui.selectedDepartmentId)}
-      </select>
-      </div>
-    `)}
+    ${previewError ? `<p class="hint" role="alert">${escapeHtml(previewError)} Reopen Saved versions or discard the pending correction.</p>` : ""}
     <section class="rotation-overview">
       <div class="rotation-overview-copy">
         <span class="eyebrow">${department?.name || "Department"} Rotation Health</span>
@@ -2344,15 +2388,17 @@ function renderRotations() {
         <span><strong>${stats.offSlots}</strong> off slots</span>
         <span><strong>${stats.morningSlots}</strong> morning</span>
         <span><strong>${stats.nightSlots}</strong> night</span>
+        <span><strong>${stats.leadSlots}</strong> lead</span>
         <span><strong>${stats.nextEffective || "None"}</strong> next start</span>
       </div>
     </section>
     ${canEditDepartmentRotations ? `
       <section class="rotation-direct-toolbar">
         <label>Effective start<input type="date" id="rotation-edit-effective-start" value="${ui.rotationLeadEffectiveStart}" ${isAdmin() ? "" : `min="${todayIso}"`}></label>
-        <span>${ui.rotationClipboard ? `Copied: ${escapeHtml(ui.rotationClipboard.name)}` : "Click a shift to set the week."}</span>
+        <span class="rotation-save-status" role="status">${changes.length ? `${changes.length} ${changes.length === 1 ? "person" : "people"} changed · Not saved` : "No unsaved changes"}</span>
+        <button class="primary" id="save-rotation-edit" ${changes.length ? "" : "disabled"}>${icons.copy} Save Changes${changes.length ? ` (${changes.length})` : ""}</button>
+        <button class="ghost" id="discard-rotation-changes" ${changes.length ? "" : "disabled"}>Discard changes</button>
         <button class="ghost" id="paste-department-rotation" ${ui.rotationClipboard && profiles.length ? "" : "disabled"}>${icons.paste} Paste to department</button>
-        ${ui.rotationLeadDraftPattern ? `<button class="primary" id="save-rotation-edit">${icons.lead} Save leads</button><button class="ghost" id="cancel-rotation-leads">Cancel leads</button>` : ""}
       </section>
     ` : ""}
     <section class="rotation-board">
@@ -2369,15 +2415,18 @@ function renderRotations() {
 }
 
 function rotationStats(profiles) {
-  const rotations = profiles.map((profile) => latestRotationForProfile(profile.id)).filter(Boolean);
-  const totals = rotations.flatMap((rotation) => sanitizeRotationPattern(rotation.pattern)).reduce((acc, statusId) => {
+  const rotations = profiles.map((profile) => displayedRotation(profile.id)).filter(Boolean);
+  const totals = rotations.flatMap(rotation => sanitizeRotationPattern(rotation.pattern).map((statusId, day) => ({ statusId,
+    lead: weeklyLeadPattern(ui.rotationPreview?.departmentLeadRotations || state.departmentLeadRotations,
+      ui.selectedDepartmentId, rotationPreviewDate(rotation.profileId, rotation))[day] === rotation.profileId }))).reduce((acc, { statusId, lead }) => {
     const status = byId(state.statuses, statusId);
     if (status?.kind === "working") acc.workingSlots += 1;
     else acc.offSlots += 1;
-    if (statusId === "morning") acc.morningSlots += 1;
-    if (statusId === "night") acc.nightSlots += 1;
+    if (lead && status?.kind === "working") acc.leadSlots += 1;
+    if (!lead && statusId === "morning") acc.morningSlots += 1;
+    if (!lead && statusId === "night") acc.nightSlots += 1;
     return acc;
-  }, { workingSlots: 0, offSlots: 0, morningSlots: 0, nightSlots: 0 });
+  }, { workingSlots: 0, offSlots: 0, morningSlots: 0, nightSlots: 0, leadSlots: 0 });
   const futureStarts = rotations
     .map((rotation) => rotation.effectiveStart)
     .filter((date) => date >= todayIso)
@@ -2392,7 +2441,8 @@ function rotationStats(profiles) {
 }
 
 function renderRotationRow(profile) {
-  const rotation = latestRotationForProfile(profile.id);
+  const rotation = displayedRotation(profile.id);
+  const draft = personRotationDraft(profile.id);
   const pattern = rotation ? sanitizeRotationPattern(rotation.pattern) : Array.from({ length: 7 });
   const missingClass = rotation ? "" : " missing";
   const canEdit = canManageProfileDepartment(profile) && !isRolePreviewActive();
@@ -2400,12 +2450,13 @@ function renderRotationRow(profile) {
     <div class="avatar">${avatar(profile)}</div>
     <div class="rotation-person-meta">
       <strong>${profile.name}</strong>
-      <span>${rotation ? `Effective ${rotation.effectiveStart}` : "Missing weekly pattern"}</span>
+      <span>${rotation ? `Effective ${rotation.effectiveStart}${draft?.effectiveStart ? " · Personal date" : ""}` : "Missing weekly pattern"}</span>
+      ${draft ? `<span class="rotation-dirty-marker" title="Unsaved rotation changes">${icons.activity} ${draft.action === "reset" ? "Reset pending" : draft.action === "move" ? "Date correction pending" : "Edited"}</span>` : ""}
     </div>
     ${rotation ? "" : `<mark>Setup</mark>`}
   `;
   return `
-    <div class="employee-cell rotation-person rotation-person-direct${missingClass}">
+    <div class="employee-cell rotation-person rotation-person-direct${missingClass}${draft ? " is-dirty" : ""}" data-rotation-person="${profile.id}">
       <button class="rotation-person-open" data-open-drawer="${canEdit ? "rotation-detail" : "person"}" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}" aria-label="${canEdit ? "Edit rotation for" : "View"} ${escapeHtml(profile.name)}">
         ${personContent}
       </button>
@@ -2553,7 +2604,9 @@ function renderLeadRotationPanel(department) {
 }
 
 function renderRotationCell(profile, rotation, statusId, weekday = 0) {
-  const isLeadSlot = leadForProfileWeekday(profile, ui.selectedDepartmentId, weekday)?.id === profile.id;
+  const date = rotationPreviewDate(profile.id, rotation);
+  const isLeadSlot = weeklyLeadPattern(ui.rotationPreview?.departmentLeadRotations || state.departmentLeadRotations,
+    ui.selectedDepartmentId, date)[weekday] === profile.id;
   if (!rotation) {
     return `
       <div class="rotation-cell shift-cell state-off missing" data-profile-id="${profile.id}" data-rotation-id="" data-weekday="${weekday}">
@@ -3552,7 +3605,25 @@ function rotationDrawer() {
   const selectedProfileId = ui.drawer.profileId || rotation?.profileId || departmentEditableProfiles.find((profile) => profileBelongsToDepartment(profile, ui.selectedDepartmentId))?.id || departmentEditableProfiles[0]?.id;
   const selectedProfile = byId(state.profiles, selectedProfileId);
   const canEdit = Boolean(selectedProfile && canManageProfileDepartment(selectedProfile) && !isRolePreviewActive());
-  const effectiveStart = ui.drawer.effectiveStart || (rotation?.effectiveStart > todayIso ? rotation.effectiveStart : ui.rotationLeadEffectiveStart);
+  ui.drawer.profileId = selectedProfileId;
+  const staged = ui.drawer.correcting ? null : personRotationDraft(selectedProfileId);
+  if (!ui.drawer.initialized) {
+    ui.drawer.patternDraft ||= staged?.pattern ? [...staged.pattern] : sanitizeRotationPattern(rotation?.pattern);
+    ui.drawer.effectiveStart = staged?.effectiveStart || ui.drawer.effectiveStart || null;
+    ui.drawer.sourceVersionId ||= staged?.sourceVersionId;
+    ui.drawer.sourceEffectiveStart ||= staged?.sourceEffectiveStart;
+    ui.drawer.sourcePattern ||= staged?.sourcePattern;
+    ui.drawer.action ||= staged?.action === "move" ? "move" : "save";
+    ui.drawer.preserveLeads ||= staged?.preserveLeads || false;
+    ui.drawer.leadDays = staged?.leadDays ? [...staged.leadDays] : weeklyLeadPattern(state.departmentLeadRotations,
+      ui.selectedDepartmentId, ui.drawer.action === "move" ? rotation.effectiveStart : rotationPreviewDate(selectedProfileId, rotation))
+      .map((id, day) => id === selectedProfileId && byId(state.statuses, ui.drawer.patternDraft[day])?.kind === "working");
+    ui.drawer.basePattern = sanitizeRotationPattern(rotation?.pattern);
+    ui.drawer.baseLeadDays = weeklyLeadPattern(state.departmentLeadRotations, ui.selectedDepartmentId,
+      ui.drawer.action === "move" ? rotation.effectiveStart : rotationPreviewDate(selectedProfileId, rotation)).map((id, day) => id === selectedProfileId && byId(state.statuses, ui.drawer.basePattern[day])?.kind === "working");
+    ui.drawer.initialized = true;
+  }
+  const effectiveStart = ui.drawer.effectiveStart || ui.rotationLeadEffectiveStart;
   const pattern = sanitizeRotationPattern(ui.drawer.patternDraft || rotation?.pattern);
   ui.drawer.leadDays ||= weeklyLeadPattern(state.departmentLeadRotations, ui.selectedDepartmentId, effectiveStart)
     .map((id, day) => id === selectedProfileId && byId(state.statuses, pattern[day])?.kind === "working");
@@ -3561,7 +3632,9 @@ function rotationDrawer() {
     <form id="rotation-form" class="drawer-form">
       <div class="person-summary"><div class="avatar">${avatar(selectedProfile)}</div><strong>${escapeHtml(selectedProfile?.name || "Employee")}</strong></div>
       <input type="hidden" name="profileId" value="${selectedProfileId}">
-      <label>Effective start<input name="effectiveStart" type="date" value="${effectiveStart}" ${isAdmin() ? "" : `min="${todayIso}"`} required ${canEdit ? "" : "disabled"}></label>
+      <label>Effective start <span class="rotation-date-source">${ui.drawer.effectiveStart ? "Personal override" : "Page date"}</span><input name="effectiveStart" type="date" value="${effectiveStart}" ${isAdmin() ? "" : `min="${todayIso}"`} required ${canEdit ? "" : "disabled"}></label>
+      <button type="button" class="ghost" id="use-page-rotation-date" ${canEdit ? "" : "disabled"}>Use page date</button>
+      ${ui.drawer.action === "move" ? `<p class="hint">Correcting saved version ${ui.drawer.sourceEffectiveStart}. Its date will move on Save Changes; other versions are retained.</p>` : ""}
       ${ui.drawer.pastedFrom ? `<p class="hint">Copied from ${escapeHtml(ui.drawer.pastedFrom)}. Review the week before saving.</p>` : ""}
       <div class="pattern-editor">
         <div class="section-title">
@@ -3573,8 +3646,10 @@ function rotationDrawer() {
           ${pattern.map((statusId, index) => patternSlot(statusId, index, canEdit)).join("")}
         </div>
       </div>
-      <p class="hint">This week repeats from the effective start. Earlier rotation versions and daily exceptions stay in place.</p>
-      <button class="primary wide" ${canEdit ? "" : "disabled"}>${rotation ? "Save Rotation" : "Create Rotation"}</button>
+      <p class="hint">Changes preview immediately. Use Save Changes above the grid to submit all edited people together.</p>
+      <button type="button" class="ghost wide" id="rotation-done">Done</button>
+      <button type="button" class="ghost wide" id="discard-person-rotation" ${staged ? "" : "disabled"}>Undo this person's edits</button>
+      ${rotation && isAdmin() && !isRolePreviewActive() ? `<details class="rotation-versions"><summary>Saved versions · Correct a date</summary>${state.rotationVersions.filter(row => row.profileId === selectedProfileId).sort((a,b) => b.effectiveStart.localeCompare(a.effectiveStart)).map(row => `<div><span>${row.effectiveStart}</span><button type="button" class="ghost" data-correct-rotation-date="${row.id}">Correct date</button></div>`).join("")}</details>` : ""}
       ${rotation && isAdmin() && !isRolePreviewActive() ? `<button type="button" class="danger wide" data-open-drawer="rotation-delete" data-profile-id="${selectedProfileId}">Delete Rotation</button>` : ""}
     </form>
   `;
@@ -3585,9 +3660,9 @@ function rotationDeleteDrawer() {
   const count = state.rotationVersions.filter(item => item.profileId === profile?.id).length;
   return `<div class="drawer-stack">
     <p>Reset <strong>${escapeHtml(profile?.name || "this person")}</strong> to <strong>No Template</strong>?</p>
-    <p class="hint">This deletes all ${count} weekly rotation versions for this person across their departments, including older and future versions, and clears their weekly lead assignments. It cannot be undone here.</p>
+    <p class="hint">After Save Changes, this deletes all ${count} weekly rotation versions for this person across their departments, including older and future versions, and clears their weekly lead assignments.</p>
     <p class="hint">Daily overrides, Annual requests, balances, and the employee profile stay in place.</p>
-    <button class="danger wide" id="confirm-delete-rotation" ${isAdmin() && !isRolePreviewActive() && count ? "" : "disabled"}>Delete All Rotation Versions</button>
+    <button class="danger wide" id="confirm-delete-rotation" ${isAdmin() && !isRolePreviewActive() && count ? "" : "disabled"}>Stage Rotation Reset</button>
     <button class="ghost wide" data-open-drawer="rotation-detail" data-profile-id="${profile?.id || ""}">Keep Rotation</button>
   </div>`;
 }
@@ -3695,6 +3770,113 @@ function updateRotationDrawerPattern(pattern) {
   const stats = rotationPatternStats(normalized);
   const summary = document.querySelector(".pattern-editor .section-title strong");
   if (summary) summary.textContent = `${stats.working} working - ${stats.off} weekend/off`;
+  stageRotationDrawer();
+}
+
+function stageRotationDrawer() {
+  const drawer = ui.drawer;
+  if (!drawer || !drawer.initialized || isRolePreviewActive() || !canManageProfileDepartment(byId(state.profiles, drawer.profileId))) return;
+  const draft = { departmentId: ui.selectedDepartmentId, profileId: drawer.profileId,
+    pattern: [...drawer.patternDraft], leadDays: [...drawer.leadDays], effectiveStart: drawer.effectiveStart || null,
+    action: drawer.action || "save", sourceVersionId: drawer.sourceVersionId,
+    sourceEffectiveStart: drawer.sourceEffectiveStart, sourcePattern: drawer.sourcePattern, preserveLeads: drawer.preserveLeads || false };
+  const changed = !latestRotationForProfile(drawer.profileId) || draft.effectiveStart || draft.action === "move"
+    || JSON.stringify(draft.pattern) !== JSON.stringify(drawer.basePattern)
+    || JSON.stringify(draft.leadDays) !== JSON.stringify(drawer.baseLeadDays);
+  const previous = structuredClone(ui.rotationDrafts);
+  ui.rotationDrafts = ui.rotationDrafts.filter(item => item.departmentId !== draft.departmentId || item.profileId !== draft.profileId);
+  if (changed) {
+    const date = draft.effectiveStart || ui.rotationLeadEffectiveStart;
+    // A fresh explicit choice takes precedence over an earlier unsaved choice.
+    ui.rotationDrafts.forEach(other => {
+      if (other.departmentId === draft.departmentId && (other.effectiveStart || ui.rotationLeadEffectiveStart) === date && other.leadDays) {
+        other.leadDays = other.leadDays.map((lead, day) => draft.leadDays[day] ? false : lead);
+      }
+    });
+    ui.rotationDrafts.push(draft);
+  }
+  ui.rotationDrafts = ui.rotationDrafts.filter(item => {
+    if (item.action !== "save" || item.effectiveStart || item.departmentId !== ui.selectedDepartmentId) return true;
+    const saved = latestRotationForProfile(item.profileId);
+    if (!saved) return true;
+    const leads = weeklyLeadPattern(state.departmentLeadRotations, item.departmentId, rotationPreviewDate(item.profileId, saved))
+      .map((id, day) => id === item.profileId && byId(state.statuses, saved.pattern[day])?.kind === "working");
+    return JSON.stringify(saved.pattern) !== JSON.stringify(item.pattern) || JSON.stringify(leads) !== JSON.stringify(item.leadDays);
+  });
+  try { previewRotations(); }
+  catch (error) { ui.rotationDrafts = previous; notify(error.message, "error"); return; }
+  persistRotationDrafts();
+  refreshRotationWorkspace();
+  const undo = document.querySelector("#discard-person-rotation");
+  if (undo) undo.disabled = !personRotationDraft(drawer.profileId);
+}
+
+function refreshRotationWorkspace() {
+  const workspace = document.querySelector(".rotation-workspace");
+  if (!workspace) return;
+  const scroll = workspace.querySelector(".rotation-board")?.scrollLeft || 0;
+  workspace.innerHTML = renderRotationWorkspace();
+  workspace.querySelector(".rotation-board").scrollLeft = scroll;
+  bindRotationWorkspace(workspace);
+}
+
+function wireDrawerButtons(root = document) {
+  root.querySelectorAll("[data-open-drawer]").forEach(button => {
+    button.onclick = () => {
+      if (button.dataset.openDrawer === "profile") { ui.pendingPhotoFile = null; ui.pendingPhotoDataUrl = ""; }
+      if (button.dataset.openDrawer === "lead" && button.dataset.departmentId) ui.selectedDepartmentId = button.dataset.departmentId;
+      ui.drawer = { type: button.dataset.openDrawer, ...button.dataset };
+      if (["rotation-detail", "rotation-delete"].includes(button.dataset.openDrawer)) ui.notice = "";
+      render();
+      if (button.dataset.openDrawer === "rotation-detail" && button.dataset.weekday !== undefined) {
+        document.querySelector(`.pattern-slot:nth-child(${Number(button.dataset.weekday) + 1}) .pattern-chip.active`)?.focus();
+      }
+    };
+  });
+}
+
+function bindRotationWorkspace(root = document) {
+  wireDrawerButtons(root);
+  root.querySelector("#rotation-edit-effective-start")?.addEventListener("change", event => {
+    const previousDate = ui.rotationLeadEffectiveStart;
+    ui.rotationLeadEffectiveStart = event.target.value || todayIso;
+    try { previewRotations(); }
+    catch (error) { ui.rotationLeadEffectiveStart = previousDate; notify(error.message, "error"); return; }
+    persistRotationDrafts();
+    refreshRotationWorkspace();
+  });
+  root.querySelector("#save-rotation-edit")?.addEventListener("click", saveRotationEditMode);
+  root.querySelector("#discard-rotation-changes")?.addEventListener("click", () => {
+    ui.rotationDrafts = ui.rotationDrafts.filter(item => item.departmentId !== ui.selectedDepartmentId);
+    persistRotationDrafts(); render();
+  });
+  root.querySelectorAll("[data-copy-rotation]").forEach(button => button.addEventListener("click", () => {
+    const profile = byId(state.profiles, button.dataset.copyRotation);
+    const rotation = displayedRotation(profile?.id);
+    if (!rotation || !canManageProfileDepartment(profile) || isRolePreviewActive()) return;
+    ui.rotationClipboard = { name: profile.name, pattern: sanitizeRotationPattern(rotation.pattern) };
+    refreshRotationWorkspace();
+  }));
+  root.querySelectorAll("[data-paste-rotation]").forEach(button => button.addEventListener("click", () => {
+    const profile = byId(state.profiles, button.dataset.pasteRotation);
+    if (!ui.rotationClipboard || !canManageProfileDepartment(profile) || isRolePreviewActive()) return;
+    ui.drawer = { type: "rotation-detail", profileId: profile.id, patternDraft: [...ui.rotationClipboard.pattern], pastedFrom: ui.rotationClipboard.name, preserveLeads: true };
+    ui.notice = ""; render(); stageRotationDrawer();
+  }));
+  root.querySelector("#paste-department-rotation")?.addEventListener("click", () => {
+    if (!ui.rotationClipboard || !canManageDepartment(ui.selectedDepartmentId) || isRolePreviewActive()) return;
+    ui.drawer = { type: "rotation-paste", departmentId: ui.selectedDepartmentId, patternDraft: [...ui.rotationClipboard.pattern], pastedFrom: ui.rotationClipboard.name, effectiveStart: ui.rotationLeadEffectiveStart };
+    ui.notice = ""; render();
+  });
+  root.querySelectorAll("[data-assign-rotation-lead]").forEach(button => button.addEventListener("click", event => {
+    event.stopPropagation();
+    if (!canManageDepartment(ui.selectedDepartmentId) || isRolePreviewActive()) return;
+    ui.drawer = { type: "rotation-detail", profileId: button.dataset.assignRotationLead };
+    render();
+    ui.drawer.leadDays[Number(button.dataset.weekday)] = true;
+    stageRotationDrawer();
+    ui.drawer = null; render();
+  }));
 }
 
 function statusDrawer() {
@@ -3753,23 +3935,7 @@ function bindEvents() {
     });
   });
 
-  document.querySelectorAll("[data-open-drawer]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (button.dataset.openDrawer === "profile") {
-        ui.pendingPhotoFile = null;
-        ui.pendingPhotoDataUrl = "";
-      }
-      if (button.dataset.openDrawer === "lead" && button.dataset.departmentId) {
-        ui.selectedDepartmentId = button.dataset.departmentId;
-      }
-      ui.drawer = { type: button.dataset.openDrawer, ...button.dataset };
-      if (["rotation-detail", "rotation-delete"].includes(button.dataset.openDrawer)) ui.notice = "";
-      render();
-      if (button.dataset.openDrawer === "rotation-detail" && button.dataset.weekday !== undefined) {
-        document.querySelector(`.pattern-slot:nth-child(${Number(button.dataset.weekday) + 1}) .pattern-chip.active`)?.focus();
-      }
-    });
-  });
+  wireDrawerButtons();
 
   document.querySelectorAll("[data-open-profile-page]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3790,49 +3956,33 @@ function bindEvents() {
     render();
   });
 
-  document.querySelector("#cancel-rotation-leads")?.addEventListener("click", () => {
-    ui.rotationLeadDraftPattern = null;
-    render();
-  });
-
-  document.querySelectorAll("[data-copy-rotation]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const profile = byId(state.profiles, button.dataset.copyRotation);
-      const rotation = latestRotationForProfile(profile?.id);
-      if (!rotation || !canManageProfileDepartment(profile) || isRolePreviewActive()) return;
-      ui.rotationClipboard = { name: profile.name, pattern: sanitizeRotationPattern(rotation.pattern) };
-      notify(`Copied ${profile.name}'s weekly shifts.`, "success");
-    });
-  });
-
-  document.querySelectorAll("[data-paste-rotation]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const profile = byId(state.profiles, button.dataset.pasteRotation);
-      if (!ui.rotationClipboard || !canManageProfileDepartment(profile) || isRolePreviewActive()) return;
-      ui.drawer = {
-        type: "rotation-detail", profileId: profile.id,
-        patternDraft: [...ui.rotationClipboard.pattern],
-        pastedFrom: ui.rotationClipboard.name, effectiveStart: ui.rotationLeadEffectiveStart
-      };
-      ui.notice = "";
-      render();
-    });
-  });
-
-  document.querySelector("#paste-department-rotation")?.addEventListener("click", () => {
-    if (!ui.rotationClipboard || !canManageDepartment(ui.selectedDepartmentId) || isRolePreviewActive()) return;
-    ui.drawer = {
-      type: "rotation-paste", departmentId: ui.selectedDepartmentId,
-      patternDraft: [...ui.rotationClipboard.pattern],
-      pastedFrom: ui.rotationClipboard.name, effectiveStart: ui.rotationLeadEffectiveStart
-    };
-    ui.notice = "";
-    render();
-  });
+  bindRotationWorkspace();
 
   document.querySelector('#rotation-form input[name="effectiveStart"]')?.addEventListener("change", (event) => {
     ui.drawer.effectiveStart = event.target.value;
+    document.querySelector(".rotation-date-source").textContent = "Personal override";
+    stageRotationDrawer();
   });
+  document.querySelector("#use-page-rotation-date")?.addEventListener("click", () => {
+    ui.drawer.effectiveStart = null;
+    document.querySelector('#rotation-form input[name="effectiveStart"]').value = ui.rotationLeadEffectiveStart;
+    document.querySelector(".rotation-date-source").textContent = "Page date";
+    stageRotationDrawer();
+  });
+  document.querySelector("#rotation-done")?.addEventListener("click", closeDrawerWithMotion);
+  document.querySelector("#discard-person-rotation")?.addEventListener("click", () => {
+    ui.rotationDrafts = ui.rotationDrafts.filter(item => item.departmentId !== ui.selectedDepartmentId || item.profileId !== ui.drawer.profileId);
+    persistRotationDrafts(); ui.drawer = null; render();
+  });
+  document.querySelectorAll("[data-correct-rotation-date]").forEach(button => button.addEventListener("click", () => {
+    const source = byId(state.rotationVersions, button.dataset.correctRotationDate);
+    if (!isAdmin() || isRolePreviewActive() || !source) return;
+    ui.drawer = { type: "rotation-detail", profileId: source.profileId, rotationId: source.id,
+      patternDraft: [...source.pattern], effectiveStart: source.effectiveStart, action: "move",
+      sourceVersionId: source.id, sourceEffectiveStart: source.effectiveStart, sourcePattern: [...source.pattern], correcting: true };
+    render();
+    document.querySelector('#rotation-form input[name="effectiveStart"]')?.focus();
+  }));
   document.querySelector("#rotation-paste-form")?.addEventListener("submit", pasteDepartmentRotation);
   document.querySelector("#confirm-delete-rotation")?.addEventListener("click", resetPersonRotation);
 
@@ -3850,23 +4000,6 @@ function bindEvents() {
 
   document.querySelector("#save-scheduler-edit")?.addEventListener("click", saveSchedulerLeadDrafts);
 
-  document.querySelector("#rotation-edit-effective-start")?.addEventListener("change", (event) => {
-    ui.rotationLeadEffectiveStart = event.target.value;
-  });
-
-  document.querySelector("#save-rotation-edit")?.addEventListener("click", saveRotationEditMode);
-
-  document.querySelectorAll("[data-assign-rotation-lead]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (!canManageDepartment(ui.selectedDepartmentId) || isRolePreviewActive()) return;
-      const weekday = Number(button.dataset.weekday);
-      const draft = [...rotationLeadPatternDraft(ui.selectedDepartmentId)];
-      draft[weekday] = button.dataset.assignRotationLead;
-      ui.rotationLeadDraftPattern = draft;
-      render();
-    });
-  });
 
   document.querySelectorAll("[data-assign-schedule-lead]").forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -4124,6 +4257,7 @@ function bindEvents() {
       const pattern = sanitizeRotationPattern(ui.drawer.patternDraft || byId(state.rotationVersions, ui.drawer.rotationId)?.pattern || latestRotationForProfile(ui.drawer.profileId)?.pattern);
       const day = Number(button.dataset.patternDay);
       const isLead = button.dataset.patternStatus === "lead";
+      ui.drawer.preserveLeads = false;
       ui.drawer.leadDays[day] = isLead;
       pattern[day] = isLead
         ? ["morning", "midday", "night"].includes(pattern[day]) ? pattern[day] : "morning"
@@ -4437,6 +4571,9 @@ async function signOut() {
     success: "Signed out.",
     failure: "Unable to sign out."
   }, async () => {
+    sessionStorage.removeItem(rotationDraftKey());
+    ui.rotationDrafts = [];
+    ui.rotationDraftsOwner = null;
     await dataStore.signOut();
     ui.rotationClipboard = null;
     ui.rotationLeadDraftPattern = null;
@@ -5025,38 +5162,37 @@ function authRedirectUrl() {
 
 async function saveRotationEditMode() {
   const departmentId = ui.selectedDepartmentId;
-  if (!canManageDepartment(departmentId)) return;
-  const effectiveStart = ui.rotationLeadEffectiveStart || todayIso;
-  if (!effectiveStart || (!editableDate(effectiveStart) && !isAdmin())) return;
-  const pattern = rotationLeadPatternDraft(departmentId);
-  const candidates = leadCandidates(departmentId);
-  if (!candidates.length) {
-    notify("Add people to this department before saving a lead rotation.", "error");
-    return;
+  const changes = departmentRotationDrafts().map(item => ({ ...item, effectiveStart: item.effectiveStart || ui.rotationLeadEffectiveStart }));
+  if (!canManageDepartment(departmentId) || isRolePreviewActive() || !changes.length) return;
+  if (changes.some(item => !item.effectiveStart || (!isAdmin() && item.effectiveStart < todayIso))) {
+    notify("Choose today or a future effective start for every changed person.", "error"); return;
   }
-  if (pattern.some((profileId) => profileId && !candidates.some((profile) => profile.id === profileId))) {
-    notify("Every lead assignment must be a person from this department.", "error");
-    return;
-  }
-  const existing = (state.departmentLeadRotations || []).find((rotation) => rotation.departmentId === departmentId && rotation.effectiveStart === effectiveStart);
-  const payload = {
-    id: existing?.id || makeId("lead-rotation"),
-    departmentId,
-    effectiveStart,
-    pattern
-  };
   await runMutation("rotation-edit-save", {
     pending: "Saving rotation edits...",
-    success: "Rotation edits saved.",
+    success: `Saved ${changes.length} rotation ${changes.length === 1 ? "change" : "changes"}.`,
     failure: "The rotation edits could not be saved."
   }, async () => {
-    await dataStore.upsertDepartmentLeadRotation(payload);
-    state.departmentLeadRotations ||= [];
-    if (existing) Object.assign(existing, payload);
-    else state.departmentLeadRotations.push(payload);
-    audit("department.lead_rotation_saved", "department_lead_rotation", payload.id, `${effectiveStart} weekly lead pattern`);
+    const result = await dataStore.saveRotationDrafts(departmentId, changes);
+    const resetIds = new Set(result.resetProfileIds);
+    state.rotationVersions = state.rotationVersions.filter(item => !resetIds.has(item.profileId));
+    for (const rotation of result.rotations) {
+      const existing = byId(state.rotationVersions, rotation.id) || state.rotationVersions.find(item => item.profileId === rotation.profileId && item.effectiveStart === rotation.effectiveStart);
+      if (existing) Object.assign(existing, rotation);
+      else state.rotationVersions.push(rotation);
+    }
+    state.departmentLeadRotations.forEach(row => { row.pattern = row.pattern.map(id => resetIds.has(id) ? "" : id); });
+    const incomingLeads = new Map(result.leadRotations.map(row => [row.id, row]));
+    const existingLeadIds = new Set(state.departmentLeadRotations.map(row => row.id));
+    state.departmentLeadRotations = [...state.departmentLeadRotations
+      .filter(row => row.departmentId !== departmentId || incomingLeads.has(row.id))
+      .map(row => incomingLeads.get(row.id) || row),
+      ...result.leadRotations.filter(row => !existingLeadIds.has(row.id))];
+    if (dataStore.mode === "demo") changes.forEach(item => audit(item.action === "reset" ? "rotation.reset" : item.action === "move" ? "rotation.date_corrected" : "rotation.saved", "profile", item.profileId, `${item.effectiveStart}: rotation change saved`));
     await saveState();
+    ui.rotationDrafts = ui.rotationDrafts.filter(item => item.departmentId !== departmentId);
+    persistRotationDrafts();
     ui.rotationLeadDraftPattern = null;
+    ui.drawer = null;
     render();
   });
 }
@@ -5187,57 +5323,18 @@ async function saveDayBulkOverrides(event) {
 
 async function saveRotation(event) {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  const profile = byId(state.profiles, form.get("profileId"));
-  if (!profile || !canManageProfileDepartment(profile)) return;
-  const pattern = sanitizeRotationPattern(form.getAll("patternItem").map((item) => item.trim()).filter(Boolean));
-  const departmentId = profileBelongsToDepartment(profile, ui.selectedDepartmentId) && canManageDepartment(ui.selectedDepartmentId)
-    ? ui.selectedDepartmentId
-    : profileDepartmentIds(profile).find(canManageDepartment);
-  const effectiveStart = form.get("effectiveStart");
-  const leadDays = [...ui.drawer.leadDays];
-  if (!effectiveStart || (!isAdmin() && effectiveStart < todayIso)) {
-    notify("Choose today or a future effective start.", "error");
-    return;
-  }
-  await runMutation("rotation-save", {
-    pending: "Saving rotation...", success: "Rotation saved.", failure: "The rotation could not be saved."
-  }, async () => {
-    const result = await dataStore.savePersonRotation(departmentId, profile.id, effectiveStart, pattern, leadDays);
-    const existing = state.rotationVersions.find(item => item.profileId === profile.id && item.effectiveStart === effectiveStart);
-    if (existing) Object.assign(existing, result.rotation);
-    else state.rotationVersions.push(result.rotation);
-    if (result.leadRotation) {
-      const existingLead = state.departmentLeadRotations.find(item => item.departmentId === departmentId && item.effectiveStart === effectiveStart);
-      if (existingLead) Object.assign(existingLead, result.leadRotation);
-      else state.departmentLeadRotations.push(result.leadRotation);
-    }
-    audit("rotation.saved", "rotation_version", result.rotation.id, `${effectiveStart}: weekly pattern saved`);
-    await saveState();
-    ui.rotationLeadDraftPattern = null;
-    ui.drawer = null;
-    render();
-  });
+  stageRotationDrawer();
 }
 
 async function resetPersonRotation() {
   const profileId = ui.drawer?.profileId;
   if (!isAdmin() || !byId(state.profiles, profileId) || ui.drawer?.type !== "rotation-delete") return;
-  await runMutation("rotation-reset", {
-    pending: "Deleting rotation...", success: "Rotation reset to No Template.", failure: "The rotation could not be deleted."
-  }, async () => {
-    await dataStore.resetPersonRotation(profileId);
-    state.rotationVersions = state.rotationVersions.filter(item => item.profileId !== profileId);
-    state.departmentLeadRotations.forEach(item => {
-      item.pattern = item.pattern.map(id => id === profileId ? "" : id);
-    });
-    if (dataStore.mode === "demo") audit("rotation.reset", "profile", profileId, "Weekly rotation reset to No Template");
-    await saveState();
-    ui.rotationLeadDraftPattern = null;
-    ui.rotationClipboard = null;
-    ui.drawer = null;
-    render();
-  });
+  ui.rotationDrafts = ui.rotationDrafts.filter(item => item.departmentId !== ui.selectedDepartmentId || item.profileId !== profileId);
+  ui.rotationDrafts.push({ departmentId: ui.selectedDepartmentId, profileId, action: "reset" });
+  persistRotationDrafts();
+  ui.rotationClipboard = null;
+  ui.drawer = null;
+  render();
 }
 
 async function pasteDepartmentRotation(event) {
@@ -5245,9 +5342,15 @@ async function pasteDepartmentRotation(event) {
   const departmentId = ui.drawer?.departmentId;
   if (departmentId !== ui.selectedDepartmentId || !canManageDepartment(departmentId)) return;
   const pattern = [...ui.drawer.patternDraft];
-  const patterns = departmentProfiles().map((profile) => ({ profileId: profile.id, pattern: [...pattern] }));
   const form = new FormData(event.currentTarget);
-  await applyRotationPatterns(departmentId, form.get("effectiveStart"), patterns);
+  const override = form.get("effectiveStart") !== ui.rotationLeadEffectiveStart ? form.get("effectiveStart") : null;
+  for (const profile of departmentProfiles()) {
+    ui.drawer = { type: "rotation-detail", profileId: profile.id, patternDraft: [...pattern], preserveLeads: true };
+    rotationDrawer();
+    ui.drawer.effectiveStart = override;
+    stageRotationDrawer();
+  }
+  ui.drawer = null; render();
 }
 
 async function applyRotationPatterns(departmentId, effectiveStart, patterns) {

@@ -1,6 +1,6 @@
 import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
-import { weeklyLeadPattern, applyExplicitLeadDays } from "./scheduleLogic.mjs";
+import { weeklyLeadPattern, applyExplicitLeadDays, applyRotationDrafts } from "./scheduleLogic.mjs";
 
 const profilePhotoPrefix = "storage:profile-photos/";
 const onboardingPhotoPrefix = "storage:profile-onboarding-photos/";
@@ -67,6 +67,15 @@ function createLocalStore() {
         ? { id: existing?.id || crypto.randomUUID(), departmentId, effectiveStart, pattern: after } : null };
     },
     async resetPersonRotation() {},
+    async saveRotationDrafts(departmentId, changes) {
+      const before = await this.load();
+      const after = applyRotationDrafts(before, departmentId, changes);
+      after.rotationVersions.forEach(row => { if (row.id.startsWith("draft:")) row.id = crypto.randomUUID(); });
+      after.departmentLeadRotations.forEach(row => { if (row.id.startsWith("draft-lead:")) row.id = crypto.randomUUID(); });
+      return { rotations: after.rotationVersions.filter(row => changes.some(item => item.profileId === row.profileId && item.effectiveStart === row.effectiveStart && item.action !== "reset")),
+        resetProfileIds: changes.filter(item => item.action === "reset").map(item => item.profileId),
+        leadRotations: after.departmentLeadRotations.filter(row => row.departmentId === departmentId) };
+    },
     async applyRotationPatterns(departmentId, effectiveStart, patterns) {
       const stored = await this.load();
       return patterns.map((item) => ({
@@ -294,6 +303,11 @@ function createRemoteStore(client) {
     },
     async resetPersonRotation(profileId) {
       return client.rpc("reset_person_rotation", { p_profile_id: profileId });
+    },
+    async saveRotationDrafts(departmentId, changes) {
+      const result = await client.rpc("save_rotation_drafts", { p_department_id: departmentId, p_changes: changes });
+      return { rotations: result.rotations.map(fromDbRotation), leadRotations: result.lead_rotations.map(fromDbLeadRotation),
+        resetProfileIds: result.reset_profile_ids };
     },
     async applyRotationPatterns(departmentId, effectiveStart, patterns) {
       const rows = await client.rpc("apply_rotation_patterns", {

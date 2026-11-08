@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   addDays,
   applyExplicitLeadDays,
+  applyRotationDrafts,
   annualEligibleDates,
   datesBetween,
   departmentLeadForDate,
@@ -19,6 +20,25 @@ import {
 
 const rotationStatusIds = ["morning", "midday", "night", "weekend"];
 const defaultWeekPattern = ["morning", "morning", "morning", "morning", "morning", "weekend", "weekend"];
+
+test("rotation drafts preserve stored history, resolve dates, and move Lead earlier without stopping it at the old date", () => {
+  const state = { rotationVersions: [
+    { id: "first", profileId: "p1", effectiveStart: "2026-11-10", pattern: [...defaultWeekPattern] },
+    { id: "untouched", profileId: "p2", effectiveStart: "2026-01-01", pattern: [...defaultWeekPattern] }
+  ], departmentLeadRotations: [{ id: "lead", departmentId: "ops", effectiveStart: "2026-11-10", pattern: ["p1", "p2", "", "", "", "", ""] }] };
+  const original = structuredClone(state);
+  const preview = applyRotationDrafts(state, "ops", [{ profileId: "p1", action: "move", sourceVersionId: "first",
+    sourceEffectiveStart: "2026-11-10", effectiveStart: "2026-11-01", pattern: [...defaultWeekPattern], leadDays: [true, false, false, false, false, false, false] }]);
+  assert.deepEqual(state, original);
+  assert.equal(preview.rotationVersions[0].effectiveStart, "2026-11-01");
+  assert.equal(weeklyLeadPattern(preview.departmentLeadRotations, "ops", "2026-11-05")[0], "p1");
+  assert.equal(weeklyLeadPattern(preview.departmentLeadRotations, "ops", "2026-11-12")[0], "p1");
+  assert.equal(weeklyLeadPattern(preview.departmentLeadRotations, "ops", "2026-11-12")[1], "p2");
+  const changed = applyRotationDrafts(state, "ops", [{ profileId: "p1", pattern: Array(7).fill("night"), leadDays: Array(7).fill(false), preserveLeads: true }], "2026-12-01");
+  assert.deepEqual(changed.departmentLeadRotations, original.departmentLeadRotations);
+  assert.deepEqual(changed.rotationVersions.find(row => row.id === "untouched"), original.rotationVersions[1]);
+  assert.equal(changed.rotationVersions.at(-1).effectiveStart, "2026-12-01");
+});
 
 function testState() {
   return {
