@@ -205,7 +205,7 @@ test('remote rotation save uses the atomic RPC and retains the draft on failure'
   };
   await page.route(`${url}/rest/v1/**`, async route => {
     const path = new URL(route.request().url()).pathname.split('/').at(-1);
-    if (path === 'save_rotation_drafts') {
+    if (path === 'save_reviewed_rotation_drafts') {
       sentPayload = route.request().postDataJSON();
       if (shouldFail) return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Test save rejected' }) });
       saved = [{ id: 'saved', profile_id: sentPayload.p_changes[0].profileId, effective_start: sentPayload.p_changes[0].effectiveStart, pattern: sentPayload.p_changes[0].pattern }];

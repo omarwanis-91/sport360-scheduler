@@ -179,7 +179,7 @@ test("Lead sees and manages only the directly assigned department", async ({ pag
 
   await expect(page.locator("#department-select option")).toHaveCount(1);
   await expect(page.locator("#department-select")).toHaveValue("ops");
-  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit daily leads", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
@@ -210,7 +210,7 @@ test("Employee has department read access and own identity editing only", async 
 
   await expect(page.locator("#department-select option")).toHaveCount(1);
   await expect(page.locator("#department-select")).toHaveValue("support");
-  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Edit daily leads", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
@@ -243,7 +243,7 @@ test("Admin can preview Employee access without changing the signed-in user", as
   await expect(banner).toContainText("Supabase session remains Admin");
   await expect(page.locator("#department-select option")).toHaveCount(1);
   await expect(page.locator("#department-select")).toHaveValue("support");
-  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Edit daily leads", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
   await expect(page.locator(".user-tile")).toContainText("Youssef Nabil");
@@ -274,7 +274,7 @@ test("Admin can preview Lead scope for one selected department", async ({ page }
   await expect(page.getByRole("region", { name: "Role Preview is active" })).toContainText("Previewing Lead · Operations");
   await expect(page.locator("#department-select option")).toHaveCount(1);
   await expect(page.locator("#department-select")).toHaveValue("ops");
-  await expect(page.getByRole("button", { name: "Edit Schedule", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit daily leads", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 
@@ -446,7 +446,7 @@ test("lead shifts replace their underlying rotation and non-working states stay 
     borderLeftWidth: getComputedStyle(element).borderLeftWidth,
     boxShadow: getComputedStyle(element).boxShadow
   }));
-  expect(weekSeparatorStyle.marginLeft).toBe("6px");
+  expect(weekSeparatorStyle.marginLeft).toBe("12px");
   expect(weekSeparatorStyle.borderLeftWidth).toBe("1px");
   expect(weekSeparatorStyle.boxShadow).not.toBe("none");
 
@@ -555,6 +555,7 @@ test("personal profile shift details stay read-only and route edits to Scheduler
 
 test("authorized scheduler clicks open one-time shift editing without lead edit mode", async ({ page }) => {
   await page.goto("/");
+  const beforeRotations = await page.evaluate(async () => (JSON.parse(localStorage.getItem('sport360-scheduler-state')) || (await import('/assets/data.js')).seedState).rotationVersions);
 
   const shift = page.locator('.schedule-grid .shift-cell[data-profile-id="emp-001"]').first();
   const date = await shift.getAttribute("data-date");
@@ -569,6 +570,9 @@ test("authorized scheduler clicks open one-time shift editing without lead edit 
   await expect(page.locator('#shift-form input[name="statusId"][value="sick"]')).toBeChecked();
   await page.getByRole("button", { name: "Save Daily Change", exact: true }).click();
   await expect(page.locator(".app-notice.success")).toContainText("Daily change saved.");
+  const savedState = await page.evaluate(() => JSON.parse(localStorage.getItem('sport360-scheduler-state')));
+  expect(savedState.rotationVersions).toEqual(beforeRotations);
+  expect(savedState.scheduleOverrides.filter(row => row.profileId === 'emp-001' && row.date === date)).toHaveLength(1);
   await page.reload();
   const savedShift = page.locator(`.schedule-grid .shift-cell[data-profile-id="emp-001"][data-date="${date}"]`);
   await expect(savedShift.locator(".shift-label")).toHaveText("Sick");
@@ -656,7 +660,7 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
   }
   await expect(page.locator(".date-head.today")).toContainText("Today");
   if (weekend) {
-    await page.getByRole("button", { name: "Edit Schedule", exact: true }).click();
+    await page.getByRole("button", { name: "Edit daily leads", exact: true }).click();
   }
   await page.locator(".date-head.today").click();
   if (weekend) {
@@ -694,7 +698,7 @@ test("parent department daily lead overrides can return to weekly rotation", asy
   }, today);
   await page.reload();
 
-  await page.getByRole("button", { name: "Edit Schedule", exact: true }).click();
+  await page.getByRole("button", { name: "Edit daily leads", exact: true }).click();
   await page.locator(`.date-head[data-date="${today}"]`).click();
 
   const dailyLeadSelect = page.getByRole("combobox", { name: "Daily lead override", exact: true });

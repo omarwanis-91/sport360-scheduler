@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, delimiter } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { rotationFutureVersions } from '../src/scheduleLogic.mjs';
 
 const runtime = process.env.PATH.split(delimiter).map(bin => join(dirname(bin), '@electric-sql/pglite'))
   .find(root => existsSync(join(root, 'package.json')));
@@ -217,5 +218,57 @@ checks++;
 const draftAudit = await db.exec(readFileSync(new URL('../supabase/audit/019_staged_rotation_changes_audit.sql', import.meta.url), 'utf8'));
 for (const result of draftAudit) for (const row of result.rows) assert.equal(row.passed, true, row.check_name);
 checks++;
+await db.exec(readFileSync(new URL('../supabase/migrations/032_rotation_future_version_review.sql', import.meta.url), 'utf8'));
+await db.query('select public.save_reviewed_rotation_drafts($1::uuid,$2::jsonb)', [dept, JSON.stringify([draft(second,'2099-09-01',night)])]);
+checks++;
+await db.exec('delete from public.rotation_versions; delete from public.department_lead_rotation_versions;');
+await call([draft(person, '', night), draft(second, '', morning)], '2099-11-08');
+await db.query('insert into public.department_lead_rotation_versions(department_id,effective_start,pattern) values ($1,$2,$3::jsonb),($1,$4,$5::jsonb),($6,$2,$7::jsonb)',
+  [dept, '2099-11-08', JSON.stringify(Array(7).fill('')), '2099-11-15', JSON.stringify(['', second, '', '', '', '', '']), otherDept, JSON.stringify(Array(7).fill(outsider))]);
+async function reviewed(change, policy = 'replace') {
+  const rotations = (await db.query('select id, profile_id, effective_start::text, pattern from public.rotation_versions')).rows.map(row => ({ id:row.id, profileId:row.profile_id, effectiveStart:row.effective_start, pattern:row.pattern }));
+  const leads = (await db.query('select id, department_id, effective_start::text, pattern from public.department_lead_rotation_versions')).rows.map(row => ({ id:row.id, departmentId:row.department_id, effectiveStart:row.effective_start, pattern:row.pattern }));
+  return { ...change, futurePolicy:policy, expectedFuture:rotationFutureVersions({rotationVersions:rotations, departmentLeadRotations:leads}, dept, change) };
+}
+const backdated = draft(person, '2099-11-01', morning, leadMonday);
+await rejectedDrafts([backdated], /Later versions exist/);
+await rejectedDrafts([{ ...backdated, futurePolicy:'replace' }], /Later versions changed/);
+await rejectedDrafts([{ ...backdated, futurePolicy:'discard' }], /Unknown later/);
+const kept = await saveDrafts([await reviewed(backdated, 'keep')]);
+assert.equal(kept.removed_rotation_ids.length, 0);
+assert.equal((await db.query("select pattern->>0 value from public.department_lead_rotation_versions where department_id=$1 and effective_start='2099-11-08'", [dept])).rows[0].value, '');
+checks++;
+const staleReview = await reviewed(backdated);
+await db.query('insert into public.department_lead_rotation_versions(department_id,effective_start,pattern) values ($1,$2,$3::jsonb)', [dept, '2099-11-22', JSON.stringify(Array(7).fill(''))]);
+await rejectedDrafts([staleReview], /Later versions changed/);
+const replaced = await saveDrafts([await reviewed(backdated)]);
+assert.equal(replaced.removed_rotation_ids.length, 1);
+assert.equal((await db.query("select count(*)::int n from public.rotation_versions where profile_id=$1 and effective_start>'2099-11-01'", [person])).rows[0].n, 0);
+for (const date of ['2099-11-08','2099-11-15','2099-11-22']) {
+  assert.equal((await db.query('select pattern->>0 value from public.department_lead_rotation_versions where department_id=$1 and effective_start=$2', [dept,date])).rows[0].value, person);
+}
+assert.equal((await db.query("select pattern->>1 value from public.department_lead_rotation_versions where department_id=$1 and effective_start='2099-11-15'", [dept])).rows[0].value, second);
+assert.equal((await db.query('select pattern->>0 value from public.department_lead_rotation_versions where department_id=$1', [otherDept])).rows[0].value, outsider);
+assert.equal((await db.query('select count(*)::int n from public.schedule_overrides')).rows[0].n, 1);
+checks++;
+await saveDrafts([await reviewed(backdated), await reviewed(draft(second, '2099-11-15', morning, leadMonday))]);
+assert.equal((await db.query("select pattern->>0 value from public.department_lead_rotation_versions where department_id=$1 and effective_start='2099-11-08'", [dept])).rows[0].value, person);
+assert.equal((await db.query("select pattern->>0 value from public.department_lead_rotation_versions where department_id=$1 and effective_start='2099-11-15'", [dept])).rows[0].value, second);
+checks++;
+await call([draft(person, '', night)], '2099-12-01');
+await rejectedDrafts([await reviewed(backdated), await reviewed(draft(second,'2099-11-16',['sick']))], /seven weekday/);
+await db.exec("set app.role='lead'");
+await rejectedDrafts([await reviewed(draft(person, '2000-01-01'))], /past rotation/);
+await rejectedDrafts([await reviewed(draft(outsider, '2099-12-01'))], /outside your department/);
+await saveDrafts([await reviewed(draft(person,'2099-11-01',night))]);
+checks++;
+await db.exec("set app.role='employee'");
+await rejectedDrafts([backdated], /Not allowed/);
+await db.exec("set app.role='admin'");
+for (const auditPath of ['019_staged_rotation_changes_audit.sql','020_rotation_future_version_review_audit.sql']) {
+  const results = await db.exec(readFileSync(new URL(`../supabase/audit/${auditPath}`, import.meta.url), 'utf8'));
+  for (const result of results) for (const row of result.rows) assert.equal(row.passed, true, row.check_name);
+}
+checks++;
 await db.close();
-console.log(`${checks} isolated PostgreSQL checks passed, including audits 017, 018, and 019.`);
+console.log(`${checks} isolated PostgreSQL checks passed, including audits 017–020.`);

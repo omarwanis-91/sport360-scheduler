@@ -13,6 +13,7 @@ import {
   isoWeekInfo,
   weeklyLeadPattern,
   applyRotationDrafts,
+  rotationFutureVersions,
   normalizeWeekPattern as normalizeWeekPatternLogic,
   parseDate as parseDateLogic,
   roleForProfile as roleForProfileLogic,
@@ -777,7 +778,7 @@ function renderSchedulerWeekBands(dates) {
   return `
     <div class="week-band-corner"><span>Weeks</span></div>
     ${schedulerWeekGroups(dates).map((group) => `
-      <div class="week-band" style="grid-column: span ${group.count}" aria-label="Week ${group.week}, ${group.year}">
+      <div class="week-band ${isWeekStart(group.startDate) ? "week-group-start" : ""}" style="grid-column: span ${group.count}" aria-label="Week ${group.week}, ${group.year}">
         <span>Week</span>
         <strong>${group.week}</strong>
       </div>
@@ -1599,7 +1600,7 @@ function renderScheduler() {
           ${canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
             <button class="primary" id="save-scheduler-edit">${icons.lead} Save</button>
             <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
-          ` : `<button class="primary" id="toggle-scheduler-edit">${icons.plus} Edit Schedule</button>` : ""}
+          ` : `<button class="primary" id="toggle-scheduler-edit">${icons.lead} Edit daily leads</button>` : ""}
         </div>
     </section>
     <section class="scheduler-shell">
@@ -1621,9 +1622,9 @@ function renderSchedulerEditCommitBar() {
   return `
     <section class="edit-commit-bar scheduler-edit-commit">
       <div>
-        <span class="eyebrow">Schedule Edit Mode</span>
+        <span class="eyebrow">Daily Lead assignments</span>
         <strong>Changes are staged until saved</strong>
-        <p>Hover an available shift to assign that person as the day lead. Click shift cells to make daily schedule changes.</p>
+        <p>Stage day-lead assignments here. Click any shift for a separate one-time shift edit.</p>
       </div>
       <div class="edit-commit-actions">
         <span>${stagedChanges} lead ${stagedChanges === 1 ? "change" : "changes"}</span>
@@ -2933,7 +2934,7 @@ function renderMiniActivity(entries) {
 function renderDrawer() {
   if (!ui.drawer) return "";
   const isCreation = isCreationDrawer();
-  const isCentered = isCreation || ["request-detail", "rotation-paste", "rotation-delete"].includes(ui.drawer.type);
+  const isCentered = isCreation || ["request-detail", "rotation-paste", "rotation-delete", "rotation-future"].includes(ui.drawer.type);
   const titleMap = {
     shift: "Shift Override",
     person: "Employee Profile",
@@ -2951,6 +2952,7 @@ function renderDrawer() {
     "rotation-detail": "Weekly Rotation",
     "rotation-paste": "Paste Department Rotation",
     "rotation-delete": "Delete Rotation",
+    "rotation-future": "Review later versions",
     status: "New Status",
     "status-detail": "Status Label"
   };
@@ -2990,6 +2992,7 @@ function drawerBody() {
   if (ui.drawer.type === "rotation" || ui.drawer.type === "rotation-detail") return rotationDrawer();
   if (ui.drawer.type === "rotation-paste") return rotationPasteDrawer();
   if (ui.drawer.type === "rotation-delete") return rotationDeleteDrawer();
+  if (ui.drawer.type === "rotation-future") return rotationFutureDrawer();
   if (ui.drawer.type === "status" || ui.drawer.type === "status-detail") return statusDrawer();
   return "";
 }
@@ -3676,6 +3679,23 @@ function rotationDeleteDrawer() {
   </div>`;
 }
 
+function rotationFutureDrawer() {
+  const changes = ui.drawer.changes;
+  return `<div class="drawer-stack">
+    <p>A later saved version would take over after your selected start date.</p>
+    <div class="rotation-future-list">${changes.filter(item => item.expectedFuture.rotations.length || item.expectedFuture.leads.length).map(item => `
+      <div><strong>${escapeHtml(byId(state.profiles, item.profileId)?.name || "Employee")}</strong>
+        <small>New start: ${item.effectiveStart}</small>
+        ${item.expectedFuture.rotations.map(row => `<span>Shifts change again: ${row.effectiveStart}</span>`).join("")}
+        ${item.expectedFuture.leads.map(row => `<span>Lead changes again: ${row.effectiveStart}${row.pattern.every(id => !id) ? " · Unassigned" : ""}</span>`).join("")}
+      </div>`).join("")}</div>
+    <p class="hint">Apply onward replaces later weekly versions for the edited people and carries their Lead choices into later team plans. Other people's shifts, unrelated Lead weekdays, daily overrides, and requests stay in place.</p>
+    <button class="primary wide" id="replace-later-rotations">Apply from these dates onward</button>
+    <button class="ghost wide" id="keep-later-rotations">Keep later versions</button>
+    <button class="ghost wide" id="review-rotation-edits">Review edits</button>
+  </div>`;
+}
+
 function rotationPasteDrawer() {
   const department = byId(state.departments, ui.drawer.departmentId);
   const profiles = departmentProfiles();
@@ -3994,6 +4014,9 @@ function bindEvents() {
   }));
   document.querySelector("#rotation-paste-form")?.addEventListener("submit", pasteDepartmentRotation);
   document.querySelector("#confirm-delete-rotation")?.addEventListener("click", resetPersonRotation);
+  document.querySelector("#replace-later-rotations")?.addEventListener("click", () => saveRotationEditMode("replace"));
+  document.querySelector("#keep-later-rotations")?.addEventListener("click", () => saveRotationEditMode("keep"));
+  document.querySelector("#review-rotation-edits")?.addEventListener("click", closeDrawerWithMotion);
 
   document.querySelector("#toggle-scheduler-edit")?.addEventListener("click", () => {
     ui.schedulerEditMode = true;
@@ -5082,7 +5105,7 @@ async function decideRequest(requestId, decision) {
 async function saveLead(event) {
   event.preventDefault();
   if (!ui.schedulerEditMode) {
-    notify("Turn on Edit Schedule before changing daily leads.", "error");
+    notify("Turn on Edit daily leads before changing daily leads.", "error");
     return;
   }
   const departmentId = activeDrawerDepartmentId();
@@ -5169,21 +5192,30 @@ function authRedirectUrl() {
   return `${url.origin}${url.pathname}`;
 }
 
-async function saveRotationEditMode() {
+async function saveRotationEditMode(futurePolicy = "") {
   const departmentId = ui.selectedDepartmentId;
-  const changes = departmentRotationDrafts().map(item => ({ ...item, effectiveStart: item.effectiveStart || ui.rotationLeadEffectiveStart }));
+  const policy = ["keep", "replace"].includes(futurePolicy) ? futurePolicy : "";
+  let changes = policy && ui.drawer?.type === "rotation-future" ? ui.drawer.changes
+    : departmentRotationDrafts().map(item => ({ ...item, effectiveStart: item.effectiveStart || ui.rotationLeadEffectiveStart }));
   if (!canManageDepartment(departmentId) || isRolePreviewActive() || !changes.length) return;
   if (changes.some(item => !item.effectiveStart || (!isAdmin() && item.effectiveStart < todayIso))) {
     notify("Choose today or a future effective start for every changed person.", "error"); return;
   }
+  if (!policy) {
+    changes = changes.map(item => ({ ...item, expectedFuture: rotationFutureVersions(state, departmentId, item) }));
+    if (changes.some(item => item.expectedFuture.rotations.length || item.expectedFuture.leads.length)) {
+      ui.drawer = { type: "rotation-future", changes }; ui.notice = ""; render(); return;
+    }
+  } else changes = changes.map(item => ({ ...item, futurePolicy: policy }));
   await runMutation("rotation-edit-save", {
     pending: "Saving rotation edits...",
-    success: `Saved ${changes.length} rotation ${changes.length === 1 ? "change" : "changes"}.`,
+    success: `Saved ${changes.length} rotation ${changes.length === 1 ? "change" : "changes"}.${policy === "keep" ? " Later versions kept." : ""}`,
     failure: "The rotation edits could not be saved."
   }, async () => {
     const result = await dataStore.saveRotationDrafts(departmentId, changes);
     const resetIds = new Set(result.resetProfileIds);
-    state.rotationVersions = state.rotationVersions.filter(item => !resetIds.has(item.profileId));
+    const removedIds = new Set(result.removedRotationIds || []);
+    state.rotationVersions = state.rotationVersions.filter(item => !resetIds.has(item.profileId) && !removedIds.has(item.id));
     for (const rotation of result.rotations) {
       const existing = byId(state.rotationVersions, rotation.id) || state.rotationVersions.find(item => item.profileId === rotation.profileId && item.effectiveStart === rotation.effectiveStart);
       if (existing) Object.assign(existing, rotation);
@@ -5208,7 +5240,7 @@ async function saveRotationEditMode() {
 
 async function saveSchedulerLeadDrafts() {
   if (!ui.schedulerEditMode) {
-    notify("Turn on Edit Schedule before saving scheduler changes.", "error");
+    notify("Turn on Edit daily leads before saving lead assignments.", "error");
     return;
   }
   if (!canManageDepartment(ui.selectedDepartmentId)) return;
@@ -5272,10 +5304,6 @@ function bindDayEditorPreview() {
 
 async function saveDayBulkOverrides(event) {
   event.preventDefault();
-  if (!ui.schedulerEditMode) {
-    notify("Turn on Edit Schedule before changing daily schedules.", "error");
-    return;
-  }
   const date = ui.drawer.date;
   if (!canManageDepartment(ui.selectedDepartmentId) || !editableDate(date)) return;
   const form = new FormData(event.currentTarget);

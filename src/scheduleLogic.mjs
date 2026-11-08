@@ -90,6 +90,18 @@ export function applyExplicitLeadDays(pattern, profileId, leadDays) {
     : pattern[day] === profileId ? "" : pattern[day] || "");
 }
 
+export function rotationFutureVersions(state, departmentId, change, defaultStart) {
+  const start = change.effectiveStart || defaultStart;
+  const order = (a, b) => a.effectiveStart.localeCompare(b.effectiveStart) || a.id.localeCompare(b.id);
+  const snapshot = row => ({ id: row.id, effectiveStart: row.effectiveStart, pattern: [...row.pattern] });
+  if (change.action === "reset") return { rotations: [], leads: [] };
+  return {
+    rotations: state.rotationVersions.filter(row => row.profileId === change.profileId && row.effectiveStart > start && row.id !== change.sourceVersionId).sort(order).map(snapshot),
+    leads: change.preserveLeads ? [] : (state.departmentLeadRotations || []).filter(row => row.departmentId === departmentId && row.effectiveStart > start
+      && row.pattern.some((id, day) => change.leadDays?.[day] ? id !== change.profileId : id === change.profileId)).sort(order).map(snapshot)
+  };
+}
+
 // Used for unsaved previews and demo persistence; production validates again in the RPC.
 export function applyRotationDrafts(state, departmentId, changes, defaultStart) {
   const rotationVersions = structuredClone(state.rotationVersions);
@@ -103,6 +115,12 @@ export function applyRotationDrafts(state, departmentId, changes, defaultStart) 
       }
       departmentLeadRotations.forEach(row => { row.pattern = row.pattern.map(id => id === change.profileId ? "" : id); });
       continue;
+    }
+    if (change.futurePolicy === "replace") {
+      for (let i = rotationVersions.length - 1; i >= 0; i--) {
+        const row = rotationVersions[i];
+        if (row.profileId === change.profileId && row.effectiveStart > change.effectiveStart && row.id !== change.sourceVersionId) rotationVersions.splice(i, 1);
+      }
     }
     let existing;
     if (change.action === "move") {
@@ -137,6 +155,10 @@ export function applyRotationDrafts(state, departmentId, changes, defaultStart) 
       else departmentLeadRotations.push({ id: `draft-lead:${departmentId}:${change.effectiveStart}`, departmentId,
         effectiveStart: change.effectiveStart, pattern: after });
     }
+  }
+  for (const change of ordered.filter(item => item.futurePolicy === "replace" && item.action !== "reset" && !item.preserveLeads)) {
+    departmentLeadRotations.filter(row => row.departmentId === departmentId && row.effectiveStart >= change.effectiveStart)
+      .forEach(row => { row.pattern = applyExplicitLeadDays(row.pattern, change.profileId, change.leadDays); });
   }
   return { rotationVersions, departmentLeadRotations };
 }
