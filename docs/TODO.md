@@ -4,7 +4,6 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Apply `031_staged_rotation_changes.sql`, pass audit 019, and deploy shared rotation Save Changes with date correction.
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
@@ -40,6 +39,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] Applied migration 031 and passed all five audit 019 checks for atomic rotation drafts and saved-date correction.
 - [x] Built immediate rotation/Lead previews, changed-person markers, account-scoped pending drafts, shared date inheritance, one atomic department save, and targeted Admin saved-date correction.
 - [x] Applied migration 030 and passed all five audit 018 checks for explicit Lead choices and Admin rotation reset.
 - [x] Applied migration 029, passed all five audit 017 checks, and merged/deployed PR #31 for direct rotation editing and copy/paste.
