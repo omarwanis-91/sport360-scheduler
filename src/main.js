@@ -1,6 +1,7 @@
 import { seedState } from "./data.js";
 import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
+import { annualYear, annualBalanceImpact, deductDemoAnnual } from "./annualBalances.mjs";
 import {
   addDays as addDaysLogic,
   annualEligibleDates as annualEligibleDatesLogic,
@@ -2941,7 +2942,7 @@ function activityFilterButton(id, label, count) {
 
 function activityType(entry) {
   if (entry.action?.startsWith("schedule.") || entry.entityType === "schedule_override" || entry.entityType === "department_lead") return "schedule";
-  if (entry.action?.startsWith("vacation.") || entry.entityType === "vacation_request") return "vacation";
+  if (entry.action?.startsWith("vacation.") || entry.action?.startsWith("annual.") || entry.entityType === "vacation_request") return "vacation";
   if (entry.action?.startsWith("profile.") || entry.action?.startsWith("role.") || entry.entityType === "profile" || entry.entityType === "user_role") return "profile";
   if (entry.action?.startsWith("department.") || entry.entityType === "department") return "department";
   if (entry.action?.startsWith("rotation.") || entry.entityType === "rotation_version") return "rotation";
@@ -2950,12 +2951,15 @@ function activityType(entry) {
 
 function activityTypeLabel(entry) {
   const type = activityType(entry);
+  if (type === "vacation") return "Annual";
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 function activityVerb(entry) {
   const [scope, action = "updated"] = entry.action.split(".");
   const normalized = action.replace(/_/g, " ");
+  if (scope === "annual" && action === "year_renewed") return "Annual renewed";
+  if (scope === "annual" && action === "balance_adjusted") return "Annual balance adjusted";
   if (scope === "schedule" && action === "override") return "Schedule changed";
   if (scope === "schedule" && action === "override_cleared") return "Schedule cleared";
   if (scope === "vacation" && action === "requested") return "Annual requested";
@@ -3307,8 +3311,12 @@ function profileDrawer() {
         }).join("")}
         <small>Each selected department is equal for schedules, rotations, and hierarchy.</small>
       </fieldset>
-      <label>Annual allowance<input name="yearlyVacationDays" type="number" min="0" value="${profile?.yearlyVacationDays || 21}" ${canEditAdminFields ? "" : "disabled"}></label>
+      <input type="hidden" name="annualBalanceYear" value="${profile?.annualBalanceYear || annualYear()}">
+      <input type="hidden" name="expectedAnnualAllowance" value="${profile?.yearlyVacationDays ?? 21}">
+      <input type="hidden" name="expectedAnnualRemaining" value="${profile?.remainingVacationDays ?? 21}">
+      <label>Annual allowance<input name="yearlyVacationDays" type="number" min="0" value="${profile?.yearlyVacationDays ?? 21}" ${canEditAdminFields ? "" : "disabled"}></label>
       <label>Annual days left<input name="remainingVacationDays" type="number" min="0" value="${profile?.remainingVacationDays ?? profile?.yearlyVacationDays ?? 21}" ${canEditAdminFields ? "" : "disabled"}></label>
+      <p class="hint">${profile?.annualBalanceYear || annualYear()} balance · renews from the saved allowance on January 1, Cairo time.</p>
       ${canEditAdminFields && profile?.userId ? accessRole === "admin" ? `
         <label>Application access role<input value="Admin · sole account" disabled></label>
       ` : `
@@ -3508,12 +3516,15 @@ function vacationImpactForRequest(request, profile) {
   const changedRows = rows.filter((row) => row.changesToVacation);
   const lowCoverageRows = rows.filter((row) => row.changesToVacation && row.target > 0 && row.availableAfter < row.target);
   const deductedDays = request.status === "pending" ? changedRows.length : request.deductedDays;
+  const recordedCharges = request.status !== "pending" && Object.keys(request.deductedDaysByYear || {}).length ? request.deductedDaysByYear : undefined;
+  const yearBalances = annualBalanceImpact(state, profile, changedRows.map(row => row.date), recordedCharges);
+  if (request.status !== "pending") yearBalances.forEach(part => { part.after = part.before; });
   return {
     rows,
     changedRows,
     lowCoverageRows,
     deductedDays,
-    balanceAfter: request.status === "pending" ? profile.remainingVacationDays - deductedDays : profile.remainingVacationDays
+    yearBalances
   };
 }
 
@@ -3523,7 +3534,7 @@ function requestDetailDrawer() {
   const department = byId(state.departments, profile.departmentId);
   const impact = vacationImpactForRequest(request, profile);
   const approvable = request.status === "pending" && canManageProfileDepartment(profile);
-  const enoughBalance = impact.balanceAfter >= 0;
+  const enoughBalance = impact.yearBalances.every(part => part.after !== null && part.after >= 0);
   const hasCoverageRisk = impact.lowCoverageRows.length > 0;
   return `
     <div class="drawer-stack vacation-approval">
@@ -3542,11 +3553,11 @@ function requestDetailDrawer() {
         </div>
         <em>${impact.deductedDays} work days</em>
       </div>
-      <div class="approval-balance ${enoughBalance ? "" : "low"}">
-        <span><strong>${profile.remainingVacationDays}</strong> current annual balance</span>
-        <span><strong>-${impact.deductedDays}</strong> scheduled work days</span>
-        <span><strong>${impact.balanceAfter}</strong> after decision</span>
-      </div>
+      ${impact.yearBalances.map(part => `<div class="approval-balance ${part.after === null || part.after < 0 ? "low" : ""}">
+        <span><strong>${part.year}</strong> Annual balance: ${part.before ?? "Unavailable"}</span>
+        <span><strong>-${part.days}</strong> scheduled work days</span>
+        <span><strong>${part.after ?? "Review required"}</strong> ${request.status === "pending" ? "after decision" : "remaining"}</span>
+      </div>`).join("")}
       ${!enoughBalance ? `<p class="form-error">This request exceeds the employee's remaining annual balance.</p>` : ""}
       ${hasCoverageRisk ? `<div class="approval-risk"><strong>${impact.lowCoverageRows.length} coverage risk${impact.lowCoverageRows.length === 1 ? "" : "s"}</strong><span>Approval drops available people below target on highlighted dates.</span></div>` : ""}
       <p class="hint">${request.reason || "No reason provided."}</p>
@@ -3560,7 +3571,7 @@ function requestDetailDrawer() {
           ${impact.rows.map((row) => renderVacationImpactRow(row, request.status, profile.id)).join("")}
         </div>
       </div>
-      <button class="primary wide" data-approve-request="${request.id}" ${approvable && enoughBalance ? "" : "disabled"}>Approve & Deduct</button>
+      <button class="primary wide" data-approve-request="${request.id}" ${approvable && enoughBalance && impact.deductedDays > 0 ? "" : "disabled"}>Approve & Deduct</button>
       <button class="danger wide" data-reject-request="${request.id}" ${approvable ? "" : "disabled"}>Reject Request</button>
     </div>
   `;
@@ -4839,9 +4850,19 @@ async function saveProfile(event) {
     photoRef: existing?.photoRef || form.get("photoRef") || "",
     yearlyVacationDays: hadProfileAdmin ? Number(form.get("yearlyVacationDays")) : existing.yearlyVacationDays,
     remainingVacationDays: hadProfileAdmin ? Number(form.get("remainingVacationDays")) : existing.remainingVacationDays,
+    annualBalanceYear: existing?.annualBalanceYear || annualYear(),
     userId: existing?.userId || null
   };
   const previousPhotoRef = existing?.photoRef || "";
+  const annualExpectation = { expectedAnnualYear: Number(form.get("annualBalanceYear")),
+    expectedAnnualAllowance: Number(form.get("expectedAnnualAllowance")), expectedAnnualRemaining: Number(form.get("expectedAnnualRemaining")) };
+  if (hadProfileAdmin && existing && dataStore.mode === "demo" && (
+    annualExpectation.expectedAnnualYear !== annualYear() || annualExpectation.expectedAnnualYear !== existing.annualBalanceYear ||
+    annualExpectation.expectedAnnualAllowance !== existing.yearlyVacationDays || annualExpectation.expectedAnnualRemaining !== existing.remainingVacationDays
+  )) { notify("Annual balance changed. Refresh before editing so approved leave is preserved.", "error"); return; }
+  if (hadProfileAdmin && state.annualBalances?.some(b => b.profileId === profile.id && b.year > profile.annualBalanceYear && b.allowance - b.remaining > profile.yearlyVacationDays)) {
+    notify("Allowance cannot be lower than already approved future-year Annual.", "error"); return;
+  }
   await runMutation("profile-save", {
     pending: ui.pendingPhotoFile ? "Uploading photo and saving profile..." : "Saving profile...",
     success: existing ? "Profile saved." : "Profile created.",
@@ -4859,7 +4880,7 @@ async function saveProfile(event) {
         if (canEditProfileHierarchy && profile.seniorityLevel !== existing.seniorityLevel) {
           await dataStore.updateProfileHierarchy(profile);
         }
-      } else if (existing) await dataStore.updateProfile(profile);
+      } else if (existing) await dataStore.updateProfile({ ...profile, ...annualExpectation });
       else {
         await dataStore.createProfile(profile);
         if (hadProfileAdmin) await dataStore.setProfileDepartments(profile);
@@ -5200,13 +5221,13 @@ async function decideRequest(requestId, decision) {
     }
 
     const changedOverrides = [];
+    if (decision === "approved") request.deductedDaysByYear = deductDemoAnnual(state, profile, eligibleDates);
     request.status = decision;
     request.decidedBy = currentUser().id;
     request.decidedAt = new Date().toISOString();
     request.deductedDays = decision === "approved" ? days : 0;
 
     if (decision === "approved") {
-      profile.remainingVacationDays -= days;
       for (const date of eligibleDates) {
         const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
         const payload = { id: existing?.id || makeId("ovr"), profileId: profile.id, date, statusId: "vacation", note: `Vacation request ${request.id}` };
@@ -5567,14 +5588,16 @@ async function saveStatus(event) {
   });
 }
 
-async function reloadState() {
+async function reloadState(options = {}) {
+  const previousDepartmentId = ui.selectedDepartmentId;
   ui.loading = true;
   ui.error = "";
   render();
   try {
     state = await dataStore.load();
     normalizeStateForUi();
-    ui.selectedDepartmentId = state.departments[0]?.id;
+    ui.selectedDepartmentId = options.preserveDepartment && visibleDepartments().some(department => department.id === previousDepartmentId)
+      ? previousDepartmentId : state.departments[0]?.id;
     syncHierarchyDepartmentSelection();
   } catch (error) {
     ui.error = error.message || "Unable to load live scheduler data.";
@@ -5626,4 +5649,15 @@ async function boot() {
   }
 }
 
+let observedAnnualYear = annualYear();
+async function refreshAtAnnualBoundary() {
+  const year = annualYear();
+  if (year === observedAnnualYear || !dataStore || ui.loading || ui.drawer || isMutationPending()
+    || (dataStore.mode === "supabase" && !dataStore.session)) return;
+  observedAnnualYear = year;
+  await reloadState({ preserveDepartment: true });
+}
+setInterval(refreshAtAnnualBoundary, 60_000);
+window.addEventListener("focus", refreshAtAnnualBoundary);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) void refreshAtAnnualBoundary(); });
 boot();

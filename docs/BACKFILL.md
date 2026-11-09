@@ -9,13 +9,13 @@ Do not reconstruct schedules or create Annual requests for dates before November
 3. Set Annual days left to the actual current remainder, for example `5`.
 4. Save Profile and reopen it to verify `5 / 15`.
 
-This sets the balance directly. It does not create ten past Annual days, requests, or daily overrides, and it does not change rotations. The allowance persists until edited; the current balance is independently editable by Admin. Future approved Annual requests deduct their eligible days from this remainder.
+This sets the balance directly. It does not create ten past Annual days, requests, or daily overrides, and it does not change rotations. The allowance persists until edited; the current balance is independently editable by Admin. Approved Annual requests charge eligible days to the year of each leave date.
 
-Record the date represented by the opening balance. Leave already accounted for in that balance must not be approved again as historical requests. The application currently has no automatic new-year balance reset or separate yearly ledger; retaining the allowance does not automatically reset the remainder each January.
+Record the date represented by the opening balance. Leave already accounted for in that balance must not be approved again as historical requests. After migration 033/audit 021 and deployment, January 1 renews the budget from the saved allowance without carryover and keeps each previous year separately. Approved next-year days remain reserved: allowance 15 with two booked days opens with 13 available. See `docs/ANNUAL_RENEWAL.md` for activation and verification.
 
 The historical-entry procedure below is optional reference for a later explicit change of plan; it is not the current setup task.
 
-Use the existing Admin workflows for a small, reviewed backfill. This guide does not run an import. There is currently no bulk importer, historical request-timestamp editor, or separate Annual balance ledger per year.
+Use the existing Admin workflows for a small, reviewed backfill. This guide does not run an import. There is currently no bulk importer or historical request-timestamp editor. Per-year balances begin with the migration's opening year; earlier entitlement/balances are not inferred.
 
 ## 1. Resolve people and scope
 
@@ -29,9 +29,9 @@ Use the existing Admin workflows for a small, reviewed backfill. This guide does
 - Take a current Supabase export and verify restoration in a non-production project before a large production import. Follow `docs/PRODUCTION_RUNBOOK.md`. The living roadmap still records the full SQL export/restore gate as open; dashboard CSVs are a preview fallback, not a verified full restore.
 - Record each person's current Annual allowance, balance, existing approved requests, and any existing daily overrides in the import range. Pause overlapping edits during the controlled entry window.
 - Verify migration `028_harden_annual_eligibility.sql` with audit `supabase/audit/016_annual_eligibility_audit.sql` before relying on duplicate/overlap protection. Its application is not yet confirmed in the living TODO.
-- Every approved Annual request deducts eligible days from the person's one current balance, including requests dated in the past. Do not start with a balance that already deducts the same historical leave and then approve it again.
+- After migration 033, approved Annual deducts from each affected year's ledger. Do not start with a remainder that already deducts the same historical leave and then approve it again. Before migration 033 is activated, the legacy approval workflow deducts everything from the one current balance.
 - For a fresh, single-year setup, enter the agreed opening balance *before* the leave being imported. Example: opening balance 21, eligible imported Annual 5, expected balance afterward 16. Use Team → Directory → employee → Edit Profile → Annual days left, as Admin. Keep the allowance consistent with the person's actual entitlement.
-- If balances already reflect imported dates, or history spans several leave years, first prepare a reviewed reconciliation with the expected closing balance. Do not approve every prior-year request against the current-year balance or temporarily invent extra entitlement. A controlled historical import/balance adjustment may be needed beyond the current UI.
+- If balances already reflect imported dates, or history predates yearly tracking, first prepare a reviewed reconciliation with the expected closing balance. Do not invent earlier years' entitlements or temporarily add extra allowance. A controlled historical import/balance adjustment may be needed beyond the current UI.
 
 ## 3. Enter rotation history first
 

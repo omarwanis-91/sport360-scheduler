@@ -40,6 +40,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Recently Completed
 
+- [x] User confirmed migration 033 applied and all five audit 021 checks true on 2026-11-09, including the active named Cron job; the database gate for PR #36 is cleared.
+- [x] Built automatic Cairo calendar-year Annual renewal, retained per-year balances, year-scoped atomic deductions, stale-edit protection, and isolated database/browser tests.
 - [x] Added foldable department nesting, separate Hierarchy/Directory tabs, drag/drop and keyboard-accessible level editing, clearer unset job titles, and centered Team action buttons. No new migration or production-data changes.
 - [x] Applied migration 032 and passed all five audit 020 checks for later-version review and scoped Apply onward.
 - [x] Confirmed the targeted empty November 8 Lead version cleanup restored continuing November 1 Lead assignments; built explicit review to prevent silent later-version cutoffs.

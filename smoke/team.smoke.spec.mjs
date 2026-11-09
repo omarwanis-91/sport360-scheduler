@@ -144,5 +144,5 @@ test('remote hierarchy saves use the guarded RPC and rejected saves keep the ori
   await expect(page.locator('.app-notice.success')).toContainText('moved to Lead');
   await page.reload(); await openTeam(page);
   await expect(page.locator('.level-lead .hierarchy-person')).toContainText('Test Admin');
-  expect(writes.filter(name => !['claim_profile_for_current_user', 'list_profile_onboarding', 'update_profile_hierarchy'].includes(name))).toEqual([]);
+  expect(writes.filter(name => !['claim_profile_for_current_user', 'list_profile_onboarding', 'refresh_annual_balances', 'update_profile_hierarchy'].includes(name))).toEqual([]);
 });
