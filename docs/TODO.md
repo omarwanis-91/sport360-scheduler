@@ -4,6 +4,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
+- [ ] Apply `034_department_analytics.sql`, pass all five audit 022 rows, review/deploy the Analytics PR, then inspect Admin all-team/department views and Lead-only scope. Employees must have no Analytics access. See `docs/ANALYTICS.md`.
+
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.

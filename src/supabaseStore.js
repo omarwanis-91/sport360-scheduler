@@ -2,6 +2,7 @@ import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
 import { weeklyLeadPattern, applyExplicitLeadDays, applyRotationDrafts, rotationFutureVersions } from "./scheduleLogic.mjs";
 import { annualYear, syncDemoAnnualBalances } from "./annualBalances.mjs";
+import { scopedAnalyticsState } from "./analyticsLogic.mjs";
 
 const profilePhotoPrefix = "storage:profile-photos/";
 const onboardingPhotoPrefix = "storage:profile-onboarding-photos/";
@@ -21,6 +22,12 @@ function createLocalStore() {
   const storageKey = "sport360-scheduler-state";
   return {
     mode: "demo",
+    async getAnalytics(params) {
+      const state=await this.load();
+      const user=state.users.find(u=>u.id===state.currentUserId);
+      const role=state.userRoles?.find(r=>r.userId===user?.id)?.role || user?.role;
+      return scopedAnalyticsState(state,{...params,role,profileId:state.profiles.find(p=>p.userId===user?.id)?.id});
+    },
     async load() {
       const stored = localStorage.getItem(storageKey);
       const state = syncDemoAnnualBalances(stored ? JSON.parse(stored) : structuredClone(seedState));
@@ -120,6 +127,9 @@ function createLocalStore() {
 function createRemoteStore(client) {
   return {
     mode: "supabase",
+    async getAnalytics({year,departmentId,directOnly}) {
+      return client.rpc("get_schedule_analytics",{p_year:year,p_department_id:departmentId||null,p_direct_only:Boolean(directOnly)});
+    },
     client,
     passwordRecovery: client.getPasswordRecovery(),
     oauthCallback: client.getOAuthCallback(),

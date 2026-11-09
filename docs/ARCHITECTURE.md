@@ -15,6 +15,8 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 | `src/styles.css` | Full visual system and responsive layout. |
 | `src/supabaseStore.js` | Supabase REST/Auth client and persistence adapter. |
 | `src/annualBalances.mjs` | Cairo year calculation, per-year approval preview, and isolated demo renewal/deductions. |
+| `src/analyticsLogic.mjs` | Saved-schedule resolution using the Scheduler's pure helpers, scoped demo snapshots, aggregation, and safe CSV export. |
+| `src/analyticsView.mjs` | Native SVG Analytics charts, exact-value inspection, accessible data tables, and dashboard layout. |
 | `src/data.js` | Seed/demo state and initial domain data. |
 | `src/config.js` | Supabase and application configuration. |
 | `scripts/localServer.js` | Local static file server. |
@@ -196,6 +198,14 @@ Runtime environment values are not committed in frontend modules. `index.html` l
 - Admins may write any profile folder; other users may write only the folder matching their claimed profile ID.
 - Existing data URLs and external photo URLs remain readable as legacy fallback until each image is replaced.
 - Prelaunch submissions use the separate private `profile-onboarding-photos` bucket. Users may write only inside their Auth user folder; approved photos remain readable through the linked employee profile.
+
+## Schedule Analytics
+
+Migration 034 adds the read-only `get_schedule_analytics(year, department_id, direct_only)` RPC. It requires an authenticated, claimed Admin or Lead. Admin can select all people or a parent department plus descendants; Lead can select only directly assigned departments and their members. Shared members count once. Admin Lead Preview explicitly requests a direct-only snapshot to avoid inheriting Admin descendant visibility. Employee has neither the navigation nor RPC access. The response omits emails, private notes, request reasons, balances, and out-of-scope memberships.
+
+The RPC returns only required schedule fields for one calendar year, including the last effective rotation before the year. The client resolves shifts with existing Scheduler helpers rather than duplicating those rules in SQL. Month/quarter/year filters share the scoped yearly snapshot. Viewer/role/preview/scope/year keys and request tokens reject stale results; mutations, reload, sign-out, and explicit refresh invalidate the snapshot. An unavailable RPC is isolated to Analytics and does not block other views.
+
+Charts use native SVG and semantic HTML without a library or framework. Analytics counts saved planned person-days, not attendance or hours. Lead replaces the underlying working label; On Ground remains distinct. Unknown days are visible, fully unknown dates are gaps and excluded from weekday averages, and opening-balance deductions never become dated leave. Current memberships define historical scope; there are no historical membership snapshots. See `docs/ANALYTICS.md` for activation and definitions.
 
 ## Known Architectural Limits
 

@@ -508,3 +508,12 @@ At the start of each calendar year in Africa/Cairo, each person's Annual budget 
 Approval charges eligible dates to their own years atomically. Already approved next-year leave remains reserved, so a 15-day allowance with two booked next-year days opens at 13 available days, not 15 free days. Saved allowance changes adjust future-year budgets while leaving archived years intact and cannot undercut already approved future bookings. Current-year manual adjustment remains independent and Admin-only. A stale profile form cannot overwrite a renewed balance or concurrent deduction. No client can force a future-year reset.
 
 Requests predating yearly tracking cannot infer an opening balance from unknown history. Installation preserves existing current remainders and identifiable future reservations; inconsistent future Annual records fail preflight for explicit review instead of guessing. Rollover and manual adjustments are audited. Automatic renewal does not cancel requests, clear exceptions, rewrite rotations, or import pre-November schedules.
+
+## D-065 - Scoped Planned-Schedule Analytics
+
+**Date:** 2026-11-09
+**Status:** Accepted scope; migration 034 and audit 022 await production application
+
+Provide Analytics to the Admin and department Leads only. Admin can inspect the organization or a department subtree; Lead remains limited to direct departments, and Employee cannot invoke the analytics RPC. Use a sanitized, read-only yearly snapshot and the same effective-rotation, override, and Lead resolution helpers as the Scheduler. Never infer attendance, hours, productivity, or historical department membership that the system has not recorded.
+
+Count each person/date once. Lead replaces the underlying working-shift category; On Ground stays separate. Annual/Sick charts count saved dated leave, not pending requests or manual opening-balance deductions. Mark unknown schedules explicitly and do not turn missing history into zeros. Show monthly leave for the selected calendar year alongside the selected month/quarter/year staffing period, with explicit labels. Preserve the compact charcoal/red identity with restrained chart accents, accessible exact-value inspection and tables, and no chart dependency or framework migration.

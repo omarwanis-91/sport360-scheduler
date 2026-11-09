@@ -84,7 +84,7 @@ Phases 0-3 are complete. The project is in Phase 4: Production-Ready Internal Re
 
 **Status:** Current
 
-Feature development freezes after Phase 3 while this production hardening phase is completed.
+Feature development normally freezes after Phase 3 while this production hardening phase is completed. The user explicitly requested scoped schedule Analytics on 2026-11-09; that read-only addition is included without closing the remaining production gates.
 
 ### Scope
 
@@ -116,6 +116,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Confirm the existing Admin allowance/remainder fields support manual opening balances without fabricated leave. Current setup skips pre-November 2026 schedules.
 - ✅ Build automatic Cairo year renewal with preserved yearly balances, split-year approval deductions, audited manual changes, and protected stale edits; isolated database and browser verification accompanies the implementation.
 - ✅ User confirmed migration 033 applied and all five audit 021 checks true on 2026-11-09, including the active Supabase Cron job, clearing the database gate for the matching yearly-balance client in PR #36.
+- ⏳ Add Admin/Lead-only Analytics with saved shift mix, daily/weekday staffing, monthly dated leave, person totals, accessible SVG charts, and CSV. Apply migration 034, pass audit 022, review the client PR, and verify production scope before activation.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.
