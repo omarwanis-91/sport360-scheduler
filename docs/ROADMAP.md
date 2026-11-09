@@ -115,7 +115,7 @@ Feature development freezes after Phase 3 while this production hardening phase 
 - ✅ Refine Team with foldable parent/child departments, Hierarchy/Directory tabs, and authorized drag/menu hierarchy moves using the existing RPC. Document the historical-entry procedure without importing production data.
 - ✅ Confirm the existing Admin allowance/remainder fields support manual opening balances without fabricated leave. Current setup skips pre-November 2026 schedules.
 - ✅ Build automatic Cairo year renewal with preserved yearly balances, split-year approval deductions, audited manual changes, and protected stale edits; isolated database and browser verification accompanies the implementation.
-- ⏳ Apply migration 033, pass audit 021, verify the active Supabase Cron job, then deploy the matching yearly-balance client.
+- ✅ User confirmed migration 033 applied and all five audit 021 checks true on 2026-11-09, including the active Supabase Cron job, clearing the database gate for the matching yearly-balance client in PR #36.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.

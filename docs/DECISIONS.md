@@ -501,7 +501,7 @@ Skip schedule reconstruction before November 2026. Admin enters the recurring An
 ## D-064 - Automatic Annual Renewal With Preserved Year Records
 
 **Date:** 2026-11-08
-**Status:** Accepted; production activation awaits migration 033 and audit 021
+**Status:** Accepted; migration 033 and all five audit 021 checks confirmed by the user on 2026-11-09
 
 At the start of each calendar year in Africa/Cairo, each person's Annual budget renews from their saved allowance without carrying unused days forward. Keep the prior year's allowance, remaining balance, requests, deductions, and schedule records. Current manual opening balances are imported unchanged; first renewal after activation in November 2026 is January 1, 2027. A database job performs renewal even when no app is open; scoped startup catch-up handles missed jobs or a paused project after resumption.
 
