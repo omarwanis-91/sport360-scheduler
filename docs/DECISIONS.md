@@ -512,7 +512,7 @@ Requests predating yearly tracking cannot infer an opening balance from unknown 
 ## D-065 - Scoped Planned-Schedule Analytics
 
 **Date:** 2026-11-09
-**Status:** Accepted scope; migration 034 and audit 022 await production application
+**Status:** Accepted; migration 034 applied and all five audit 022 checks confirmed by the user on 2026-11-10
 
 Provide Analytics to the Admin and department Leads only. Admin can inspect the organization or a department subtree; Lead remains limited to direct departments, and Employee cannot invoke the analytics RPC. Use a sanitized, read-only yearly snapshot and the same effective-rotation, override, and Lead resolution helpers as the Scheduler. Never infer attendance, hours, productivity, or historical department membership that the system has not recorded.
 
