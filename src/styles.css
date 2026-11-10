@@ -73,7 +73,7 @@
 .analytics-line-wrap { position:relative; padding-top:8px; }
 .analytics-line-scroll { overflow-x:auto; scrollbar-width:thin; scrollbar-color:#78394e #171419; }
 .analytics-line { width:100%; min-width:600px; height:auto; display:block; overflow:visible; touch-action:pan-x pan-y; stroke:none; }
-.analytics-line text { fill:#c4baca; font:14px system-ui,sans-serif; }
+.analytics-line text { fill:#c4baca; font:18px system-ui,sans-serif; }
 .analytics-gridline { stroke:#ffffff12; stroke-dasharray:3 5; }
 .analytics-work-line,.analytics-leave-line { fill:none; stroke:#ef8da5; stroke-width:2.7; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
 .analytics-work-dot { fill:#f6b4c5; stroke:#ef8da5; stroke-width:1; cursor:crosshair; outline:none; }
