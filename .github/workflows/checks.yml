@@ -30,6 +30,9 @@ jobs:
       - name: Verify yearly Annual balances in isolated PostgreSQL
         run: npm run test:annual-db
 
+      - name: Verify Analytics role boundaries in isolated PostgreSQL
+        run: npm run test:analytics-db
+
       - name: Build production bundle
         run: npm run build
         env:

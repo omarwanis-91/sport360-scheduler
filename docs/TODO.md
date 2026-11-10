@@ -4,6 +4,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
+- [ ] Verify production Analytics after PR #37 deployment: inspect Admin all-team/department views and Lead-only scope. Employees must have no Analytics access. Migration 034 and all five audit 022 rows are confirmed applied. See `docs/ANALYTICS.md`.
+
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.
 - [ ] Deploy the matching role-scoped UI and Admin Role Preview, then verify Admin, Lead, and Employee boundaries in production.
 - [x] Keep the reviewed app available for internal preview at `https://sport360-scheduler.vercel.app`.
@@ -39,6 +41,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [ ] Phase 6: split decisions into individual ADR files when the current log becomes difficult to scan.
 
 ## Recently Completed
+
+- [x] User confirmed migration 034 applied and all five audit 022 checks true on 2026-11-10, clearing the Analytics database gate for PR #37.
 
 - [x] User confirmed migration 033 applied and all five audit 021 checks true on 2026-11-09, including the active named Cron job; the database gate for PR #36 is cleared.
 - [x] Built automatic Cairo calendar-year Annual renewal, retained per-year balances, year-scoped atomic deductions, stale-edit protection, and isolated database/browser tests.

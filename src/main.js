@@ -2,6 +2,8 @@ import { seedState } from "./data.js";
 import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
 import { annualYear, annualBalanceImpact, deductDemoAnnual } from "./annualBalances.mjs";
+import { analyticsRange, resolveAnalyticsDays, aggregateAnalytics, analyticsCsv } from "./analyticsLogic.mjs";
+import { renderAnalyticsDashboard, bindAnalyticsProbe } from "./analyticsView.mjs";
 import {
   addDays as addDaysLogic,
   annualEligibleDates as annualEligibleDatesLogic,
@@ -125,6 +127,7 @@ const ui = {
   notice: "",
   noticeKind: "info",
   rolePreview: null,
+  analytics: { month:todayIso.slice(0,7), period:"month", departmentId:"all", key:"", status:"idle", snapshot:null, days:null, model:null, error:"", token:0, sort:{key:"name",direction:"asc"} },
   rolePreviewDraftRole: "lead",
   rolePreviewDraftDepartmentId: "",
   mutation: { key: "", status: "idle", message: "" }
@@ -159,6 +162,7 @@ async function runMutation(key, messages, action) {
   render();
   try {
     const result = await action();
+    invalidateAnalytics();
     ui.mutation = { key, status: "success", message: messages.success };
     notify(messages.success, "success");
     return { ok: true, result };
@@ -973,6 +977,7 @@ function render() {
         ${navButton("requests", "Requests", icons.requests)}
         ${navButton("team", "Team", icons.people)}
         ${navButton("rotations", "Rotations", icons.rotations)}
+        ${canViewAnalytics() ? navButton("analytics", "Analytics", icons.activity) : ""}
         ${isAdmin() ? navButton("activity", "Activity", icons.activity) : ""}
         ${isAdmin() ? navButton("settings", "Settings", icons.settings) : ""}
       </nav>
@@ -1304,10 +1309,84 @@ function renderActiveView() {
   else if (ui.activeView === "requests") content = renderRequests();
   else if (["team", "people", "hierarchy", "departments"].includes(ui.activeView)) content = renderTeam();
   else if (ui.activeView === "rotations") content = renderRotations();
+  else if (ui.activeView === "analytics") content = renderAnalytics();
   else if (ui.activeView === "activity") content = renderActivity();
   else if (ui.activeView === "settings") content = renderSettings();
   else content = renderScheduler();
   return `<div class="view-stage${enteringClass}" data-active-view="${ui.activeView}">${content}</div>`;
+}
+
+function canViewAnalytics() { return isAdmin() || isLead(); }
+
+function invalidateAnalytics() {
+  const a=ui.analytics;
+  a.token++;a.key="";a.status="idle";a.snapshot=null;a.days=null;a.model=null;a.error="";
+}
+
+function analyticsContext() {
+  const a=ui.analytics;
+  const departments=visibleDepartments();
+  if(a.departmentId!=="all"&&!departments.some(d=>d.id===a.departmentId))a.departmentId="all";
+  const preview=isRolePreviewActive();
+  const departmentId=preview?ui.rolePreview.departmentId:a.departmentId==="all"?null:a.departmentId;
+  const year=analyticsRange(a.month,a.period).year;
+  const params={year,departmentId,directOnly:preview};
+  const key=JSON.stringify([state.currentUserId,effectiveRole(),preview?ui.rolePreview:null,params]);
+  return {params,key,departments};
+}
+
+function loadAnalytics(context) {
+  const a=ui.analytics,token=++a.token;
+  a.key=context.key;a.status="loading";a.snapshot=null;a.days=null;a.model=null;a.error="";
+  Promise.resolve().then(()=>dataStore.getAnalytics(context.params)).then(snapshot=>{
+    if(a.token!==token||!canViewAnalytics()||analyticsContext().key!==context.key)return;
+    a.snapshot=snapshot;a.days=resolveAnalyticsDays(snapshot);a.status="ready";a.justLoaded=true;
+    if(ui.activeView==="analytics")render();
+  }).catch(error=>{
+    if(a.token!==token||!canViewAnalytics()||analyticsContext().key!==context.key)return;
+    a.status="error";a.error=error.message||"Analytics could not load.";
+    if(ui.activeView==="analytics")render();
+  });
+}
+
+function renderAnalytics() {
+  if(!canViewAnalytics()){invalidateAnalytics();return `${renderTopbar("Analytics","Admin and Lead access only.","")}<section class="empty-state">You do not have access to Analytics.</section>`;}
+  const a=ui.analytics,context=analyticsContext();
+  if(a.key!==context.key)loadAnalytics(context);
+  const range=analyticsRange(a.month,a.period);
+  a.model=a.status==="ready"?aggregateAnalytics(a.snapshot,a.days,a.month,a.period):null;
+  const entering=a.justLoaded;a.justLoaded=false;
+  const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label><label>Month<input id="analytics-month" type="month" min="2000-01" max="2100-12" value="${a.month}"/></label><label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label><button class="ghost" id="analytics-refresh" aria-label="Refresh analytics">${icons.rotations}</button><button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button></div>`;
+  const scope=context.params.departmentId?context.departments.find(d=>d.id===context.params.departmentId)?.name:"All teams";
+  return `${renderTopbar("Analytics",`${escapeHtml(scope)} · ${range.label} · Planned from saved schedules`,controls)}
+    ${a.status==="error"?`<section class="empty-state analytics-error" role="alert"><strong>Analytics could not load</strong><span>${escapeHtml(a.error)}</span><span>For a new deployment, apply migration 034 and audit 022 first.</span><button class="primary" id="analytics-retry">Retry</button></section>`:a.model?renderAnalyticsDashboard(a.model,a.sort,entering):'<section class="analytics-loading" role="status" aria-live="polite"><span>Loading schedule analytics…</span><div></div><div></div><div></div></section>'}`;
+}
+
+function bindAnalyticsEvents() {
+  if(ui.activeView!=="analytics"||!canViewAnalytics())return;
+  const a=ui.analytics;
+  const updateAndFocus=selector=>{render();document.querySelector(selector)?.focus({preventScroll:true});};
+  for(const [selector,field] of [["#analytics-month","month"],["#analytics-period","period"],["#analytics-department","departmentId"]]) {
+    document.querySelector(selector)?.addEventListener("change",event=>{
+      if(!event.target.value||!event.target.checkValidity())return;
+      if(field==="month") {
+        try { analyticsRange(event.target.value); } catch { notify("Choose a month between January 2000 and December 2100.","warning");return; }
+      }
+      a[field]=event.target.value;updateAndFocus(selector);
+    });
+  }
+  for(const id of ["#analytics-retry","#analytics-refresh"])document.querySelector(id)?.addEventListener("click",()=>{invalidateAnalytics();render();});
+  document.querySelectorAll("[data-analytics-month]").forEach(button=>button.addEventListener("click",()=>{a.month=button.dataset.analyticsMonth;a.period="month";updateAndFocus(`[data-analytics-month="${a.month}"]`);}));
+  document.querySelectorAll("[data-analytics-sort]").forEach(button=>button.addEventListener("click",()=>{
+    const key=button.dataset.analyticsSort;
+    a.sort={key,direction:a.sort.key===key&&a.sort.direction==="asc"?"desc":"asc"};updateAndFocus(`[data-analytics-sort="${key}"]`);
+  }));
+  document.querySelector("#analytics-export")?.addEventListener("click",()=>{
+    if(!canViewAnalytics()||a.status!=="ready"||a.key!==analyticsContext().key||!a.model)return;
+    const url=URL.createObjectURL(new Blob([analyticsCsv(a.model)],{type:"text/csv;charset=utf-8"}));
+    const link=document.createElement("a");link.href=url;link.download=`sport360-analytics-${a.model.range.start}-${a.model.range.end}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
+  if(a.model)bindAnalyticsProbe(a.model);
 }
 
 function renderMyProfile() {
@@ -4061,6 +4140,7 @@ function closeDrawerWithMotion() {
 }
 
 function bindEvents() {
+  bindAnalyticsEvents();
   document.querySelectorAll("[data-exit-role-preview]").forEach((button) => {
     button.addEventListener("click", exitRolePreview);
   });
@@ -4341,6 +4421,7 @@ function bindEvents() {
   });
 
   document.querySelector("#user-switcher")?.addEventListener("change", (event) => {
+    invalidateAnalytics();
     ui.rotationClipboard = null;
     ui.rotationLeadDraftPattern = null;
     ui.rolePreview = null;
@@ -4733,6 +4814,7 @@ function bindAuthEvents() {
 }
 
 async function signOut() {
+  invalidateAnalytics();
   await runMutation("sign-out", {
     pending: "Signing out...",
     success: "Signed out.",
@@ -5589,6 +5671,7 @@ async function saveStatus(event) {
 }
 
 async function reloadState(options = {}) {
+  invalidateAnalytics();
   const previousDepartmentId = ui.selectedDepartmentId;
   ui.loading = true;
   ui.error = "";
