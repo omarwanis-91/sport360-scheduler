@@ -4,6 +4,9 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
+- [ ] Review and deploy the Analytics readability refinement: larger text/numbers, point popups, month/year dropdowns, fuller shift mix, and value-weighted soft glows. No new migration required.
+- [ ] Review the read-only onboarding diagnostic for the three reported signup accounts before creating or linking any operational profiles; avoid duplicate people and preserve Admin approval.
+
 - [ ] Verify production Analytics after PR #37 deployment: inspect Admin all-team/department views and Lead-only scope. Employees must have no Analytics access. Migration 034 and all five audit 022 rows are confirmed applied. See `docs/ANALYTICS.md`.
 
 - [ ] Apply `028_harden_annual_eligibility.sql` and pass audit 016 before relying on overlap protection in production.

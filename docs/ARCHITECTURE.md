@@ -207,6 +207,8 @@ The RPC returns only required schedule fields for one calendar year, including t
 
 Charts use native SVG and semantic HTML without a library or framework. Analytics counts saved planned person-days, not attendance or hours. Lead replaces the underlying working label; On Ground remains distinct. Unknown days are visible, fully unknown dates are gaps and excluded from weekday averages, and opening-balance deductions never become dated leave. Current memberships define historical scope; there are no historical membership snapshots. See `docs/ANALYTICS.md` for activation and definitions.
 
+Analytics inspection uses point-anchored HTML popups over the SVG, supporting hover, tap and roving keyboard focus (arrows/Home/End/Escape) without a date slider. Month and year are native dropdowns across browsers. Its larger reporting type scale and full-width people table stay scoped to Analytics CSS. SVG gradients and diffuse halos map opacity to nonzero values while retaining exact geometry and labels; zero values stay unlit. No persistence, schedule aggregation or authorization changes are involved in this refinement.
+
 ## Known Architectural Limits
 
 - `src/main.js` and `src/styles.css` are large and will eventually benefit from modularization.

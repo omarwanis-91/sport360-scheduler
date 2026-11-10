@@ -517,3 +517,12 @@ Requests predating yearly tracking cannot infer an opening balance from unknown 
 Provide Analytics to the Admin and department Leads only. Admin can inspect the organization or a department subtree; Lead remains limited to direct departments, and Employee cannot invoke the analytics RPC. Use a sanitized, read-only yearly snapshot and the same effective-rotation, override, and Lead resolution helpers as the Scheduler. Never infer attendance, hours, productivity, or historical department membership that the system has not recorded.
 
 Count each person/date once. Lead replaces the underlying working-shift category; On Ground stays separate. Annual/Sick charts count saved dated leave, not pending requests or manual opening-balance deductions. Mark unknown schedules explicitly and do not turn missing history into zeros. Show monthly leave for the selected calendar year alongside the selected month/quarter/year staffing period, with explicit labels. Preserve the compact charcoal/red identity with restrained chart accents, accessible exact-value inspection and tables, and no chart dependency or framework migration.
+
+## D-066 - Readable Analytics And Point Inspection
+
+**Date:** 2026-11-10
+**Status:** Accepted
+
+Use a larger reporting type scale, a full-width people table, and a larger gradient Shift mix chart with aligned values. Replace the date slider and detached readout with popups near actual daily chart points, available through hover, tap and keyboard navigation. Use explicit month/year dropdowns consistently in Chrome, Edge and Firefox. Keep the daily data table as an accessible alternative.
+
+Use broader, diffuse glows whose intensity follows the displayed value within its metric/series. Zero work/leave values remain unlit. Glows supplement exact counts and chart geometry; they do not change aggregation, category meanings, permissions, or stored data. Preserve the Sport360 dark palette and reduced-motion behavior.
