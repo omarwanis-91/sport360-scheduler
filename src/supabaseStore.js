@@ -2,6 +2,7 @@ import { appConfig, supabaseConfig } from "./config.js";
 import { seedState } from "./data.js";
 import { weeklyLeadPattern, applyExplicitLeadDays, applyRotationDrafts, rotationFutureVersions } from "./scheduleLogic.mjs";
 import { annualYear, syncDemoAnnualBalances } from "./annualBalances.mjs";
+import { normalizeDemoProfileStructure, profileTeamIds, derivedProfileTitle, isDepartmentContainer } from "./profileStructure.mjs";
 import { scopedAnalyticsState } from "./analyticsLogic.mjs";
 
 const profilePhotoPrefix = "storage:profile-photos/";
@@ -30,12 +31,12 @@ function createLocalStore() {
     },
     async load() {
       const stored = localStorage.getItem(storageKey);
-      const state = syncDemoAnnualBalances(stored ? JSON.parse(stored) : structuredClone(seedState));
+      const state = normalizeDemoProfileStructure(syncDemoAnnualBalances(stored ? JSON.parse(stored) : structuredClone(seedState)));
       localStorage.setItem(storageKey, JSON.stringify(state));
       return state;
     },
     async persist(state) {
-      localStorage.setItem(storageKey, JSON.stringify(syncDemoAnnualBalances(state)));
+      localStorage.setItem(storageKey, JSON.stringify(normalizeDemoProfileStructure(syncDemoAnnualBalances(state))));
     },
     async reset() {
       localStorage.removeItem(storageKey);
@@ -51,6 +52,19 @@ function createLocalStore() {
     async updateProfile() {},
     async updateOwnProfile() {},
     async updateProfileHierarchy() {},
+    async updateProfileStructure(profile) {
+      const stored=await this.load(),user=stored.users.find(u=>u.id===stored.currentUserId);
+      const role=stored.userRoles?.find(r=>r.userId===user?.id)?.role||user?.role;
+      const actor=stored.profiles.find(p=>p.userId===user?.id),before=stored.profiles.find(p=>p.id===profile.id);
+      const scope=profileTeamIds(stored,actor),prior=profileTeamIds(stored,before);
+      if(role!=="admin" && (role!=="lead" || actor?.seniorityLevel!=="manager" || !scope.length))throw new Error("Only Admin or a Manager with Lead access can change team structure");
+      if(role!=="admin" && (stored.userRoles?.find(r=>r.userId===before?.userId)?.role||stored.users.find(u=>u.id===before?.userId)?.role)==="admin")throw new Error("Only Admin can change the Admin profile");
+      if(profile.departmentIds.some(id=>isDepartmentContainer(stored,id)||!scope.includes(id)))throw new Error("Choose only your own teams");
+      if(profile.id===actor?.id && scope.some(id=>!profile.departmentIds.includes(id)))throw new Error("Managers cannot remove their own team access");
+      if(before.seniorityLevel!==profile.seniorityLevel && prior.some(id=>!scope.includes(id)))throw new Error("Position changes require management of all of this person's teams");
+      const departmentIds=[...new Set([...prior.filter(id=>!scope.includes(id)),...profile.departmentIds])];
+      return {...profile,departmentIds,departmentId:departmentIds[0]||null,title:derivedProfileTitle(stored,{...profile,departmentId:null,departmentIds})};
+    },
     async addProfileToDepartment() {},
     async removeProfileFromDepartment() {},
     async setProfileDepartments() {},
@@ -198,7 +212,10 @@ function createRemoteStore(client) {
       this.prelaunchRestricted = false;
     },
     async createProfile(profile) {
-      await client.insert("employee_profiles", toDbProfile(profile));
+      const row=await client.rpc("create_admin_team_profile",{p_profile_id:profile.id,p_email:profile.email,p_full_name:profile.name,
+        p_seniority_level:profile.seniorityLevel,p_department_ids:profile.departmentIds||[],p_photo_url:profile.photoRef||profile.photo||null,
+        p_yearly_vacation_days:profile.yearlyVacationDays,p_remaining_vacation_days:profile.remainingVacationDays});
+      return row?{...fromDbProfile(row),departmentIds:profile.departmentIds||[]}:null;
     },
     async updateProfile(profile) {
       const row = await client.rpc("save_admin_profile_annual", {
@@ -227,22 +244,33 @@ function createRemoteStore(client) {
       });
     },
     async updateProfileHierarchy(profile) {
-      await client.rpc("update_profile_hierarchy", {
+      const row=await client.rpc("update_profile_hierarchy", {
         p_profile_id: profile.id,
         p_seniority_level: profile.seniorityLevel
       });
+      return row?fromDbProfile(row):null;
+    },
+    async updateProfileStructure(profile,editOwnIdentity=false) {
+      const result=await client.rpc("save_managed_profile_structure",{p_profile_id:profile.id,p_seniority_level:profile.seniorityLevel,
+        p_department_ids:profile.departmentIds||[],p_full_name:editOwnIdentity?profile.name:null,p_photo_url:editOwnIdentity?profile.photoRef||profile.photo||null:null});
+      const mapped=fromDbProfile(result.profile);
+      mapped.departmentIds=result.department_ids||[];
+      mapped.structurePermissions={teams:result.can_edit_teams,position:result.can_edit_position};
+      return mapped;
     },
     async addProfileToDepartment(profileId, departmentId) {
-      await client.rpc("add_profile_to_department", {
+      const row=await client.rpc("add_profile_to_department", {
         p_profile_id: profileId,
         p_department_id: departmentId
       });
+      return row?fromDbProfile(row):null;
     },
     async removeProfileFromDepartment(profileId, departmentId) {
-      await client.rpc("remove_profile_from_department", {
+      const row=await client.rpc("remove_profile_from_department", {
         p_profile_id: profileId,
         p_department_id: departmentId
       });
+      return row?fromDbProfile(row):null;
     },
     async setProfileDepartments(profile) {
       await saveProfileMemberships(client, profile);
@@ -772,6 +800,10 @@ async function loadRemoteState(client, session) {
   }));
   const currentProfile = mappedProfiles.find((profile) => profile.userId === session.user.id);
   const currentRole = roles.find((role) => role.user_id === session.user.id);
+  if(currentRole?.role === "lead" && currentProfile?.seniorityLevel === "manager") {
+    const permissions=await client.rpc("get_profile_structure_permissions");
+    mappedProfiles.forEach(profile=>{const entry=(permissions||[]).find(row=>row.profile_id===profile.id);profile.structurePermissions={teams:entry?.can_edit_teams===true,position:entry?.can_edit_position===true};});
+  }
   const auditLog = currentRole?.role === "admin" ? await safeAuditLoad(client) : [];
   const onboardingSubmissions = currentRole?.role === "admin"
     ? await loadOnboardingSubmissions(client)
@@ -859,7 +891,7 @@ async function loadOnboardingSubmissions(client) {
 }
 
 function fromDbDepartment(row) {
-  return { id: row.id, name: row.name, parentDepartmentId: row.parent_department_id || null, coverageTarget: row.min_available_people ?? 1 };
+  return { id: row.id, name: row.name, parentDepartmentId: row.parent_department_id || null, coverageTarget: row.min_available_people ?? 1, isContainer:row.is_container===true };
 }
 
 function toDbDepartment(department) {

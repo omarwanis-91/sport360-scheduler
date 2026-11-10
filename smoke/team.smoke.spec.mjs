@@ -28,8 +28,8 @@ test('department parents nest correctly regardless of source order and folding p
   await expect(unit.locator(':scope > ul > li')).toHaveCount(2);
   await expect(unit.getByRole('button', { name: /Video Edit/ })).toBeVisible();
   await page.locator('[data-team-department="ops"]').click();
-  await expect(page.locator('.hierarchy-person[data-profile-id="emp-003"]')).toContainText('Job title not set');
-  expect((await stored(page)).profiles.find(p => p.id === 'emp-003').title).toBe('Pending assignment');
+  await expect(page.locator('.hierarchy-person[data-profile-id="emp-003"]')).toContainText('Video Editor');
+  expect((await stored(page)).profiles.find(p => p.id === 'emp-003').title).toBe('Video Editor');
   await page.getByRole('button', { name: 'Collapse Video Unit', exact: true }).click();
   await expect(unit.locator(':scope > ul')).toBeHidden();
   await expect(page.locator('#team-department-select')).toHaveValue('ops');
@@ -88,16 +88,17 @@ test('drag and level menu persist hierarchy only and do not open the profile aft
   const after = await stored(page);
   const changed = after.profiles.find(p => p.id === 'emp-003');
   expect(changed.seniorityLevel).toBe('lead');
-  expect({ ...changed, seniorityLevel: 'artist' }).toEqual(before.profiles.find(p => p.id === changed.id));
+  expect({ ...changed, seniorityLevel: 'artist', title:before.profiles.find(p=>p.id===changed.id).title }).toEqual(before.profiles.find(p => p.id === changed.id));
   for (const key of ['users', 'departments', 'rotationVersions', 'departmentLeadRotations', 'scheduleOverrides', 'vacationRequests']) expect(after[key]).toEqual(before[key]);
   await page.reload(); await openTeam(page);
   await expect(page.locator('.level-lead [data-hierarchy-drag="emp-003"]')).toBeVisible();
 });
 
-test('Lead edits remain department scoped and Employee and Role Preview cannot drag or change levels', async ({ page }) => {
+test('Manager with Lead access stays department scoped and Employee and Role Preview cannot drag or change levels', async ({ page }) => {
   await page.goto('/');
+  await page.evaluate(async()=>{const s=structuredClone((await import('/assets/data.js')).seedState);s.profiles[1].seniorityLevel='manager';localStorage.setItem('sport360-scheduler-state',JSON.stringify(s));});await page.reload();
   await page.locator('#user-switcher').selectOption('user-lead'); await openTeam(page);
-  await expect(page.locator('[data-hierarchy-drag]')).toHaveCount(3);
+  await expect(page.locator('[data-hierarchy-drag]')).toHaveCount(2);
   await expect(page.locator('[data-team-department="support"]')).toHaveCount(0);
   await expect(page.locator('[data-hierarchy-drag="emp-004"]')).toHaveCount(0);
   await page.getByLabel('Hierarchy level for Karim Adel', { exact: true }).selectOption('manager');

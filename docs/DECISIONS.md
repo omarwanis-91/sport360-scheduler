@@ -517,3 +517,14 @@ Requests predating yearly tracking cannot infer an opening balance from unknown 
 Provide Analytics to the Admin and department Leads only. Admin can inspect the organization or a department subtree; Lead remains limited to direct departments, and Employee cannot invoke the analytics RPC. Use a sanitized, read-only yearly snapshot and the same effective-rotation, override, and Lead resolution helpers as the Scheduler. Never infer attendance, hours, productivity, or historical department membership that the system has not recorded.
 
 Count each person/date once. Lead replaces the underlying working-shift category; On Ground stays separate. Annual/Sick charts count saved dated leave, not pending requests or manual opening-balance deductions. Mark unknown schedules explicitly and do not turn missing history into zeros. Show monthly leave for the selected calendar year alongside the selected month/quarter/year staffing period, with explicit labels. Preserve the compact charcoal/red identity with restrained chart accents, accessible exact-value inspection and tables, and no chart dependency or framework migration.
+
+## D-067 - Leaf Teams, Derived Titles, and Manager Structure Permissions
+
+**Date:** 2026-11-10
+**Status:** Accepted; migration 035 and audit 024 pending production application
+
+Video Unit is an organizational container, never a direct person assignment. Video Edit and Motion Graphics are leaf teams; a person may belong to either or both. Show concise leaf names in assignment controls and person tags. Derive operational Title from team and Artist/Lead/Manager position using the nine agreed mappings in `docs/TEAM_STRUCTURE.md`. Employee codes remain internal and existing codes are preserved.
+
+Admin may change all team structures. A non-Admin must have both Manager position and Lead access role; Manager with Employee access is insufficient. Limit membership changes to managed teams, preserve hidden memberships, and require management of every target team before changing a hybrid person's global position. Protect the sole Admin and manager self-access. Keep Role and Annual settings Admin-only; everyone retains own name/photo editing. Enforce these rules through guarded RPCs and triggers, including legacy paths, rather than relying on disabled controls.
+
+Open profile editing as a centered blocking modal with focus containment, restrained charcoal/red styling, separate sections, and larger Annual controls. Distinguish recurring allowance from the current year's remainder. Preflight parent-only assignments for explicit Admin reconciliation; never infer teams or disturb operational history. D-066 is reserved by the separate Analytics readability PR #38.

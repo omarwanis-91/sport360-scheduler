@@ -28,7 +28,11 @@ The sole unrestricted account. Manages departments, people, access roles, rotati
 
 ### Department Lead
 
-Reads and manages current and future schedules, rotations, hierarchy, memberships, and requests only for directly assigned departments.
+Reads and manages current and future schedules, rotations, and requests only for directly assigned teams. Changing team membership or position additionally requires Manager position. Role and Annual balance changes remain Admin-only.
+
+### Team structure
+
+Video Unit contains Video Edit and Motion Graphics; people belong to either team or both, never directly to the container. Artist, Lead, and Manager are positions, separate from access roles. Titles follow team and position automatically. A Manager with Employee access cannot change structure; a Manager with Lead access can manage their own teams. Changing a hybrid person's global position requires management of both teams.
 
 ### Employee
 
