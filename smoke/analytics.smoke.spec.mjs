@@ -152,8 +152,9 @@ for(const width of [375,768,1024,1280,1920])test(`Analytics viewport ${width}: n
   await page.setViewportSize({width,height:1000});await open(page);
   await expect(page.locator('.analytics-kpi')).toHaveCount(4);await expect(page.getByRole('heading',{name:'Daily staffing',exact:true})).toBeVisible();
   const chart=await page.locator('.analytics-line').boundingBox();expect(chart.height).toBeGreaterThan(width<600?70:100);
-  const axisSize=await page.locator('.analytics-line').evaluate(svg=>parseFloat(getComputedStyle(svg.querySelector('text')).fontSize)*svg.getBoundingClientRect().width/svg.viewBox.baseVal.width);
+  // Measure the laid-out text size, excluding the brief entrance animation's scale.
+  const axisSize=await page.locator('.analytics-line').evaluate(svg=>parseFloat(getComputedStyle(svg.querySelector('text')).fontSize)*svg.clientWidth/svg.viewBox.baseVal.width);
   expect(axisSize).toBeGreaterThanOrEqual(12.5);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
-  await page.screenshot({path:`test-results/analytics-${width}.png`,fullPage:true});
+  await page.screenshot({path:`test-results/analytics-${width}.png`,fullPage:true,animations:'disabled'});
 });
