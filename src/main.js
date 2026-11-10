@@ -1356,7 +1356,9 @@ function renderAnalytics() {
   const range=analyticsRange(a.month,a.period);
   a.model=a.status==="ready"?aggregateAnalytics(a.snapshot,a.days,a.month,a.period):null;
   const entering=a.justLoaded;a.justLoaded=false;
-  const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label><label>Month<input id="analytics-month" type="month" min="2000-01" max="2100-12" value="${a.month}"/></label><label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label><button class="ghost" id="analytics-refresh" aria-label="Refresh analytics">${icons.rotations}</button><button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button></div>`;
+  const months=Array.from({length:12},(_,index)=>{const id=String(index+1).padStart(2,"0");return `<option value="${id}" ${a.month.slice(5)===id?"selected":""}>${new Date(2026,index,1).toLocaleDateString("en-GB",{month:"long"})}</option>`;}).join("");
+  const years=Array.from({length:101},(_,index)=>2000+index).map(year=>`<option value="${year}" ${range.year===year?"selected":""}>${year}</option>`).join("");
+  const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label><label>Month<select id="analytics-month">${months}</select></label><label>Year<select id="analytics-year">${years}</select></label><label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label><button class="ghost" id="analytics-refresh" aria-label="Refresh analytics">${icons.rotations}</button><button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button></div>`;
   const scope=context.params.departmentId?context.departments.find(d=>d.id===context.params.departmentId)?.name:"All teams";
   return `${renderTopbar("Analytics",`${escapeHtml(scope)} · ${range.label} · Planned from saved schedules`,controls)}
     ${a.status==="error"?`<section class="empty-state analytics-error" role="alert"><strong>Analytics could not load</strong><span>${escapeHtml(a.error)}</span><span>For a new deployment, apply migration 034 and audit 022 first.</span><button class="primary" id="analytics-retry">Retry</button></section>`:a.model?renderAnalyticsDashboard(a.model,a.sort,entering):'<section class="analytics-loading" role="status" aria-live="polite"><span>Loading schedule analytics…</span><div></div><div></div><div></div></section>'}`;
@@ -1366,13 +1368,13 @@ function bindAnalyticsEvents() {
   if(ui.activeView!=="analytics"||!canViewAnalytics())return;
   const a=ui.analytics;
   const updateAndFocus=selector=>{render();document.querySelector(selector)?.focus({preventScroll:true});};
-  for(const [selector,field] of [["#analytics-month","month"],["#analytics-period","period"],["#analytics-department","departmentId"]]) {
+  for(const [selector,field] of [["#analytics-month","monthPart"],["#analytics-year","year"],["#analytics-period","period"],["#analytics-department","departmentId"]]) {
     document.querySelector(selector)?.addEventListener("change",event=>{
       if(!event.target.value||!event.target.checkValidity())return;
-      if(field==="month") {
-        try { analyticsRange(event.target.value); } catch { notify("Choose a month between January 2000 and December 2100.","warning");return; }
-      }
-      a[field]=event.target.value;updateAndFocus(selector);
+      if(field==="monthPart") a.month=`${a.month.slice(0,4)}-${event.target.value}`;
+      else if(field==="year") a.month=`${event.target.value}-${a.month.slice(5)}`;
+      else a[field]=event.target.value;
+      updateAndFocus(selector);
     });
   }
   for(const id of ["#analytics-retry","#analytics-refresh"])document.querySelector(id)?.addEventListener("click",()=>{invalidateAnalytics();render();});
