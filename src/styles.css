@@ -8613,6 +8613,33 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 }
 
 .week-band.week-group-start { margin-left: var(--week-boundary-inset); }
+
+.schedule-team-divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  margin-top: 5px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.schedule-team-divider h2 {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  margin: 0;
+  padding: 6px 12px;
+  border-left: 2px solid #b45e75;
+  background: #19171b;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.schedule-grid .schedule-team-divider h2 { left: 8px; }
+
 .rotation-future-list { display: grid; gap: 10px; max-height: 35vh; overflow: auto; }
 .rotation-future-list > div { display: grid; gap: 4px; padding: 10px; border-left: 2px solid #b45e75; background: rgba(164, 65, 90, .07); font-size: 12px; }
 .rotation-future-list small, .rotation-future-list span { color: var(--muted); }

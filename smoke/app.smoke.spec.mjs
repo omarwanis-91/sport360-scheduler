@@ -765,7 +765,7 @@ test("profile title and multiple department memberships persist in the UI", asyn
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
   await page.locator("#department-select").selectOption("support");
-  await expect(page.getByRole("button", { name: "OW Omar Wanis Manager - 22 annual days", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "OW Omar Wanis Manager", exact: true })).toBeVisible();
 });
 
 test("admins can delete pseudo profiles", async ({ page }) => {
