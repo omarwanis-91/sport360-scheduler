@@ -33,7 +33,7 @@ jobs:
       - name: Verify Analytics role boundaries in isolated PostgreSQL
         run: npm run test:analytics-db
 
-      - name: Verify Team structure and profile rules in isolated PostgreSQL
+      - name: Verify Team structure, Low Days, and holidays in isolated PostgreSQL
         run: npm run test:structure-db
 
       - name: Build production bundle

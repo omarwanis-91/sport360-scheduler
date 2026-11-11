@@ -528,3 +528,12 @@ Video Unit is an organizational container, never a direct person assignment. Vid
 Admin may change all team structures. A non-Admin must have both Manager position and Lead access role; Manager with Employee access is insufficient. Limit membership changes to managed teams, preserve hidden memberships, and require management of every target team before changing a hybrid person's global position. Protect the sole Admin and manager self-access. Keep Role and Annual settings Admin-only; everyone retains own name/photo editing. Enforce these rules through guarded RPCs and triggers, including legacy paths, rather than relying on disabled controls.
 
 Open profile editing as a centered blocking modal with focus containment, restrained charcoal/red styling, separate sections, and larger Annual controls. Distinguish recurring allowance from the current year's remainder. Preflight parent-only assignments for explicit Admin reconciliation; never infer teams or disturb operational history. D-066 is reserved by the separate Analytics readability PR #38.
+
+## D-068 - Low Days Deadlines and Public Holidays
+
+**Date:** 2026-11-11
+**Status:** Accepted
+
+Confirming work on a scheduled day off or a configured public holiday records the working shift and earns one Low Days credit per person and worked date. The replacement day must be taken by the date 30 calendar days after work, inclusive, using the Cairo calendar. The replacement is a separate schedule exception with no Annual deduction. Admin and Leads can book, move, or cancel an upcoming replacement within their team scope. Past bookings and earned credits remain in history. Overdue credits remain visible for review and the deadline stays enforced.
+
+Show due-soon credits within seven days and overdue credits in Team Alerts for Admin and Leads. Employees see their own balance and deadlines in My Profile. Admin enters the observed holiday name and date, chooses organization-wide or selected teams, and decides between a day off and scheduled coverage. Existing daily changes take precedence. Holiday days off and replacement days are excluded from Annual eligibility and treated as known off days in Analytics.

@@ -198,32 +198,55 @@ export function departmentLeadForDate(state, departmentId, dateIso) {
   return { profile, source: rotation && profile ? "Lead rotation" : "Unassigned", rotation };
 }
 
+export function publicHolidayForProfile(state, profileId, dateIso) {
+  const holiday = state.publicHolidays?.find((item) => item.date === dateIso);
+  if (!holiday) return null;
+  if (holiday.organizationWide) return holiday;
+  const applies = Array.isArray(holiday.profileIds)
+    ? holiday.profileIds.includes(profileId)
+    : profileDepartmentIds(byId(state.profiles, profileId)).some((id) => holiday.departmentIds.includes(id));
+  return applies ? holiday : null;
+}
+
 export function scheduleFor(state, profileId, dateIso) {
   const override = state.scheduleOverrides.find((entry) => entry.profileId === profileId && entry.date === dateIso);
   const rotation = activeRotation(state.rotationVersions, profileId, dateIso);
   const rotationStatus = rotation ? byId(state.statuses, rotation.pattern.length === 7
     ? rotation.pattern[weekdayIndex(dateIso)]
     : rotation.pattern[Math.max(0, dateDiff(rotation.effectiveStart, dateIso)) % rotation.pattern.length]) : null;
+  const confirmedWork = state.lowDayCredits?.some((credit) => credit.profileId === profileId && credit.workedDate === dateIso);
 
   if (override) {
+    if (override.statusId === "low_day") {
+      return { id: "low_day", label: "Replacement Day", kind: "off", color: "#ad89ce",
+        source: "Low Days", note: override.note, override, rotation, rotationStatus };
+    }
     return {
       ...byId(state.statuses, override.statusId),
       source: "Override",
       note: override.note,
+      confirmedWork,
       override,
       rotation,
       rotationStatus
     };
   }
 
+  const holiday = publicHolidayForProfile(state, profileId, dateIso);
+  if (holiday?.dayOff) {
+    return { id: "public_holiday", label: "Public Holiday", kind: "off", color: "#d4ac74",
+      source: "Public holiday", note: holiday.name, rotation, rotationStatus };
+  }
+
   if (!rotation) return { id: "empty", label: "Unassigned", color: "#3f3f46", kind: "off", source: "No rotation" };
 
-  return { ...rotationStatus, source: "Rotation", rotation, rotationStatus };
+  return { ...rotationStatus, source: "Rotation", rotation, rotationStatus, confirmedWork };
 }
 
 export function isAnnualEligibleSchedule(schedule) {
   return Boolean(
     schedule?.kind === "working"
+    && !schedule.confirmedWork
     && !["weekend", "sick", "vacation"].includes(schedule.id)
   );
 }

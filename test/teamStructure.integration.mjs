@@ -115,4 +115,96 @@ await db.exec('reset role');selectedRole='postgres';equal(await original(),befor
 await login(admin);
 await rows('select public.create_admin_team_profile($1,$2,$3,$4,$5::uuid[],null,18,7)',[id(80),'new@test','New Hybrid','lead',`{${edit},${motion}}`]);
 const created=await profile(id(80));equal(created.title,'Lead Hybrid');equal(created.yearly_vacation_days,18);equal(created.remaining_vacation_days,7);assert.match(created.employee_code,/^SCH-/);checks++;
-await db.close();console.log(`${checks} team structure PostgreSQL checks passed.`);
+console.log(`${checks} team structure PostgreSQL checks passed.`);
+const beforeCalendarChecks = checks;
+await db.exec('reset role');
+selectedRole = 'postgres';
+await db.exec(file('../supabase/migrations/014_profile_seniority_and_lead_rotations.sql')
+  .match(/create table if not exists public\.department_lead_rotation_versions \([\s\S]+?\n\);/i)[0]);
+const annualGuard = file('../supabase/migrations/028_harden_annual_eligibility.sql');
+await db.exec(annualGuard.slice(annualGuard.indexOf('create or replace function public.validate_vacation_request_eligibility'),
+  annualGuard.indexOf('create or replace function public.decide_vacation_request')));
+await db.exec(file('../supabase/migrations/034_department_analytics.sql'));
+await db.exec(file('../supabase/migrations/036_low_days_and_public_holidays.sql'));
+const at = async (days) => (await rows("select ((now() at time zone 'Africa/Cairo')::date + $1::int)::text as value", [days]))[0].value;
+const [worked, holidayWork, overdueWork, today, replacement, closedDate, staffedDate, deadline, tooLate] =
+  await Promise.all([-24, -23, -35, 0, 1, 2, 3, 6, 7].map(at));
+const calendar = async () => (await rows('select public.get_low_day_calendar() value'))[0].value;
+const saveHoliday = async (date, name, teamIds, off) =>
+  (await rows('select public.save_public_holiday(null,$1,$2,$3::uuid[],$4) value', [date, name, teamIds, off]))[0].value;
+const confirm = async (person, day, shift = 'night') =>
+  (await rows('select public.confirm_low_day_work($1,$2,$3,$4) value', [person, day, shift, 'Confirmed work']))[0].value;
+const book = async (credit, date) =>
+  (await rows('select public.book_low_day($1,$2) value', [credit, date]))[0].value;
+const eligible = async (person, date) => (await inspect('select * from public.annual_eligible_dates($1,$2,$2)', [person, date])).length;
+
+const audit = await rows(file('../supabase/audit/025_low_days_and_public_holidays_audit.sql'));
+equal(audit.map((result) => result.passed), [true, true, true, true, true]);
+await rows('delete from public.rotation_versions where profile_id = $1', [pe]);
+await rows('delete from public.schedule_overrides where profile_id = $1', [pe]);
+await rows("insert into public.rotation_versions(profile_id,effective_start,pattern) select id,$1,array_fill('morning'::text,array[7]) from public.employee_profiles where id=any($2::uuid[])",
+  [await at(-90), [pe, phm, outsider]]);
+await rows("insert into public.schedule_overrides(profile_id,shift_date,status_id,note) values($1,$2,'weekend','Off'),($1,$3,'weekend','Off'),($1,$4,'midday','Keep this schedule'),($1,$5,'vacation','Approved Annual')",
+  [pe, worked, overdueWork, replacement, staffedDate]);
+const balanceBefore = (await profile()).remaining_vacation_days;
+
+await login(lead);
+await deny(() => saveHoliday(holidayWork, 'Lead cannot add a holiday', [], true), /Only Admin/);
+await deny(() => confirm(outsider, worked), /only confirm work/);
+await deny(() => confirm(pe, replacement), /already started/);
+await deny(() => confirm(pe, today), /scheduled day off or public holiday/);
+await login(admin);
+await deny(() => saveHoliday(closedDate, 'Container is invalid', [unit], true), /leaf teams/);
+equal((await saveHoliday(closedDate, 'Motion closed', [motion], true)).holidays[0].name, 'Motion closed');
+await saveHoliday(holidayWork, 'Organization coverage', [], false);
+await saveHoliday(staffedDate, 'Video closure', [edit], true);
+await deny(() => saveHoliday(closedDate, 'Duplicate', [], false), /already a public holiday/);
+equal(await eligible(pe, closedDate), 1);
+equal(await eligible(phm, closedDate), 0);
+equal(await eligible(outsider, closedDate), 1);
+equal(await eligible(pe, staffedDate), 0);
+
+await login(lead);
+const snapshot = (await rows("select public.get_schedule_analytics(extract(year from $1::date)::int,$2) value", [closedDate, edit]))[0].value;
+const scopedHoliday = snapshot.publicHolidays.find((holiday) => holiday.date === closedDate);
+equal(scopedHoliday.profileIds.includes(phm), true);
+equal(scopedHoliday.profileIds.includes(pe), false);
+equal(scopedHoliday.departmentIds, []);
+const earned = (await confirm(pe, worked)).credit;
+equal(earned.due_date, deadline);
+equal(earned.reason, 'day_off');
+equal(await eligible(pe, worked), 0);
+await deny(() => confirm(pe, worked), /already exists/);
+equal((await confirm(pe, holidayWork)).credit.reason, 'public_holiday');
+const overdue = (await confirm(pe, overdueWork)).credit;
+await deny(() => book(overdue.id, today), /upcoming working day/);
+await deny(() => book(earned.id, tooLate), /upcoming working day/);
+await deny(() => book(earned.id, staffedDate), /regular working day/);
+const booked = await book(earned.id, replacement);
+equal(booked.override.status_id, 'low_day');
+equal(await eligible(pe, replacement), 0);
+await deny(() => rows("update public.schedule_overrides set status_id='morning' where id=$1", [booked.override.id]), /Team Alerts/);
+await deny(() => rows('delete from public.schedule_overrides where id=$1', [booked.override.id]), /Team Alerts/);
+await login(admin);
+await deny(() => saveHoliday(replacement, 'Overlapping holiday', [], true), /replacement day is booked/);
+await deny(() => rows("insert into public.schedule_overrides(profile_id,shift_date,status_id) values($1,$2,'low_day')", [pe, tooLate]), /Team Alerts/);
+await login(artist);
+equal((await calendar()).credits.length, 3);
+await deny(() => rows('insert into public.vacation_requests(profile_id,start_date,end_date) values($1,$2,$2)', [pe, replacement]), /eligible working day/);
+await deny(() => book(earned.id, deadline), /only book replacement/);
+await deny(() => confirm(pe, worked), /only confirm work/);
+await deny(() => rows('select * from public.low_day_credits'), /permission denied/);
+await login(lead);
+const moved = await book(earned.id, deadline);
+equal(moved.credit.replacement_date, deadline);
+equal(moved.restoredOverride.note, 'Keep this schedule');
+equal(moved.restoredOverride.status_id, 'midday');
+equal(await eligible(pe, deadline), 0);
+equal((await book(earned.id, null)).credit.replacement_date, null);
+equal(await eligible(pe, deadline), 1);
+equal(await eligible(pe, replacement), 1);
+equal((await profile()).remaining_vacation_days, balanceBefore);
+await login(null, 'anon');
+await deny(calendar, /permission denied/);
+await db.close();
+console.log(`${checks - beforeCalendarChecks} Low Days and public holidays PostgreSQL checks passed.`);
