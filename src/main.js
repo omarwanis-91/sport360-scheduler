@@ -1663,6 +1663,38 @@ function renderTopbar(title, subtitle, action = "") {
   `;
 }
 
+function renderDepartmentScheduleRows(department, profiles, renderRow) {
+  if (department?.name.trim().toLowerCase() !== "video unit") {
+    return profiles.map(renderRow).join("");
+  }
+
+  const scope = new Set(departmentScopeIds(department.id));
+  const videoEdit = new Set();
+  const motionGraphics = new Set();
+  for (const team of assignableDepartments(state)) {
+    if (!scope.has(team.id)) continue;
+    const name = team.name.trim().toLowerCase();
+    if (name === "video edit") videoEdit.add(team.id);
+    if (name === "motion graphics" || name === "motion") motionGraphics.add(team.id);
+  }
+
+  const groups = { "Video Edit": [], Hybrid: [], "Other teams": [], "Motion Graphics": [] };
+  for (const profile of profiles) {
+    const teams = profileDepartmentIds(profile);
+    const edits = teams.some((id) => videoEdit.has(id));
+    const animates = teams.some((id) => motionGraphics.has(id));
+    if (edits && animates) groups.Hybrid.push(profile);
+    else if (edits) groups["Video Edit"].push(profile);
+    else if (animates) groups["Motion Graphics"].push(profile);
+    else groups["Other teams"].push(profile);
+  }
+
+  return Object.entries(groups).filter(([, members]) => members.length).map(([label, members]) => `
+    <div class="schedule-team-divider"><h2>${label}</h2></div>
+    ${members.map(renderRow).join("")}
+  `).join("");
+}
+
 function renderScheduler() {
   const dates = datesInRange();
   const profiles = departmentProfiles();
@@ -1708,7 +1740,7 @@ function renderScheduler() {
           <strong>${profiles.length} profiles</strong>
         </div>
         ${dates.map((date) => renderDateHead(date)).join("")}
-        ${profiles.map((profile) => renderProfileRow(profile, dates)).join("")}
+        ${renderDepartmentScheduleRows(department, profiles, (profile) => renderProfileRow(profile, dates))}
       </div>
     </section>
   `;
@@ -1773,7 +1805,7 @@ function renderProfileRow(profile, dates) {
       <div class="avatar">${avatar(profile)}</div>
       <div>
         <strong>${profile.name}</strong>
-        <span>${profile.title} - ${profile.remainingVacationDays} annual days</span>
+        <span>${escapeHtml(profile.title)}</span>
       </div>
     </button>
     ${dates.map((date) => renderShiftCell(profile, date)).join("")}
@@ -2553,7 +2585,7 @@ function renderRotationWorkspace(department = byId(state.departments, ui.selecte
           <strong>${department?.name || "Department"}</strong>
         </div>
         ${weekDays.map((day) => `<div class="rotation-day-head">${day}</div>`).join("")}
-        ${profiles.map(renderRotationRow).join("")}
+        ${renderDepartmentScheduleRows(department, profiles, renderRotationRow)}
       </div>
     </section>
   `;

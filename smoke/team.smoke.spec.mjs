@@ -10,6 +10,63 @@ async function stored(page) {
   return page.evaluate(async () => JSON.parse(localStorage.getItem('sport360-scheduler-state')) || (await import('/assets/data.js')).seedState);
 }
 
+test('Video Unit groups both grids in team order and shows hybrid people once', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const state = structuredClone((await import('/assets/data.js')).seedState);
+    state.departments = [
+      { id: 'unit', name: 'Video Unit' },
+      { id: 'ops', name: 'Video Edit', parentDepartmentId: 'unit' },
+      { id: 'support', name: 'Motion Graphics', parentDepartmentId: 'unit' },
+      { id: 'field', name: 'Field Team' }
+    ];
+    const hybrid = state.profiles.find((profile) => profile.id === 'emp-001');
+    hybrid.departmentId = 'support';
+    hybrid.departmentIds = ['support', 'ops'];
+    localStorage.setItem('sport360-scheduler-state', JSON.stringify(state));
+  });
+  await page.reload();
+
+  for (const [view, gridSelector, scrollSelector] of [
+    ['Scheduler', '.schedule-grid', '.scheduler-shell'],
+    ['Rotations', '.rotation-grid', '.rotation-board']
+  ]) {
+    await page.getByRole('button', { name: view, exact: true }).click();
+    await page.locator('#department-select').selectOption('unit');
+    const grid = page.locator(gridSelector);
+    const rows = grid.locator(':scope > .schedule-team-divider, :scope > .employee-cell');
+    expect(await rows.evaluateAll((elements) => elements.map((element) =>
+      element.dataset.rotationPerson || element.dataset.profileId || element.textContent.trim()
+    ))).toEqual(['Video Edit', 'emp-002', 'emp-003', 'Hybrid', 'emp-001', 'Motion Graphics', 'emp-004']);
+
+    const scroller = page.locator(scrollSelector);
+    const groupHeading = grid.getByRole('heading', { name: 'Hybrid', exact: true });
+    await groupHeading.scrollIntoViewIfNeeded();
+    await scroller.evaluate((element) => { element.scrollLeft = 320; });
+    await expect(groupHeading).toBeInViewport();
+    const alignment = await scroller.evaluate((element) => {
+      const row = element.querySelector('.schedule-team-divider');
+      const firstPerson = row.nextElementSibling;
+      const firstDay = firstPerson.nextElementSibling;
+      return {
+        scroll: element.scrollLeft,
+        labelOffset: row.firstElementChild.getBoundingClientRect().left - element.getBoundingClientRect().left,
+        rowOffset: Math.abs(firstPerson.getBoundingClientRect().top - firstDay.getBoundingClientRect().top)
+      };
+    });
+    expect(alignment.scroll).toBeGreaterThan(0);
+    expect(alignment.labelOffset).toBeGreaterThanOrEqual(0);
+    expect(alignment.labelOffset).toBeLessThan(20);
+    expect(alignment.rowOffset).toBeLessThan(1);
+
+    await page.locator('#department-select').selectOption('ops');
+    await expect(grid.locator('.schedule-team-divider')).toHaveCount(0);
+    await expect(grid.locator('.employee-cell')).toHaveCount(3);
+  }
+});
+
 test('department parents nest correctly regardless of source order and folding preserves selection', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(async () => {
