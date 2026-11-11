@@ -194,14 +194,11 @@ test("Lead sees and manages only the directly assigned department", async ({ pag
   await expect(page.getByRole("button", { name: "New Profile", exact: true })).toHaveCount(0);
 
   await page.locator(".person-card").filter({ hasText: "Karim Adel" }).click();
-  await page.getByRole("button", { name: "Edit Hierarchy", exact: true }).click();
-  await expect(page.getByLabel("Name", { exact: true })).toBeDisabled();
-  await expect(page.getByLabel("Title", { exact: true })).toBeDisabled();
-  await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Edit Team", exact: true })).toHaveCount(0);
   await page.locator("#close-drawer").click();
 
   await page.locator("#team-department-select").selectOption("ops");
-  await expect(page.getByRole("button", { name: /Member$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Member$/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "New Department", exact: true })).toHaveCount(0);
 });
 
@@ -226,8 +223,8 @@ test("Employee has department read access and own identity editing only", async 
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
   await expect(page.getByLabel("Name", { exact: true })).toBeEnabled();
   await expect(page.locator("#photo-input")).toBeEnabled();
-  await expect(page.getByLabel("Title", { exact: true })).toBeDisabled();
-  await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toBeDisabled();
+  await expect(page.locator("#profile-title-preview")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Position", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Save Profile", exact: true })).toBeEnabled();
 });
 
@@ -258,6 +255,7 @@ test("Admin can preview Employee access without changing the signed-in user", as
   await expect(page.locator(".app-notice.warning")).toContainText("Role Preview is read-only");
   await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Youssef Nabil");
 
+  await page.locator("#close-drawer").click();
   await page.locator(".role-preview-sidebar").getByRole("button", { name: "Exit Preview", exact: true }).click();
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   await expect(page.locator(".user-tile")).toContainText("Omar Wanis");
@@ -510,10 +508,10 @@ test("creation opens centered while editing stays in the right sidebar", async (
   await expect(page.locator(".drawer.creation-modal")).toBeVisible();
   await expect(page.getByRole("heading", { name: "New Department", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Department name", exact: true }).fill("Motion Graphics");
-  await page.getByRole("combobox", { name: "Parent department", exact: true }).selectOption("ops");
+  await page.getByRole("combobox", { name: "Parent department", exact: true }).selectOption("");
   await page.getByRole("button", { name: "Create Department", exact: true }).click();
   const subDepartmentOption = page.locator(".team-department-option").filter({ hasText: "Motion Graphics" });
-  await expect(page.locator('[data-team-tree-node="ops"] > ul').getByRole("button", { name: /Motion Graphics/ })).toBeVisible();
+  await expect(page.locator('#team-department-tree-root').getByRole("button", { name: /Motion Graphics/ })).toBeVisible();
   await expect(subDepartmentOption).toContainText("0");
 
   await page.locator("#close-drawer").click();
@@ -548,7 +546,7 @@ test("personal profile shift details stay read-only and route edits to Scheduler
   await upcomingShift.click();
 
   await expect(page.getByRole("heading", { name: "Day Details", exact: true })).toBeVisible();
-  await expect(page.locator(".person-summary-copy > span")).toHaveText("Workforce Admin");
+  await expect(page.locator(".person-summary-copy > span")).toHaveText("Manager");
   await expect(page.locator(".detail-line").filter({ hasText: "Date" })).toContainText(/[A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2}/);
   await expect(page.locator("#shift-form")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open in Scheduler", exact: true })).toBeVisible();
@@ -633,12 +631,12 @@ test("admins can assign hierarchy roles and weekly or daily department leads", a
   await page.goto("/");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Position", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Department role", exact: true })).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Hierarchy role", exact: true }).selectOption("lead");
+  await page.getByRole("combobox", { name: "Position", exact: true }).selectOption("lead");
   await page.getByRole("button", { name: "Save Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Hierarchy role", exact: true })).toHaveValue("lead");
+  await expect(page.getByRole("combobox", { name: "Position", exact: true })).toHaveValue("lead");
 
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Rotations", exact: true }).click();
@@ -748,26 +746,26 @@ test("profile title and multiple department memberships persist in the UI", asyn
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
 
-  await page.getByRole("textbox", { name: "Title", exact: true }).fill("Editorial Operations Director");
+  await expect(page.locator("[name=title], [name=employeeId]")).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Customer Support", exact: true }).check();
   await page.getByRole("button", { name: "Save Profile", exact: true }).click();
 
-  await expect(page.getByText("SCH-001 · Editorial Operations Director", { exact: true })).toBeVisible();
+  await expect(page.getByText("SCH-001 · Manager", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Editorial Operations Director");
+  await expect(page.locator("#profile-title-preview")).toHaveText("Manager");
   await expect(page.getByRole("checkbox", { name: "Customer Support", exact: true })).toBeChecked();
   await expect(page.getByText("Primary", { exact: true })).toHaveCount(0);
 
   await page.reload();
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit My Profile", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Editorial Operations Director");
+  await expect(page.locator("#profile-title-preview")).toHaveText("Manager");
   await expect(page.getByRole("checkbox", { name: "Customer Support", exact: true })).toBeChecked();
 
   await page.locator("#close-drawer").click();
   await page.getByRole("button", { name: "Scheduler", exact: true }).click();
   await page.locator("#department-select").selectOption("support");
-  await expect(page.getByRole("button", { name: "OW Omar Wanis Editorial Operations Director - 22 annual days", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "OW Omar Wanis Manager - 22 annual days", exact: true })).toBeVisible();
 });
 
 test("admins can delete pseudo profiles", async ({ page }) => {

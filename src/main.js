@@ -2,6 +2,7 @@ import { seedState } from "./data.js";
 import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
 import { annualYear, annualBalanceImpact, deductDemoAnnual } from "./annualBalances.mjs";
+import { assignableDepartments, derivedProfileTitle, isDepartmentContainer, profileTeamIds } from "./profileStructure.mjs";
 import { analyticsRange, resolveAnalyticsDays, aggregateAnalytics, analyticsCsv } from "./analyticsLogic.mjs";
 import { renderAnalyticsDashboard, bindAnalyticsProbe } from "./analyticsView.mjs";
 import {
@@ -355,8 +356,7 @@ function leadForProfileWeekday(profile, departmentId, weekday) {
 }
 
 function departmentLabel(department) {
-  const parent = byId(state.departments, department?.parentDepartmentId);
-  return parent ? `${parent.name} / ${department.name}` : department?.name || "";
+  return department?.name || "";
 }
 
 function departmentOptions(selectedId, { excludeId = "", includeNone = false, noneLabel = "Top-level department", teamNames = false } = {}) {
@@ -440,7 +440,7 @@ function profileDepartmentIds(profile) {
 }
 
 function profileDepartmentNames(profile) {
-  return profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
+  return profileTeamIds(state,profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
 }
 
 function directlySharesDepartment(firstProfile, secondProfile) {
@@ -463,6 +463,7 @@ function canViewProfile(profile) {
     return profile.id === currentProfile()?.id || profileDepartmentIds(profile).includes(ui.rolePreview.departmentId);
   }
   if (isAdmin() || profile.id === currentProfile()?.id) return true;
+  if (isTeamManager() && profileTeamIds(state,profile).length === 0) return true;
   return directlySharesDepartment(currentProfile(), profile);
 }
 
@@ -528,7 +529,15 @@ function canManageProfileDepartment(profile) {
 }
 
 function canManageDepartmentMembers(departmentId) {
-  return isAdmin() || (isLead() && canManageDepartment(departmentId));
+  return !isDepartmentContainer(state,departmentId) && (isAdmin() || (isTeamManager() && canManageDepartment(departmentId)));
+}
+
+function isTeamManager() {
+  return isLead() && currentProfile()?.seniorityLevel === "manager" && profileTeamIds(state,currentProfile()).length > 0;
+}
+
+function canEditProfileTeams(profile) {
+  return isAdmin() || (roleForProfile(profile)!=="admin" && isTeamManager() && (dataStore?.mode === "supabase" ? profile?.structurePermissions?.teams === true : profileTeamIds(state,profile).length === 0 || directlySharesDepartment(currentProfile(),profile)));
 }
 
 function managedDepartmentForProfile(profile) {
@@ -536,11 +545,11 @@ function managedDepartmentForProfile(profile) {
 }
 
 function canEditHierarchy(profile) {
-  return isAdmin() || (isLead() && canManageProfileDepartment(profile));
+  return isAdmin() || (roleForProfile(profile)!=="admin" && isTeamManager() && (dataStore?.mode === "supabase" ? profile?.structurePermissions?.position === true : profileTeamIds(state,profile).every(id=>profileTeamIds(state,currentProfile()).includes(id))));
 }
 
 function canEditProfile(profile) {
-  return canManageProfiles() || currentProfile()?.id === profile?.id || canEditHierarchy(profile);
+  return canManageProfiles() || currentProfile()?.id === profile?.id || canEditProfileTeams(profile);
 }
 
 function canRequestVacationFor(profile) {
@@ -963,7 +972,7 @@ function render() {
       }
     }
     app.innerHTML = `
-    <aside class="sidebar">
+    <aside class="sidebar" ${ui.drawer?.type === "profile" ? 'inert aria-hidden="true"' : ""}>
       <div class="brand">
         <div class="brand-mark">S</div>
         <div>
@@ -1010,10 +1019,10 @@ function render() {
         </div>
       </div>
     </aside>
-    <main class="workspace ${isRolePreviewActive() ? "role-preview-active" : ""}">
+    <main class="workspace ${isRolePreviewActive() ? "role-preview-active" : ""}" ${ui.drawer?.type === "profile" ? 'inert aria-hidden="true"' : ""}>
       ${renderRolePreviewBanner()}
       ${renderActiveView()}
-      ${renderAppNotice()}
+      ${ui.drawer?.type === "profile" ? "" : renderAppNotice()}
     </main>
     ${renderDrawer()}
   `;
@@ -1923,7 +1932,7 @@ function renderTeam() {
           <div class="hierarchy-board compact">
             ${renderHierarchyDepartment(hierarchySection, levels)}
           </div>
-          ${profiles.some(canEditHierarchy) && !isRolePreviewActive() ? `<p class="hint hierarchy-edit-hint">Drag between levels, or use a person's level menu. Hierarchy does not change sign-in permissions.</p>` : ""}
+          ${profiles.some(canEditHierarchy) && !isRolePreviewActive() ? `<p class="hint hierarchy-edit-hint">Drag between positions, or use a person's position menu. Structure changes are limited to Admin and team managers with Lead access.</p>` : ""}
         </section>` : `<section class="team-directory-panel${panelMotion}" id="team-directory-panel" role="tabpanel" aria-labelledby="team-directory-tab">
           <div class="team-section-head">
             <div>
@@ -2167,7 +2176,7 @@ function renderPersonCard(profile, department = byId(state.departments, profile.
       <div class="avatar large">${avatar(profile)}</div>
       <strong>${profile.name}</strong>
       <span>${escapeHtml(teamJobTitle(profile))}</span>
-      <em class="department-name">${department?.name || "Unassigned"}</em>
+      <em class="department-name">${escapeHtml(profileDepartmentNames(profile).join(" · ") || "Unassigned")}</em>
       <mark class="${profile.userId ? "claimed" : "unclaimed"}">${profile.userId ? roleForProfile(profile) : "Unclaimed"}</mark>
     </button>
   `;
@@ -2196,7 +2205,7 @@ function renderPersonListRow(profile) {
         <span>${profile.email}</span>
       </div>
       <span>${escapeHtml(teamJobTitle(profile))}</span>
-      <em>${department?.name || "Unassigned"}</em>
+      <em>${escapeHtml(profileDepartmentNames(profile).join(" · ") || "Unassigned")}</em>
       <mark class="${profile.userId ? "claimed" : "unclaimed"}">${profile.userId ? roleForProfile(profile) : "Unclaimed"}</mark>
       <small>${profile.remainingVacationDays}/${profile.yearlyVacationDays} days</small>
     </button>
@@ -2212,7 +2221,7 @@ function renderPersonTile(profile) {
         <strong>${profile.name}</strong>
         <span>${escapeHtml(teamJobTitle(profile))}</span>
       </div>
-      <em>${department?.name || "Unassigned"}</em>
+      <em>${escapeHtml(profileDepartmentNames(profile).join(" · ") || "Unassigned")}</em>
     </button>
   `;
 }
@@ -2684,7 +2693,7 @@ function renderHierarchyDepartment(section, levels) {
 
 function renderHierarchyPerson(profile, activeDepartmentId) {
   const editable = canEditHierarchy(profile) && !isRolePreviewActive();
-  const departments = profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
+  const departments = profileDepartmentNames(profile);
   const activeDepartmentName = byId(state.departments, activeDepartmentId)?.name;
   const otherDepartments = activeDepartmentName ? departments.filter((department) => department !== activeDepartmentName) : departments;
   return `
@@ -2714,8 +2723,9 @@ async function moveHierarchyPerson(profileId, level) {
     pending: "Updating hierarchy...", success: `${profile.name} moved to ${hierarchyLevelLabel(level)}.`,
     failure: "The hierarchy change could not be saved."
   }, async () => {
-    await dataStore.updateProfileHierarchy({ ...profile, seniorityLevel: level });
+    const saved=await dataStore.updateProfileHierarchy({ ...profile, seniorityLevel: level });
     profile.seniorityLevel = level;
+    profile.title=saved?.title || derivedProfileTitle(state,profile);
     if (dataStore.mode === "demo") audit("profile.hierarchy_updated", "profile", profile.id, `${profile.name}: ${hierarchyLevelLabel(level)}`);
     await saveState();
   });
@@ -3123,7 +3133,8 @@ function renderMiniActivity(entries) {
 function renderDrawer() {
   if (!ui.drawer) return "";
   const isCreation = isCreationDrawer();
-  const isCentered = isCreation || ["request-detail", "rotation-paste", "rotation-delete", "rotation-future"].includes(ui.drawer.type);
+  const isProfile = ui.drawer.type === "profile";
+  const isCentered = isProfile || isCreation || ["request-detail", "rotation-paste", "rotation-delete", "rotation-future"].includes(ui.drawer.type);
   const titleMap = {
     shift: "Shift Override",
     person: "Employee Profile",
@@ -3147,14 +3158,16 @@ function renderDrawer() {
   };
 
   return `
-    <aside class="drawer open ${isCentered ? "creation-modal" : "edit-sidebar"} ${ui.drawer.type === "request-detail" ? "request-review-modal" : ""}" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+    ${isProfile ? '<div class="profile-editor-scrim" aria-hidden="true"></div>' : ""}
+    <aside class="drawer open ${isCentered ? "creation-modal" : "edit-sidebar"} ${isProfile ? "profile-editor-modal" : ""} ${ui.drawer.type === "request-detail" ? "request-review-modal" : ""}" role="dialog" aria-modal="true" aria-labelledby="drawer-title" tabindex="-1">
       <div class="drawer-head">
         <div>
           <span class="eyebrow">${ui.drawer.type === "request-detail" ? "Review" : isCreation ? "Create" : "Details"}</span>
           <h2 id="drawer-title">${titleMap[ui.drawer.type]}</h2>
         </div>
-        <button class="icon-button" id="close-drawer" aria-label="Close ${titleMap[ui.drawer.type]}" title="Close">${icons.close}</button>
+        <button class="icon-button" id="close-drawer" aria-label="Close ${titleMap[ui.drawer.type]}" title="Close" ${isProfile && isMutationPending() ? "disabled" : ""}>${icons.close}</button>
       </div>
+      ${isProfile ? renderAppNotice() : ""}
       ${drawerBody()}
     </aside>
   `;
@@ -3306,7 +3319,7 @@ function personDrawer() {
         <span>${profile.userId ? "This employee profile is connected to a sign-in account." : "An administrator can link this profile while reviewing a pending account."}</span>
       </div>
       <button class="primary wide" data-open-profile-page="${profile.id}">Open Full Profile</button>
-      ${canEditProfile(profile) ? `<button class="primary wide" data-open-drawer="profile" data-profile-id="${profile.id}">${canManageProfiles() ? "Edit Profile" : currentProfile()?.id === profile.id ? "Edit My Profile" : "Edit Hierarchy"}</button>` : ""}
+      ${canEditProfile(profile) ? `<button class="primary wide" data-open-drawer="profile" data-profile-id="${profile.id}">${canManageProfiles() ? "Edit Profile" : currentProfile()?.id === profile.id ? "Edit My Profile" : "Edit Team"}</button>` : ""}
       ${managedDepartmentForProfile(profile) && !(isLead() && currentProfile()?.id === profile.id) ? `<button type="button" class="ghost wide" id="remove-department">Remove From ${escapeHtml(byId(state.departments, managedDepartmentForProfile(profile))?.name || "Department")}</button>` : ""}
       ${canRequestVacationFor(profile) ? `<button class="ghost wide" data-open-drawer="request" data-profile-id="${profile.id}">Create Annual Request</button>` : ""}
       ${canManageProfiles() && profile.userId && !isSoleAdminProfile ? `<button class="danger wide" id="unlink-profile">Unlink Account</button>` : ""}
@@ -3353,58 +3366,64 @@ function onboardingDrawer() {
 
 function profileDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
-  const canEdit = profile ? canEditProfile(profile) : canManageProfiles();
-  const canEditAdminFields = canManageProfiles();
-  const canEditIdentity = canEditAdminFields || currentProfile()?.id === profile?.id;
-  const canEditHierarchyField = profile ? canEditHierarchy(profile) : canEditAdminFields;
-  const canEditPhoto = canEditIdentity;
-  const accessRole = profile?.userId ? roleForProfile(profile) : "unclaimed";
+  const admin = canManageProfiles();
+  const own = currentProfile()?.id === profile?.id;
+  const editable = profile ? canEditProfile(profile) : admin;
+  const editIdentity = admin || own;
+  const editTeams = profile ? canEditProfileTeams(profile) : admin;
+  const editPosition = profile ? canEditHierarchy(profile) : admin;
+  const teams = assignableDepartments(state).filter(d=>admin || visibleDepartments().some(visible=>visible.id===d.id));
+  const initialTeams = profile ? profileTeamIds(state,profile) : [ui.drawer.departmentId || ui.selectedDepartmentId].filter(id=>teams.some(d=>d.id===id));
+  const role = profile?.userId ? roleForProfile(profile) : "unclaimed";
+  const year = profile?.annualBalanceYear || annualYear();
+  const title = admin ? derivedProfileTitle(state,{...profile,departmentId:null,departmentIds:initialTeams}) : profile?.title || derivedProfileTitle(state,profile);
   return `
-    <form id="profile-form" class="drawer-form">
-      <div class="photo-uploader ${canEditPhoto ? "" : "disabled"}" id="photo-dropzone">
-        <div class="avatar large" id="photo-preview">${avatar(profile)}</div>
-        <div>
-          <strong>${profile?.photo ? "Change photo" : "Upload photo"}</strong>
-          <span>${canEditPhoto ? "Drop an image here or choose from your PC." : "Photo editing is locked for your role."}</span>
-        </div>
-        <input id="photo-input" type="file" accept="image/*" ${canEditPhoto ? "" : "disabled"}>
-        <input name="photoRef" type="hidden" value="${profile?.photoRef || profile?.photo || ""}">
+    <form id="profile-form" class="drawer-form profile-editor-form">
+      <div class="profile-editor-body">
+        <section class="profile-editor-section" aria-labelledby="profile-identity-title">
+          <header><h3 id="profile-identity-title">Profile</h3></header>
+          <div class="profile-identity-grid">
+            <div class="photo-uploader ${editIdentity ? "" : "disabled"}" id="photo-dropzone">
+              <div class="avatar large" id="photo-preview">${avatar(profile)}</div>
+              <div><strong>${profile?.photo ? "Change photo" : "Add photo"}</strong><span>${editIdentity ? "Choose or drop an image." : "Managed by the profile owner."}</span></div>
+              <input id="photo-input" type="file" accept="image/*" aria-label="Profile photo" ${editIdentity ? "" : "disabled"}>
+              <input name="photoRef" type="hidden" value="${escapeHtml(profile?.photoRef || profile?.photo || "")}">
+            </div>
+            <div class="profile-identity-fields">
+              <label>Name<input name="name" required autocomplete="name" value="${escapeHtml(profile?.name || "")}" ${editIdentity ? "" : "disabled"}></label>
+              <label>Email<input name="email" type="email" required autocomplete="email" value="${escapeHtml(profile?.email || "")}" ${admin ? "" : "disabled"}></label>
+            </div>
+          </div>
+        </section>
+        <section class="profile-editor-section" aria-labelledby="profile-team-title">
+          <header><h3 id="profile-team-title">Team & position</h3></header>
+          <fieldset class="department-memberships profile-team-choices" ${editTeams ? "" : "disabled"}>
+            <legend>Teams</legend>
+            ${teams.map(department=>`<label><input type="checkbox" name="departmentMembership" value="${department.id}" ${initialTeams.includes(department.id) ? "checked" : ""}><span>${escapeHtml(department.name)}</span></label>`).join("")}
+          </fieldset>
+          <div class="profile-position-row">
+            <label>Position<select name="seniorityLevel" ${editPosition ? "" : "disabled"}>${seniorityLevels.map(([id,label])=>`<option value="${id}" ${normalizeHierarchyLevel(profile?.seniorityLevel) === id ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+            <div class="profile-derived-title"><span>Title <small>Automatic</small></span><output id="profile-title-preview">${escapeHtml(title)}</output></div>
+          </div>
+          ${!editPosition && editTeams ? `<p class="hint">Position changes require management of all of this person’s teams.</p>` : ""}
+        </section>
+        <section class="profile-editor-section" aria-labelledby="profile-access-title">
+          <header><h3 id="profile-access-title">Access</h3></header>
+          ${admin && profile?.userId && role !== "admin" ? `<label class="profile-role-field">Role<select name="role">${["employee","lead"].map(value=>`<option value="${value}" ${role===value?"selected":""}>${value === "lead" ? "Lead" : "Employee"}</option>`).join("")}</select></label>` : `<label class="profile-role-field">Role<input value="${role === "admin" ? "Admin · sole account" : role === "unclaimed" ? "Not linked to an account" : role === "lead" ? "Lead" : "Employee"}" disabled></label>`}
+        </section>
+        <section class="profile-editor-section" aria-labelledby="profile-allowance-title">
+          <header><h3 id="profile-allowance-title">Yearly allowance</h3><p>Recurring allowance for each new calendar year.</p></header>
+          <label class="profile-balance-card"><span>Annual allowance<small>Days per year</small></span><input name="yearlyVacationDays" aria-label="Annual allowance" type="number" min="0" step="1" required value="${profile?.yearlyVacationDays ?? 21}" ${admin ? "" : "disabled"}></label>
+        </section>
+        <section class="profile-editor-section" aria-labelledby="profile-balance-title">
+          <header><h3 id="profile-balance-title">${year} balance</h3><p>Available Annual days for ${year} only.</p></header>
+          <label class="profile-balance-card"><span>Annual days left<small>${year} remaining</small></span><input name="remainingVacationDays" aria-label="Annual days left" type="number" min="0" step="1" required value="${profile?.remainingVacationDays ?? profile?.yearlyVacationDays ?? 21}" ${admin ? "" : "disabled"}></label>
+          <input type="hidden" name="annualBalanceYear" value="${year}">
+          <input type="hidden" name="expectedAnnualAllowance" value="${profile?.yearlyVacationDays ?? 21}">
+          <input type="hidden" name="expectedAnnualRemaining" value="${profile?.remainingVacationDays ?? 21}">
+        </section>
       </div>
-      <label>Name<input name="name" required placeholder="Employee name" value="${profile?.name || ""}" ${canEditIdentity ? "" : "disabled"}></label>
-      <label>Email<input name="email" type="email" required placeholder="employee@sport360.test" value="${profile?.email || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <label>Title<input name="title" required placeholder="Agent" value="${profile?.title || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <label>Hierarchy role<select name="seniorityLevel" ${canEditHierarchyField ? "" : "disabled"}>
-        ${seniorityLevels.map(([id, label]) => `<option value="${id}" ${normalizeHierarchyLevel(profile?.seniorityLevel) === id ? "selected" : ""}>${label}</option>`).join("")}
-      </select></label>
-      <label>Employee ID<input name="employeeId" required placeholder="SCH-100" value="${profile?.employeeId || ""}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <fieldset class="department-memberships" ${canEditAdminFields ? "" : "disabled"}>
-        <legend>Departments</legend>
-        ${state.departments.map((department) => {
-          const isMember = profileDepartmentIds(profile).includes(department.id) || ui.drawer.departmentId === department.id;
-          return `
-            <label>
-              <input type="checkbox" name="departmentMembership" value="${department.id}" ${isMember ? "checked" : ""}>
-              <span>${departmentLabel(department)}</span>
-            </label>
-          `;
-        }).join("")}
-        <small>Each selected department is equal for schedules, rotations, and hierarchy.</small>
-      </fieldset>
-      <input type="hidden" name="annualBalanceYear" value="${profile?.annualBalanceYear || annualYear()}">
-      <input type="hidden" name="expectedAnnualAllowance" value="${profile?.yearlyVacationDays ?? 21}">
-      <input type="hidden" name="expectedAnnualRemaining" value="${profile?.remainingVacationDays ?? 21}">
-      <label>Annual allowance<input name="yearlyVacationDays" type="number" min="0" value="${profile?.yearlyVacationDays ?? 21}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <label>Annual days left<input name="remainingVacationDays" type="number" min="0" value="${profile?.remainingVacationDays ?? profile?.yearlyVacationDays ?? 21}" ${canEditAdminFields ? "" : "disabled"}></label>
-      <p class="hint">${profile?.annualBalanceYear || annualYear()} balance · renews from the saved allowance on January 1, Cairo time.</p>
-      ${canEditAdminFields && profile?.userId ? accessRole === "admin" ? `
-        <label>Application access role<input value="Admin · sole account" disabled></label>
-      ` : `
-        <label>Application access role<select name="role">
-          ${["employee", "lead"].map((role) => `<option value="${role}" ${accessRole === role ? "selected" : ""}>${role}</option>`).join("")}
-        </select></label>
-      ` : ""}
-      <p class="hint">${canEditAdminFields ? "Application access controls permissions. The existing Admin account is protected as the sole Admin." : canEditHierarchyField && currentProfile()?.id !== profile?.id ? "Leads can change hierarchy only for people in their department." : "You can update only your display name and profile photo. Admins manage title, hierarchy, departments, access, email, and balances."}</p>
-      <button class="primary wide" ${canEdit ? "" : "disabled"}>${profile ? "Save Profile" : "Create Profile"}</button>
+      <footer class="profile-editor-actions"><button type="button" class="ghost" id="cancel-profile-edit" ${isMutationPending() ? "disabled" : ""}>Cancel</button><button class="primary" ${!editable || isMutationPending() ? "disabled" : ""}>${profile ? "Save Profile" : "Create Profile"}</button></footer>
     </form>
   `;
 }
@@ -3554,7 +3573,7 @@ function calendarDayDrawer() {
         </div>
       </div>
       <div class="detail-line"><span>Date</span><strong>${formatDay(date)} ${formatDate(date)}</strong></div>
-      <div class="detail-line"><span>Departments</span><strong>${profileDepartmentIds(profile).map((id) => byId(state.departments, id)?.name).filter(Boolean).join(", ") || "Unassigned"}</strong></div>
+      <div class="detail-line"><span>Teams</span><strong>${profileDepartmentNames(profile).join(", ") || "Unassigned"}</strong></div>
       <div class="detail-line"><span>Rotation default</span><strong>${displayStatusLabel(rotationStatus) || "No rotation"}</strong></div>
       <div class="detail-line"><span>Manual override</span><strong>${schedule.override ? "Yes" : "No"}</strong></div>
       ${schedule.note ? `<p class="hint">${displayScheduleNote(schedule.note)}</p>` : ""}
@@ -4129,6 +4148,11 @@ function closeDrawerWithMotion() {
     ui.pendingPhotoDataUrl = "";
     ui.drawer = null;
     render();
+    if (closingDrawer?.type === "profile") {
+      const candidate=document.querySelector(`[data-open-drawer="profile"][data-profile-id="${closingDrawer.profileId}"]`)
+        || document.querySelector(`.hierarchy-person[data-profile-id="${closingDrawer.profileId}"]`);
+      candidate?.focus({preventScroll:true});
+    }
   };
   if (!drawer || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     finish();
@@ -4139,7 +4163,30 @@ function closeDrawerWithMotion() {
   window.setTimeout(finish, 190);
 }
 
+function bindProfileModal() {
+  const modal=document.querySelector(".profile-editor-modal");
+  if(!modal)return;
+  const form=modal.querySelector("#profile-form");
+  const updateTitle=()=>{
+    if(!isAdmin() && dataStore.mode!=="demo")return;
+    const data=new FormData(form);
+    modal.querySelector("#profile-title-preview").textContent=derivedProfileTitle(state,{departmentIds:data.getAll("departmentMembership"),seniorityLevel:data.get("seniorityLevel")});
+  };
+  form.querySelectorAll('[name="departmentMembership"], [name="seniorityLevel"]').forEach(input=>input.addEventListener("change",updateTitle));
+  modal.querySelector("#cancel-profile-edit")?.addEventListener("click",()=>{if(!isMutationPending())closeDrawerWithMotion();});
+  modal.addEventListener("keydown",event=>{
+    if(event.key==="Escape" && !isMutationPending()){event.preventDefault();event.stopPropagation();closeDrawerWithMotion();return;}
+    if(event.key!=="Tab")return;
+    const items=[...modal.querySelectorAll('button:not(:disabled),input:not(:disabled):not([type="hidden"]),select:not(:disabled),[tabindex="0"]')].filter(el=>el.getClientRects().length);
+    if(!items.length){event.preventDefault();modal.focus();return;}
+    if(event.shiftKey && (document.activeElement===items[0] || document.activeElement===modal)){event.preventDefault();items.at(-1).focus();}
+    else if(!event.shiftKey && document.activeElement===items.at(-1)){event.preventDefault();items[0].focus();}
+  });
+  (modal.querySelector('[name="name"]:not(:disabled)') || modal.querySelector('select:not(:disabled)') || modal.querySelector("#close-drawer"))?.focus({preventScroll:true});
+}
+
 function bindEvents() {
+  bindProfileModal();
   bindAnalyticsEvents();
   document.querySelectorAll("[data-exit-role-preview]").forEach((button) => {
     button.addEventListener("click", exitRolePreview);
@@ -4440,7 +4487,7 @@ function bindEvents() {
   document.querySelector("#sign-out")?.addEventListener("click", signOut);
   document.querySelector("#dismiss-notice")?.addEventListener("click", () => {
     ui.notice = "";
-    render();
+    document.querySelector(".app-notice")?.remove();
   });
   document.querySelector("#shift-form")?.addEventListener("submit", saveShiftOverride);
   document.querySelector("#clear-override")?.addEventListener("click", clearShiftOverride);
@@ -4913,17 +4960,18 @@ async function saveProfile(event) {
   const hadProfileAdmin = canManageProfiles();
   const canEditOwnIdentity = Boolean(existing && currentProfile()?.id === existing.id);
   const canEditProfileHierarchy = Boolean(existing && canEditHierarchy(existing));
-  if (!hadProfileAdmin && !canEditOwnIdentity && !canEditProfileHierarchy) return;
-  const departmentIds = hadProfileAdmin
+  const canEditTeams = Boolean(existing && canEditProfileTeams(existing));
+  if (!hadProfileAdmin && !canEditOwnIdentity && !canEditTeams) return;
+  const departmentIds = hadProfileAdmin || canEditTeams
     ? form.getAll("departmentMembership").filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index)
     : profileDepartmentIds(existing);
-  const departmentId = hadProfileAdmin ? (departmentIds[0] || null) : existing.departmentId;
+  const departmentId = hadProfileAdmin || canEditTeams ? (departmentIds[0] || null) : existing.departmentId;
   const profile = {
     id: existing?.id || makeId("emp"),
-    employeeId: hadProfileAdmin ? form.get("employeeId") : existing.employeeId,
+    employeeId: existing?.employeeId || `SCH-${crypto.randomUUID().slice(0,8).toUpperCase()}`,
     email: hadProfileAdmin ? form.get("email") : existing.email,
     name: hadProfileAdmin || canEditOwnIdentity ? form.get("name") : existing.name,
-    title: hadProfileAdmin ? form.get("title") : existing.title,
+    title: existing?.title || "Artist",
     seniorityLevel: hadProfileAdmin || canEditProfileHierarchy ? form.get("seniorityLevel") : existing.seniorityLevel,
     leadEligible: existing?.leadEligible ?? true,
     departmentId,
@@ -4935,6 +4983,7 @@ async function saveProfile(event) {
     annualBalanceYear: existing?.annualBalanceYear || annualYear(),
     userId: existing?.userId || null
   };
+  if (hadProfileAdmin || dataStore.mode === "demo") profile.title=derivedProfileTitle(state,profile);
   const previousPhotoRef = existing?.photoRef || "";
   const annualExpectation = { expectedAnnualYear: Number(form.get("annualBalanceYear")),
     expectedAnnualAllowance: Number(form.get("expectedAnnualAllowance")), expectedAnnualRemaining: Number(form.get("expectedAnnualRemaining")) };
@@ -4958,14 +5007,17 @@ async function saveProfile(event) {
         profile.photoRef = uploadedPhoto.reference;
       }
       if (existing && !hadProfileAdmin) {
-        if (canEditOwnIdentity) await dataStore.updateOwnProfile(profile);
-        if (canEditProfileHierarchy && profile.seniorityLevel !== existing.seniorityLevel) {
-          await dataStore.updateProfileHierarchy(profile);
-        }
-      } else if (existing) await dataStore.updateProfile({ ...profile, ...annualExpectation });
+        if (canEditTeams) {
+          const saved=await dataStore.updateProfileStructure(profile,canEditOwnIdentity);
+          if(saved) Object.assign(profile,{title:saved.title,departmentId:saved.departmentId,departmentIds:saved.departmentIds,seniorityLevel:saved.seniorityLevel,structurePermissions:saved.structurePermissions});
+        } else if (canEditOwnIdentity) await dataStore.updateOwnProfile(profile);
+      } else if (existing) {
+        const saved=await dataStore.updateProfile({ ...profile, ...annualExpectation });
+        if(saved)Object.assign(profile,{title:saved.title,employeeId:saved.employeeId});
+      }
       else {
-        await dataStore.createProfile(profile);
-        if (hadProfileAdmin) await dataStore.setProfileDepartments(profile);
+        const saved=await dataStore.createProfile(profile);
+        if(saved)Object.assign(profile,saved);
       }
 
       if (hadProfileAdmin && existing?.userId && form.get("role")) {
@@ -4996,7 +5048,7 @@ async function saveProfile(event) {
       audit(existing ? "profile.updated" : "profile.created", "profile", profile.id, profile.email);
     }
     await saveState();
-    ui.drawer = { type: "person", profileId: profile.id };
+    ui.drawer = canViewProfile(profile) ? { type: "person", profileId: profile.id } : null;
     render();
   });
 }
@@ -5124,7 +5176,8 @@ async function removeProfileDepartment() {
     state.departmentLeads = state.departmentLeads.filter((lead) => lead.profileId !== profile.id || lead.departmentId !== managedDepartmentId);
     ui.drawer = null;
     render();
-    await dataStore.removeProfileFromDepartment(profile.id, managedDepartmentId);
+    const saved=await dataStore.removeProfileFromDepartment(profile.id, managedDepartmentId);
+    profile.title=saved?.title || derivedProfileTitle(state,profile);
     if (dataStore?.mode !== "supabase") {
       audit("profile.department_removed", "profile", profile.id, `${profile.name} removed from ${previousDepartment?.name || "department"}`);
     }
@@ -5154,12 +5207,20 @@ async function saveDepartment(event) {
     success: existing ? "Department saved." : "Department created.",
     failure: "The department could not be saved."
   }, async () => {
+    const becomingContainer=isDepartmentContainer(state,department.id)||department.name.toLowerCase().replace(/[^a-z]/g,"")==="videounit";
+    const newParent=department.parentDepartmentId;
+    if ((becomingContainer&&state.profiles.some(p=>profileDepartmentIds(p).includes(department.id))) ||
+      (newParent&&state.profiles.some(p=>profileDepartmentIds(p).includes(newParent)))) {
+      throw new Error("Move people to Video Edit, Motion Graphics, or another team before making their department a container.");
+    }
+    await dataStore.upsertDepartment(department);
+    department.isContainer=becomingContainer;
     if (existing) Object.assign(existing, department);
     else state.departments.push(department);
+    if(newParent)byId(state.departments,newParent).isContainer=true;
     coverageTargets[department.id] = department.coverageTarget;
     saveCoverageTargets();
     audit(existing ? "department.updated" : "department.created", "department", department.id, department.name);
-    await dataStore.upsertDepartment(department);
     await saveState();
     ui.drawer = { type: "department-detail", departmentId: department.id };
     render();
@@ -5225,7 +5286,8 @@ async function assignDepartmentMembers(event) {
       if (!profile) continue;
       profile.departmentId = department.id;
       profile.departmentIds = [department.id];
-      await dataStore.addProfileToDepartment(profile.id, department.id);
+      const saved=await dataStore.addProfileToDepartment(profile.id, department.id);
+      profile.title=saved?.title || derivedProfileTitle(state,profile);
       if (dataStore?.mode !== "supabase") {
         audit("profile.department_assigned", "profile", profile.id, `${profile.name} added to ${department.name}`);
       }
