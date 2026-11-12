@@ -1,4 +1,4 @@
-import { datesBetween, scheduleFor, departmentLeadForDate, weekdayIndex, toIso } from './scheduleLogic.mjs';
+import { datesBetween, scheduleFor, departmentLeadForDate, publicHolidayForProfile, weekdayIndex, toIso } from './scheduleLogic.mjs';
 
 export const shiftSeries = [
   { id:'morning', label:'Morning', color:'#d9b95f' },
@@ -28,7 +28,12 @@ export function scopedAnalyticsState(state, { year, departmentId=null, directOnl
     .map(p=>({id:p.id,name:p.name,departmentIds:membership(p).filter(id=>ids.includes(id))}));
   const visible=new Set(profiles.map(p=>p.id));
   const allowed=(rows,field)=>rows.filter(r=>visible.has(r.profileId)&&(!field||r[field].slice(0,4)===String(year)));
+  const publicHolidays = (state.publicHolidays || []).filter(holiday => holiday.date.slice(0, 4) === String(year))
+    .map(holiday => ({ date: holiday.date, dayOff: holiday.dayOff,
+      profileIds: profiles.filter(person => publicHolidayForProfile(state, person.id, holiday.date)).map(person => person.id) }))
+    .filter(holiday => holiday.profileIds.length);
   return { year, departments, profiles, statuses:state.statuses.map(({id,label,kind})=>({id,label,kind})),
+    publicHolidays,
     rotationVersions:allowed(state.rotationVersions), scheduleOverrides:allowed(state.scheduleOverrides,'date'),
     departmentLeads:state.departmentLeads.filter(r=>ids.includes(r.departmentId)&&visible.has(r.profileId)&&r.date.slice(0,4)===String(year)),
     departmentLeadRotations:(state.departmentLeadRotations||[]).filter(r=>ids.includes(r.departmentId))
@@ -64,7 +69,7 @@ export function resolveAnalyticsDays(snapshot) {
 
 export function aggregateAnalytics(snapshot, days, month, period='month') {
   const range=analyticsRange(month,period);
-  const blank=()=>Object.fromEntries([...shiftSeries.map(s=>s.id),'vacation','sick','weekend','empty','working'].map(id=>[id,0]));
+  const blank=()=>Object.fromEntries([...shiftSeries.map(s=>s.id),'vacation','sick','weekend','public_holiday','low_day','empty','working'].map(id=>[id,0]));
   const validIds=new Set(Object.keys(blank()));
   const people=snapshot.profiles.map(p=>({...p,...blank()}));
   const byPerson=new Map(people.map(p=>[p.id,p]));
@@ -99,7 +104,7 @@ export function aggregateAnalytics(snapshot, days, month, period='month') {
 }
 
 export function analyticsCsv(model) {
-  const cols=[['name','Person'],['working','Working'],...shiftSeries.map(s=>[s.id,s.label]),['vacation','Annual'],['sick','Sick'],['weekend','Weekend'],['empty','Unassigned']];
+  const cols=[['name','Person'],['working','Working'],...shiftSeries.map(s=>[s.id,s.label]),['vacation','Annual'],['sick','Sick'],['weekend','Weekend'],['public_holiday','Public Holiday'],['low_day','Replacement Day'],['empty','Unassigned']];
   const cell=value=>'"'+String(value??'').replace(/^[=+@\-\s]/,'\'$&').replaceAll('"','""')+'"';
   return '\uFEFF'+[cols.map(c=>cell(c[1])).join(','),...model.people.map(p=>cols.map(([id])=>cell(p[id])).join(','))].join('\r\n');
 }

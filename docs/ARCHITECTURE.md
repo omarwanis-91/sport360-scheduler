@@ -105,7 +105,7 @@ Admin-only Delete Rotation opens an in-app confirmation before `reset_person_rot
 
 - Overrides belong to one profile and one date.
 - An override replaces the rotation-derived state for that date.
-- Annual, Sick, and On Ground are daily exceptions.
+- Annual, Sick, On Ground, and booked Replacement Days are daily exceptions. A booked replacement day uses a protected override.
 - Clearing an override returns the date to its rotation-derived state.
 - Approved vacation requests may materialize vacation days into schedule rows for resolution, but the UI treats them as request-sourced vacation rather than manual overrides.
 
@@ -116,8 +116,14 @@ For a person and date:
 1. Find a matching daily override.
 2. Find the newest rotation version effective on that date.
 3. Resolve the correct weekday slot.
-4. Use the override when present; otherwise use the rotation result.
-5. If no rotation exists, show Unassigned.
+4. Use the override when present. Otherwise, apply a configured public holiday day off for the person's teams.
+5. Use the rotation result on regular dates and holidays with scheduled coverage. If no rotation exists, show Unassigned.
+
+Migration 036 adds dated holidays and Low Days credits. Admin enters a holiday name, observed date, team scope, and day-off or scheduled-coverage treatment under Settings → Public Holidays. Any targeted team membership qualifies a hybrid profile. Existing daily overrides keep precedence, including approved Annual. The Scheduler names applicable holidays in date headers. Profiles can inspect the holiday in their calendar.
+
+Admin and scoped Leads can confirm a worked shift on an eligible day off or public holiday through the Scheduler. The RPC records the actual shift and issues one credit per person and date in the same transaction. A credit is due 30 calendar days after the worked date, with dates resolved in Africa/Cairo. Team → Alerts shows open and upcoming booked credits, counts those due within seven days and overdue, and lets authorized viewers choose a regular working day by the deadline. Moving or cancelling a booking restores the prior shift. Employees see their own history and deadlines in My Profile → Low Days. Overdue credits stay visible and cannot be booked beyond the deadline.
+
+The calendar and credit tables are private. The read RPC resolves holiday applicability against full memberships, including hidden hybrid memberships, and returns credit history only to its owner or an authorized manager. The Analytics snapshot carries scoped holiday applicability and counts both new exceptions as known off days. Annual request validation and approval share the holiday-aware workday calculation and exclude confirmed worked dates. Replacement-day actions never charge the Annual ledger.
 
 ## Main Domain Data
 

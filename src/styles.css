@@ -8640,6 +8640,76 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 
 .schedule-grid .schedule-team-divider h2 { left: 8px; }
 
+.calendar-workflow-panel {
+  padding: 14px;
+}
+
+.calendar-workflow-panel h2 {
+  margin: 0;
+}
+
+.calendar-workflow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.calendar-workflow-row > div {
+  display: grid;
+  flex: 1 1 160px;
+  gap: 3px;
+}
+
+.calendar-workflow-row > div > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.low-day-state,
+.low-day-alert-count {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.low-day-state.due,
+.holiday-date-label {
+  color: #efc58c;
+}
+
+.low-day-state.overdue,
+.low-day-alert-count {
+  color: #ffb4c3;
+  border-color: #793a4b;
+  background: #351c25;
+}
+
+.date-head .holiday-date-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-day.holiday-marked {
+  border-top-color: #d4ac74;
+}
+
+.shift-cell.low_day .shift-icon,
+.month-day.low_day em {
+  color: #c5a5e0;
+}
+
+#holiday-teams[hidden] {
+  display: none;
+}
+
 .rotation-future-list { display: grid; gap: 10px; max-height: 35vh; overflow: auto; }
 .rotation-future-list > div { display: grid; gap: 4px; padding: 10px; border-left: 2px solid #b45e75; background: rgba(164, 65, 90, .07); font-size: 12px; }
 .rotation-future-list small, .rotation-future-list span { color: var(--muted); }

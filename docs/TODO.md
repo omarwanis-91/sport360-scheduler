@@ -4,7 +4,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 ## Now
 
-- [ ] Run Team preflight 023, explicitly resolve any container-only people, apply migration 035, and pass audit 024 before merging the Team/profile client. Then verify the centered editor and Manager-with-Lead boundaries using `docs/TEAM_STRUCTURE.md`.
+- [ ] Verify the centered editor and Manager-with-Lead boundaries in production. Migration 035 and all five audit 024 checks passed before merging PR #39.
+- [ ] Apply `036_low_days_and_public_holidays.sql`, run audit 025, then verify holiday setup, worked-day confirmation, booking, and role-scoped Alerts in production.
 - [ ] Review the separate Analytics readability PR #38; keep its improvements when merging the Team/profile branch.
 - [ ] Review the three confirmed pending onboarding submissions in Admin Team → Pending profiles and link each to the correct existing operational profile. Diagnosis is complete; avoid duplicate profiles and preserve their schedules/balances.
 
@@ -26,7 +27,6 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [ ] Restore the verified export into a non-production Supabase project.
 - [ ] Pilot one department for five business days and record signoff.
 - [ ] Design and migrate Events: event dates, visibility, assigned people, optional On Ground prompt, calendar display, and audit trail.
-- [ ] Design and migrate Low Days: owed-day creation, approval/confirmation, replacement day selection, schedule impact, and audit trail.
 
 ## Deferred
 

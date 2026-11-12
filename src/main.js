@@ -4,6 +4,7 @@ import { createSupabaseStore } from "./supabaseStore.js";
 import { annualYear, annualBalanceImpact, deductDemoAnnual } from "./annualBalances.mjs";
 import { assignableDepartments, derivedProfileTitle, isDepartmentContainer, profileTeamIds } from "./profileStructure.mjs";
 import { analyticsRange, resolveAnalyticsDays, aggregateAnalytics, analyticsCsv } from "./analyticsLogic.mjs";
+import { availableReplacementDates, bookDemoLowDay, cairoDate, canConfirmWorkedDay, confirmDemoLowDay, lowDayStatus, saveDemoHoliday } from "./lowDays.mjs";
 import { renderAnalyticsDashboard, bindAnalyticsProbe } from "./analyticsView.mjs";
 import {
   addDays as addDaysLogic,
@@ -20,6 +21,7 @@ import {
   rotationFutureVersions,
   normalizeWeekPattern as normalizeWeekPatternLogic,
   parseDate as parseDateLogic,
+  publicHolidayForProfile,
   roleForProfile as roleForProfileLogic,
   sanitizeRotationPattern as sanitizeRotationPatternLogic,
   scheduleFor as scheduleForLogic,
@@ -68,7 +70,9 @@ const statusIcons = {
   weekend: icons.weekend,
   vacation: icons.vacation,
   sick: icons.sick,
-  ground: icons.ground
+  ground: icons.ground,
+  low_day: icons.weekend,
+  public_holiday: icons.scheduler
 };
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -163,9 +167,18 @@ async function runMutation(key, messages, action) {
   render();
   try {
     const result = await action();
+    let success = messages.success;
+    if (state.lowDaysEnabled && dataStore.mode === "supabase" && isLead()
+      && ["profile-save", "profile-remove-department", "department-members"].includes(key)) {
+      try {
+        Object.assign(state, await dataStore.loadLowDayCalendar(false));
+      } catch {
+        success += " Reload to refresh holidays and replacement days for the updated team.";
+      }
+    }
     invalidateAnalytics();
-    ui.mutation = { key, status: "success", message: messages.success };
-    notify(messages.success, "success");
+    ui.mutation = { key, status: "success", message: success };
+    notify(success, "success");
     return { ok: true, result };
   } catch (error) {
     const message = error.message || messages.failure;
@@ -193,7 +206,7 @@ function displayScheduleSource(source) {
 }
 
 function displayScheduleNote(note = "") {
-  return note.replace(/^Vacation request\b/i, "Annual request");
+  return escapeHtml(note.replace(/^Vacation request\b/i, "Annual request"));
 }
 
 function normalizeStateForUi() {
@@ -652,12 +665,16 @@ function leadAvailabilityForDepartmentDate(departmentId, dateIso) {
   const lead = departmentLeadForDate(departmentId, dateIso);
   const schedule = lead.profile ? scheduleFor(lead.profile.id, dateIso) : null;
   const available = Boolean(lead.profile && isScheduleLeadAvailable(schedule));
+  const holiday = holidayForDepartment(departmentId, dateIso);
+  const closed = holiday?.dayOff && visibleProfiles()
+    .filter((profile) => profileBelongsToDepartment(profile, departmentId))
+    .every((profile) => publicHolidayForProfile(state, profile.id, dateIso) && scheduleFor(profile.id, dateIso).kind !== "working");
   return {
     ...lead,
     department: byId(state.departments, departmentId),
     schedule,
     available,
-    missing: !available
+    missing: !available && !closed
   };
 }
 
@@ -1419,6 +1436,7 @@ function renderMyProfile() {
         ${renderProfileHero(profile)}
         ${renderProfileQuickStats(profile)}
         ${renderProfileInfoCards(profile, "compact")}
+        ${state.lowDaysEnabled ? renderMyLowDays(profile) : ""}
       <template>
       <article class="my-profile-hero">
         <div class="avatar xlarge">${avatar(profile)}</div>
@@ -1632,6 +1650,7 @@ function renderCalendarDay(profile, date) {
   const schedule = presentation.schedule;
   const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, schedule);
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
+  const holiday = publicHolidayForProfile(state, profile.id, date);
   const isSelected = ui.drawer?.type === "calendar-day"
     && ui.drawer.profileId === profile.id
     && ui.drawer.date === date;
@@ -1640,7 +1659,7 @@ function renderCalendarDay(profile, date) {
   const weekendClass = weekdayIndex(date) >= 5 ? "weekend-day" : "";
   const calendarClass = `month-day ${dayClass} ${presentation.visualId} ${sourceClass} ${weekendClass} ${approvedVacation ? "approved-vacation" : ""} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
   return `
-    <button type="button" class="${calendarClass}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${presentation.label} - ${presentation.source}">
+    <button type="button" class="${calendarClass}${holiday ? " holiday-marked" : ""}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${presentation.label} - ${presentation.source}${holiday ? ` · ${escapeHtml(holiday.name)}` : ""}">
       <span>${parseDate(date).getDate()}</span>
       ${date === todayIso ? `<small class="today-label">Today</small>` : ""}
       <em>${presentation.icon}</em>
@@ -1791,12 +1810,23 @@ function renderDateHead(date) {
   const leadLabel = leads.length > 1
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
+  const holiday = holidayForDepartment(ui.selectedDepartmentId, date);
   return `
-    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${leadLabel}">
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${leadLabel}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
+      ${holiday ? `<em class="holiday-date-label" title="${escapeHtml(holiday.name)}">${escapeHtml(holiday.name)}</em>` : ""}
     </button>
   `;
+}
+
+function holidayForDepartment(departmentId, date) {
+  const holiday = state.publicHolidays?.find((item) => item.date === date);
+  if (!holiday) return null;
+  const scope = departmentScopeIds(departmentId);
+  if (holiday.organizationWide || holiday.departmentIds.some((id) => scope.includes(id))) return holiday;
+  return visibleProfiles().some((profile) => profileBelongsToDepartment(profile, departmentId)
+    && publicHolidayForProfile(state, profile.id, date)) ? holiday : null;
 }
 
 function renderProfileRow(profile, dates) {
@@ -1923,7 +1953,10 @@ function renderTeam() {
     ["lead", "Lead"],
     ["artist", "Artist"]
   ];
-  const activeTab = ui.teamTab;
+  const showAlerts = state.lowDaysEnabled && (isAdmin() || isLead());
+  const activeTab = !showAlerts && ui.teamTab === "alerts" ? "hierarchy" : ui.teamTab;
+  const teamCredits = showAlerts ? teamLowDayCredits(profiles) : [];
+  const alertCount = teamCredits.filter((credit) => ["due", "overdue"].includes(lowDayStatus(credit))).length;
   const panelMotion = ui.teamTabAnimate ? " team-panel-enter" : "";
   ui.teamTabAnimate = false;
   const actions = `
@@ -1952,6 +1985,7 @@ function renderTeam() {
         <div class="team-tabs" role="tablist" aria-label="Team workspace">
           <button role="tab" id="team-hierarchy-tab" data-team-tab="hierarchy" aria-selected="${activeTab === "hierarchy"}" aria-controls="team-hierarchy-panel" tabindex="${activeTab === "hierarchy" ? 0 : -1}">Hierarchy</button>
           <button role="tab" id="team-directory-tab" data-team-tab="directory" aria-selected="${activeTab === "directory"}" aria-controls="team-directory-panel" tabindex="${activeTab === "directory" ? 0 : -1}">Directory</button>
+          ${showAlerts ? `<button role="tab" id="team-alerts-tab" data-team-tab="alerts" aria-selected="${activeTab === "alerts"}" aria-controls="team-alerts-panel" tabindex="${activeTab === "alerts" ? 0 : -1}">Alerts${alertCount ? ` <span class="low-day-alert-count">${alertCount}</span>` : ""}</button>` : ""}
         </div>
         ${activeTab === "hierarchy" ? `<section class="team-structure-panel${panelMotion}" id="team-hierarchy-panel" role="tabpanel" aria-labelledby="team-hierarchy-tab">
           <div class="team-section-head">
@@ -1965,7 +1999,7 @@ function renderTeam() {
             ${renderHierarchyDepartment(hierarchySection, levels)}
           </div>
           ${profiles.some(canEditHierarchy) && !isRolePreviewActive() ? `<p class="hint hierarchy-edit-hint">Drag between positions, or use a person's position menu. Structure changes are limited to Admin and team managers with Lead access.</p>` : ""}
-        </section>` : `<section class="team-directory-panel${panelMotion}" id="team-directory-panel" role="tabpanel" aria-labelledby="team-directory-tab">
+        </section>` : activeTab === "alerts" ? renderTeamAlerts(teamCredits, panelMotion) : `<section class="team-directory-panel${panelMotion}" id="team-directory-panel" role="tabpanel" aria-labelledby="team-directory-tab">
           <div class="team-section-head">
             <div>
               <span class="eyebrow">People</span>
@@ -2919,8 +2953,9 @@ function renderSettings() {
       </form>
       ${selectedDepartment && !previewProfiles.length ? `<p class="form-error" role="status">This department has no profiles to represent yet.</p>` : ""}
     </section>
+    ${state.lowDaysEnabled && canManageSystemSettings() ? renderHolidaySettings() : ""}
     <section class="status-grid">
-      ${state.statuses.map((status) => `
+      ${state.statuses.filter((status) => status.id !== "low_day").map((status) => `
         <button class="status-card" data-open-drawer="status-detail" data-status-id="${status.id}">
           <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
           <strong>${displayStatusLabel(status)}</strong>
@@ -3176,6 +3211,10 @@ function renderDrawer() {
     "request-detail": "Annual Request",
     lead: "Lead Assignment",
     "calendar-day": "Day Details",
+    "low-day-work": "Confirm Worked Day",
+    "low-day-book": "Replacement Day",
+    "holiday": ui.drawer.holidayId ? "Edit Public Holiday" : "Add Public Holiday",
+    "holiday-remove": "Remove Public Holiday",
     coverage: "Coverage",
     department: "New Department",
     "department-detail": "Department",
@@ -3219,6 +3258,9 @@ function drawerBody() {
   if (ui.drawer.type === "request") return requestDrawer();
   if (ui.drawer.type === "request-detail") return requestDetailDrawer();
   if (ui.drawer.type === "calendar-day") return calendarDayDrawer();
+  if (ui.drawer.type === "low-day-work") return lowDayWorkDrawer();
+  if (ui.drawer.type === "low-day-book") return lowDayBookingDrawer();
+  if (ui.drawer.type === "holiday" || ui.drawer.type === "holiday-remove") return publicHolidayDrawer();
   if (ui.drawer.type === "lead") return leadDrawer();
   if (ui.drawer.type === "coverage") return coverageDrawer();
   if (ui.drawer.type === "department" || ui.drawer.type === "department-detail") return departmentDrawer();
@@ -3229,6 +3271,147 @@ function drawerBody() {
   if (ui.drawer.type === "rotation-future") return rotationFutureDrawer();
   if (ui.drawer.type === "status" || ui.drawer.type === "status-detail") return statusDrawer();
   return "";
+}
+
+function canManageLowDay(profile) {
+  return Boolean(state.lowDaysEnabled && profile && !isRolePreviewActive()
+    && (isAdmin() || canManageProfileDepartment(profile)));
+}
+
+function teamLowDayCredits(profiles) {
+  const ids = new Set(profiles.filter((profile) => isAdmin() || canManageProfileDepartment(profile)).map((profile) => profile.id));
+  return state.lowDayCredits.filter((credit) => ids.has(credit.profileId) && lowDayStatus(credit) !== "taken")
+    .sort((first, second) => first.dueDate.localeCompare(second.dueDate));
+}
+
+const lowDayLabels = { open: "Available", due: "Due soon", overdue: "Overdue", booked: "Booked", taken: "Taken" };
+
+function renderLowDayRow(credit, showPerson = false) {
+  const profile = byId(state.profiles, credit.profileId);
+  const status = lowDayStatus(credit);
+  return `<div class="calendar-workflow-row">
+    <div>
+      ${showPerson ? `<strong>${escapeHtml(profile?.name || "Employee")}</strong>` : ""}
+      <span>Worked ${credit.workedDate} · Use by ${credit.dueDate}</span>
+      ${credit.replacementDate ? `<span>Replacement on ${credit.replacementDate}</span>` : ""}
+    </div>
+    <span class="low-day-state ${status}">${lowDayLabels[status]}</span>
+    ${showPerson && canManageLowDay(profile) ? `<button type="button" class="ghost" data-open-drawer="low-day-book" data-credit-id="${credit.id}" aria-label="Manage replacement day for ${escapeHtml(profile.name)} worked ${credit.workedDate}">${status === "open" || status === "due" ? "Book" : "Review"}</button>` : ""}
+  </div>`;
+}
+
+function renderMyLowDays(profile) {
+  const credits = state.lowDayCredits.filter((credit) => credit.profileId === profile.id);
+  const available = credits.filter((credit) => ["open", "due"].includes(lowDayStatus(credit))).length;
+  return `<section class="list-panel calendar-workflow-panel" aria-labelledby="my-low-days-title">
+    <div class="team-section-head"><h2 id="my-low-days-title">Low Days</h2><span>${available} available</span></div>
+    ${credits.length ? credits.map((credit) => renderLowDayRow(credit)).join("") : '<p class="hint">No replacement days earned.</p>'}
+  </section>`;
+}
+
+function renderTeamAlerts(credits, motion) {
+  return `<section class="team-directory-panel${motion}" id="team-alerts-panel" role="tabpanel" aria-labelledby="team-alerts-tab">
+    <div class="team-section-head"><h2>Replacement days</h2><span>${credits.length} to track</span></div>
+    ${credits.length ? credits.map((credit) => renderLowDayRow(credit, true)).join("") : '<p class="hint">No open or upcoming replacement days for this team.</p>'}
+  </section>`;
+}
+
+function renderWorkedDayAction(profile, date) {
+  if (!canManageLowDay(profile)) return "";
+  const credit = state.lowDayCredits.find((item) => item.profileId === profile.id
+    && (item.workedDate === date || item.replacementDate === date));
+  if (credit) return `<button type="button" class="ghost wide" data-open-drawer="low-day-book" data-credit-id="${credit.id}">View Low Days credit</button>`;
+  if (!canConfirmWorkedDay(state, profile.id, date)) return "";
+  return `<button type="button" class="ghost wide" data-open-drawer="low-day-work" data-profile-id="${profile.id}" data-date="${date}">Confirm worked day</button>`;
+}
+
+function lowDayWorkDrawer() {
+  const profile = byId(state.profiles, ui.drawer.profileId);
+  const date = ui.drawer.date;
+  if (!canManageLowDay(profile) || !canConfirmWorkedDay(state, profile.id, date)) return '<p class="hint">This date is unavailable for confirmation.</p>';
+  const shift = scheduleFor(profile.id, date);
+  const holiday = publicHolidayForProfile(state, profile.id, date);
+  const selected = ui.drawer.workStatus || shift.id;
+  const choices = ["morning", "midday", "night", "ground"].map((id) => byId(state.statuses, id)).filter((item) => item?.kind === "working");
+  return `<form class="drawer-form" id="low-day-work-form">
+    <div class="detail-line"><span>Employee</span><strong>${escapeHtml(profile.name)}</strong></div>
+    <div class="detail-line"><span>Worked date</span><strong>${date}</strong></div>
+    <div class="detail-line"><span>Reason</span><strong>${holiday ? escapeHtml(holiday.name) : "Scheduled day off"}</strong></div>
+    <div class="detail-line"><span>Take replacement by</span><strong>${addDays(date, 30)}</strong></div>
+    <label>Shift worked<select name="statusId" required><option value="">Choose shift</option>
+      ${choices.map((status) => `<option value="${status.id}" ${status.id === selected ? "selected" : ""}>${escapeHtml(status.label)}</option>`).join("")}
+    </select></label>
+    <label>Note<textarea name="note" maxlength="500">${escapeHtml(ui.drawer.workNote ?? (shift.kind === "working" ? shift.note : "") ?? "")}</textarea></label>
+    <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Confirm Work and Add Credit</button>
+  </form>`;
+}
+
+function lowDayBookingDrawer() {
+  const credit = byId(state.lowDayCredits, ui.drawer.creditId);
+  const profile = byId(state.profiles, credit?.profileId);
+  if (!credit || !canManageLowDay(profile)) return '<p class="hint">This credit is unavailable.</p>';
+  const dates = availableReplacementDates(state, credit);
+  const status = lowDayStatus(credit);
+  return `<form class="drawer-form" id="low-day-book-form">
+    ${renderLowDayRow(credit)}
+    <div class="detail-line"><span>Employee</span><strong>${escapeHtml(profile.name)}</strong></div>
+    <div class="detail-line"><span>Earned for</span><strong>${credit.reason === "public_holiday" ? "Public holiday work" : "Working a day off"}</strong></div>
+    ${dates.length ? `<label>Replacement date<select name="date" required><option value="">Choose working day</option>
+      ${dates.map((date) => `<option value="${date}" ${date === (ui.drawer.bookingDate || credit.replacementDate) ? "selected" : ""}>${formatDay(date)} ${date}</option>`).join("")}
+    </select></label>
+    <p class="hint" id="low-day-coverage" aria-live="polite"></p>
+    <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Save Replacement Day</button>` :
+      `<p class="hint">${status === "overdue" ? "The deadline has passed. This credit remains in the record for review." : status === "taken" ? "This replacement day has been taken." : "There are no eligible scheduled working days before the deadline."}</p>`}
+    ${status === "booked" ? `<button type="button" class="ghost wide" id="cancel-low-day-booking" ${isMutationPending() ? "disabled" : ""}>Cancel Booking</button>` : ""}
+  </form>`;
+}
+
+function renderHolidaySettings() {
+  return `<section class="list-panel calendar-workflow-panel" aria-labelledby="holiday-settings-title">
+    <div class="team-section-head"><h2 id="holiday-settings-title">Public Holidays</h2>
+      <button type="button" class="primary" data-open-drawer="holiday">${icons.plus} Add Public Holiday</button>
+    </div>
+    ${state.publicHolidays.length ? state.publicHolidays.map((holiday) => `<div class="calendar-workflow-row">
+      <div><strong>${escapeHtml(holiday.name)}</strong>
+        <span>${holiday.date} · ${holiday.dayOff ? "Day off" : "Scheduled coverage"}</span>
+        <span>${holiday.organizationWide ? "Entire organization" : escapeHtml(holiday.departmentIds.map((id) => byId(state.departments, id)?.name || "Removed team").join(", "))}</span>
+      </div>
+      <button type="button" class="ghost" data-open-drawer="holiday" data-holiday-id="${holiday.id}" aria-label="Edit ${escapeHtml(holiday.name)}">Edit</button>
+    </div>`).join("") : '<p class="hint">No public holidays added.</p>'}
+  </section>`;
+}
+
+function publicHolidayDrawer() {
+  if (!state.lowDaysEnabled || !canManageSystemSettings()) return "";
+  const saved = byId(state.publicHolidays, ui.drawer.holidayId);
+  const holiday = ui.drawer.holidayDraft || saved;
+  const scoped = holiday && !holiday.organizationWide;
+  if (ui.drawer.type === "holiday-remove") {
+    return saved ? `<form class="drawer-form" id="holiday-remove-form">
+      <p>Remove ${escapeHtml(saved.name)} on ${saved.date}? The schedule will use the regular rotation and any saved daily changes.</p>
+      <button class="danger wide" ${isMutationPending() ? "disabled" : ""}>Remove Public Holiday</button>
+      <button type="button" class="ghost wide" data-open-drawer="holiday" data-holiday-id="${saved.id}">Keep Holiday</button>
+    </form>` : "";
+  }
+  return `<form class="drawer-form" id="public-holiday-form">
+    <label>Holiday name<input name="name" maxlength="100" required value="${escapeHtml(holiday?.name || "")}"></label>
+    <label>Observed date<input name="date" type="date" required value="${holiday?.date || cairoDate()}"></label>
+    <label>Schedule treatment<select name="treatment">
+      <option value="off" ${holiday?.dayOff === false ? "" : "selected"}>Day off</option>
+      <option value="coverage" ${holiday?.dayOff === false ? "selected" : ""}>Scheduled coverage</option>
+    </select></label>
+    <label>Applies to<select name="scope">
+      <option value="all" ${scoped ? "" : "selected"}>Entire organization</option>
+      <option value="teams" ${scoped ? "selected" : ""}>Selected teams</option>
+    </select></label>
+    <fieldset class="department-memberships" id="holiday-teams" ${scoped ? "" : "hidden"}>
+      <legend>Affected teams</legend>
+      ${assignableDepartments(state).map((team) => `<label><input name="team" type="checkbox" value="${team.id}" ${holiday?.departmentIds.includes(team.id) ? "checked" : ""}>${escapeHtml(team.name)}</label>`).join("")}
+    </fieldset>
+    <p class="hint">Scheduled coverage keeps regular shifts. Day off applies where a daily change has not already been set.</p>
+    <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Save Public Holiday</button>
+    ${saved ? `<button type="button" class="ghost wide" data-open-drawer="holiday-remove" data-holiday-id="${saved.id}">Remove Holiday</button>` : ""}
+  </form>`;
 }
 
 function coverageDrawer() {
@@ -3271,7 +3454,7 @@ function coverageGroup(label, entries) {
 function shiftDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   const schedule = scheduleFor(profile.id, ui.drawer.date);
-  const canEdit = canManageProfileDepartment(profile) && editableDate(ui.drawer.date);
+  const canEdit = canManageProfileDepartment(profile) && editableDate(ui.drawer.date) && schedule.id !== "low_day";
   const rotation = activeRotation(profile.id, ui.drawer.date);
   const rotationStatus = schedule.rotationStatus;
   const existingOverride = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === ui.drawer.date);
@@ -3295,6 +3478,7 @@ function shiftDrawer() {
       ` : ""}
       <div class="detail-line"><span>Rotation default</span><strong>${displayStatusLabel(rotationStatus) || "No rotation"}</strong></div>
       <div class="detail-line"><span>Override</span><strong>${existingOverride ? displayStatusLabel(schedule) : "None"}</strong></div>
+      ${renderWorkedDayAction(profile, ui.drawer.date)}
       <div class="shift-status-picker">
         ${renderDailyStatusGroups("statusId", schedule.id, canEdit)}
       </div>
@@ -3303,7 +3487,7 @@ function shiftDrawer() {
         <label>Apply to<input name="endDate" type="date" value="${ui.drawer.date}" ${canEdit ? "" : "disabled"}></label>
       </div>
       <label>Note<textarea name="note" ${canEdit ? "" : "disabled"}>${displayScheduleNote(schedule.note || "")}</textarea></label>
-      <p class="hint">${canEdit ? "Saving creates a manual daily change. Sick and On Ground live here; annual leave is approved through requests." : "This date or department is locked for your role."}</p>
+      <p class="hint">${schedule.id === "low_day" ? "Manage this replacement day in Team Alerts." : canEdit ? "Saving creates a manual daily change. Sick and On Ground live here; annual leave is approved through requests." : "This date or department is locked for your role."}</p>
       <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Daily Change</button>
       ${canManageProfileDepartment(profile) ? `<button type="button" class="ghost wide" data-open-drawer="rotation-detail" data-profile-id="${profile.id}" data-rotation-id="${rotation?.id || ""}">${rotation ? "Edit Weekly Rotation" : "Create Weekly Rotation"}</button>` : ""}
       <button type="button" class="danger wide" id="clear-override" ${canEdit && existingOverride ? "" : "disabled"}>Clear Override</button>
@@ -3585,6 +3769,7 @@ function calendarDayDrawer() {
   const rotationStatus = schedule.rotationStatus;
   const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, schedule);
   const approvedVacation = vacationRequestForDate(profile.id, date, "approved");
+  const holiday = publicHolidayForProfile(state, profile.id, date);
   const canRequest = canRequestVacationFor(profile);
   const schedulerDepartmentId = profileDepartmentIds(profile).find((departmentId) => canManageDepartment(departmentId)) || profile.departmentId;
   const canOpenScheduler = canManageDepartment(schedulerDepartmentId);
@@ -3605,6 +3790,7 @@ function calendarDayDrawer() {
         </div>
       </div>
       <div class="detail-line"><span>Date</span><strong>${formatDay(date)} ${formatDate(date)}</strong></div>
+      ${holiday ? `<div class="detail-line"><span>Public holiday</span><strong>${escapeHtml(holiday.name)}</strong></div>` : ""}
       <div class="detail-line"><span>Teams</span><strong>${profileDepartmentNames(profile).join(", ") || "Unassigned"}</strong></div>
       <div class="detail-line"><span>Rotation default</span><strong>${displayStatusLabel(rotationStatus) || "No rotation"}</strong></div>
       <div class="detail-line"><span>Manual override</span><strong>${schedule.override ? "Yes" : "No"}</strong></div>
@@ -3622,6 +3808,7 @@ function calendarDayDrawer() {
         </button>
       ` : ""}
       ${canOpenScheduler ? `<button type="button" class="ghost wide" data-open-scheduler-date="${date}" data-department-id="${schedulerDepartmentId}">Open in Scheduler</button>` : ""}
+      ${ui.activeView === "scheduler" ? renderWorkedDayAction(profile, date) : ""}
       <button type="button" class="primary wide" data-open-drawer="request" data-profile-id="${profile.id}" data-date="${date}" ${canRequest ? "" : "disabled"}>Request Annual From This Day</button>
     </div>
   `;
@@ -3824,6 +4011,7 @@ function leadDrawer() {
 
 function renderBulkShiftRow(profile, date, canEdit) {
   const schedule = scheduleFor(profile.id, date);
+  canEdit = canEdit && schedule.id !== "low_day";
   const existingOverride = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
   const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, schedule);
   const availabilityLabel = schedule.id === "ground" ? "Away" : schedule.kind === "working" ? "Available" : "Unavailable";
@@ -3848,7 +4036,7 @@ function renderBulkShiftRow(profile, date, canEdit) {
       </div>
       ${pendingVacation ? `<button type="button" class="request-context pending compact" data-open-drawer="request-detail" data-request-id="${pendingVacation.id}"><strong>Pending annual</strong><span>${pendingVacation.startDate} to ${pendingVacation.endDate}</span></button>` : ""}
       <div class="bulk-row-controls">
-        <input name="note-${profile.id}" placeholder="Note" value="${existingOverride?.note || ""}" ${canEdit ? "" : "disabled"}>
+        <input name="note-${profile.id}" placeholder="Note" value="${escapeHtml(existingOverride?.note || "")}" ${canEdit ? "" : "disabled"}>
         <label class="clear-toggle ${existingOverride ? "" : "disabled"}">
           <input type="checkbox" name="clear-${profile.id}" ${canEdit && existingOverride ? "" : "disabled"}>
           <span>Clear</span>
@@ -4354,7 +4542,11 @@ function bindEvents() {
     button.addEventListener("keydown", event => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
-      activate(event.key === "Home" ? "hierarchy" : event.key === "End" ? "directory" : ui.teamTab === "hierarchy" ? "directory" : "hierarchy");
+      const tabs = [...document.querySelectorAll("[data-team-tab]")];
+      const position = tabs.indexOf(button);
+      const step = event.key === "ArrowRight" ? 1 : -1;
+      const next = event.key === "Home" ? tabs[0] : event.key === "End" ? tabs.at(-1) : tabs[(position + step + tabs.length) % tabs.length];
+      activate(next.dataset.teamTab);
     });
   });
   bindHierarchyEditing();
@@ -4522,6 +4714,20 @@ function bindEvents() {
     document.querySelector(".app-notice")?.remove();
   });
   document.querySelector("#shift-form")?.addEventListener("submit", saveShiftOverride);
+  document.querySelector("#low-day-work-form")?.addEventListener("submit", confirmWorkedDay);
+  document.querySelector("#low-day-book-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const date = new FormData(event.currentTarget).get("date");
+    if (date) void saveLowDayBooking(date);
+  });
+  document.querySelector("#cancel-low-day-booking")?.addEventListener("click", () => void saveLowDayBooking(null));
+  bindLowDayCoverage();
+  const holidayForm = document.querySelector("#public-holiday-form");
+  holidayForm?.addEventListener("submit", (event) => void saveHoliday(event, false));
+  holidayForm?.elements.scope.addEventListener("change", (event) => {
+    document.querySelector("#holiday-teams").hidden = event.target.value !== "teams";
+  });
+  document.querySelector("#holiday-remove-form")?.addEventListener("submit", (event) => void saveHoliday(event, true));
   document.querySelector("#clear-override")?.addEventListener("click", clearShiftOverride);
   document.querySelector("#unlink-profile")?.addEventListener("click", unlinkProfileAccount);
   document.querySelector("#delete-profile")?.addEventListener("click", deleteProfile);
@@ -4913,6 +5119,107 @@ async function signOut() {
   });
 }
 
+function applyLowDayResult({ credit, override, previousDate, restoredOverride }) {
+  state.lowDayCredits = [...state.lowDayCredits.filter((item) => item.id !== credit.id), credit];
+  state.scheduleOverrides = state.scheduleOverrides.filter((item) =>
+    item.profileId !== credit.profileId || (item.date !== previousDate && item.date !== override?.date));
+  if (restoredOverride) state.scheduleOverrides.push(restoredOverride);
+  if (override) state.scheduleOverrides.push(override);
+}
+
+async function confirmWorkedDay(event) {
+  event.preventDefault();
+  const profile = byId(state.profiles, ui.drawer.profileId);
+  const date = ui.drawer.date;
+  if (!canManageLowDay(profile) || !canConfirmWorkedDay(state, profile.id, date)) return;
+  const form = new FormData(event.currentTarget);
+  const input = { profileId: profile.id, date, statusId: form.get("statusId"), note: String(form.get("note") || "").trim() };
+  Object.assign(ui.drawer, { workStatus: input.statusId, workNote: input.note });
+  await runMutation("low-day-confirm", {
+    pending: "Confirming the worked shift…", success: `Work confirmed. Take the replacement by ${addDays(date, 30)}.`,
+    failure: "The worked shift could not be confirmed."
+  }, async () => {
+    const result = dataStore.mode === "demo" ? confirmDemoLowDay(state, input) : await dataStore.confirmLowDay(input);
+    applyLowDayResult(result);
+    if (dataStore.mode === "demo") audit("low_day.earned", "profile", profile.id, `Worked ${date} · use by ${result.credit.dueDate}`);
+    await saveState();
+    ui.drawer = null;
+  });
+}
+
+function bindLowDayCoverage() {
+  const picker = document.querySelector("#low-day-book-form select[name=date]");
+  const output = document.querySelector("#low-day-coverage");
+  if (!picker || !output) return;
+  const credit = byId(state.lowDayCredits, ui.drawer.creditId);
+  const profile = byId(state.profiles, credit?.profileId);
+  const update = () => {
+    const date = picker.value;
+    if (!date) { output.textContent = ""; return; }
+    if (date === credit.replacementDate) { output.textContent = "This date is already booked."; return; }
+    const teams = profileTeamIds(state, profile).filter(canManageDepartment);
+    const changes = teams.map((id) => {
+      const people = visibleProfiles().filter((person) => profileDepartmentIds(person).includes(id));
+      const before = coverageForDate(people, date).available;
+      const team = byId(state.departments, id);
+      return `${team?.name || "Team"} coverage: ${before} → ${Math.max(0, before - 1)}`;
+    });
+    if (assignedLeadDatesForProfile(profile.id, [date]).some((item) => teams.includes(item.departmentId))) {
+      changes.push("Review the lead assignment for this date.");
+    }
+    output.textContent = changes.join(" · ");
+  };
+  picker.addEventListener("change", update);
+  update();
+}
+
+async function saveLowDayBooking(date) {
+  const credit = byId(state.lowDayCredits, ui.drawer.creditId);
+  if (!credit || !canManageLowDay(byId(state.profiles, credit.profileId))) return;
+  ui.drawer.bookingDate = date;
+  await runMutation("low-day-book", {
+    pending: "Updating the replacement day…",
+    success: date ? "Replacement day booked." : "Booking cancelled. The previous schedule is restored.",
+    failure: "The replacement day could not be updated."
+  }, async () => {
+    const result = dataStore.mode === "demo" ? bookDemoLowDay(state, credit.id, date) : await dataStore.bookLowDay(credit.id, date);
+    applyLowDayResult(result);
+    if (dataStore.mode === "demo") audit(date ? "low_day.booked" : "low_day.booking_cancelled", "profile", credit.profileId, date || credit.replacementDate);
+    await saveState();
+    ui.drawer = null;
+  });
+}
+
+async function saveHoliday(event, remove) {
+  event.preventDefault();
+  if (!state.lowDaysEnabled || !canManageSystemSettings()) return;
+  const form = new FormData(event.currentTarget);
+  const organizationWide = form.get("scope") !== "teams";
+  const holiday = {
+    id: ui.drawer.holidayId, name: String(form.get("name") || "").trim(), date: form.get("date"),
+    dayOff: form.get("treatment") === "off", organizationWide,
+    departmentIds: organizationWide ? [] : form.getAll("team")
+  };
+  if (!remove && (!holiday.name || !holiday.date || (!organizationWide && !holiday.departmentIds.length))) {
+    notify("Enter a name and date, and select at least one affected team.", "error");
+    return;
+  }
+  if (!remove) ui.drawer.holidayDraft = holiday;
+  await runMutation("holiday-save", {
+    pending: "Updating public holidays…", success: remove ? "Public holiday removed." : "Public holiday saved.",
+    failure: "The public holiday could not be updated."
+  }, async () => {
+    if (dataStore.mode === "demo") {
+      state.publicHolidays = saveDemoHoliday(state, holiday, remove);
+      audit(remove ? "holiday.deleted" : "holiday.saved", "public_holiday", holiday.id || holiday.date, holiday.name || "Holiday removed");
+    } else {
+      Object.assign(state, await dataStore.savePublicHoliday(holiday, remove));
+    }
+    await saveState();
+    ui.drawer = null;
+  });
+}
+
 async function saveShiftOverride(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -4923,6 +5230,10 @@ async function saveShiftOverride(event) {
   const rangeStart = startDate <= endDate ? startDate : endDate;
   const rangeEnd = startDate <= endDate ? endDate : startDate;
   const targetDates = datesBetween(rangeStart, rangeEnd).filter(editableDate);
+  if (targetDates.some((date) => scheduleFor(profile.id, date).id === "low_day")) {
+    notify("Manage booked replacement days in Team Alerts.", "error");
+    return;
+  }
   const selectedStatusId = form.get("statusId");
   const selectedStatus = byId(state.statuses, selectedStatusId);
   if (!selectedStatus || ![...rotationStatusIds, ...manualExceptionStatusIds].includes(selectedStatusId)) {
@@ -4970,7 +5281,7 @@ async function clearShiftOverride() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile || !canManageProfileDepartment(profile) || !editableDate(ui.drawer.date)) return;
   const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === ui.drawer.date);
-  if (!existing) return;
+  if (!existing || existing.statusId === "low_day") return;
   await runMutation("shift-clear", {
     pending: "Clearing daily change...",
     success: "Daily change cleared.",
@@ -5638,6 +5949,7 @@ async function saveDayBulkOverrides(event) {
     const note = (form.get(`note-${profile.id}`) || "").trim();
     const shouldClear = form.get(`clear-${profile.id}`) === "on";
     const existing = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === date);
+    if (!statusId || existing?.statusId === "low_day") continue;
     if (shouldClear) {
       if (!existing) continue;
       cleared.push(existing);

@@ -32,6 +32,9 @@ function createLocalStore() {
     async load() {
       const stored = localStorage.getItem(storageKey);
       const state = normalizeDemoProfileStructure(syncDemoAnnualBalances(stored ? JSON.parse(stored) : structuredClone(seedState)));
+      state.publicHolidays ||= [];
+      state.lowDayCredits ||= [];
+      state.lowDaysEnabled = true;
       localStorage.setItem(storageKey, JSON.stringify(state));
       return state;
     },
@@ -301,6 +304,25 @@ function createRemoteStore(client) {
     },
     async upsertScheduleOverride(override) {
       await client.upsert("schedule_overrides", toDbOverride(override), "profile_id,shift_date");
+    },
+    async confirmLowDay({ profileId, date, statusId, note }) {
+      const result = await client.rpc("confirm_low_day_work", {
+        p_profile: profileId, p_date: date, p_status: statusId, p_note: note
+      });
+      return fromDbLowDayResult(result);
+    },
+    async bookLowDay(creditId, date) {
+      return fromDbLowDayResult(await client.rpc("book_low_day", { p_credit: creditId, p_date: date }));
+    },
+    async savePublicHoliday(holiday, remove) {
+      const calendar = await client.rpc("save_public_holiday", {
+        p_id: holiday.id || null, p_date: holiday.date || null, p_name: holiday.name || null,
+        p_department_ids: holiday.departmentIds || [], p_day_off: holiday.dayOff ?? null, p_delete: remove
+      });
+      return fromDbLowDayCalendar(calendar, true);
+    },
+    async loadLowDayCalendar(admin) {
+      return fromDbLowDayCalendar(await client.rpc("get_low_day_calendar"), admin);
     },
     async deleteScheduleOverride(override) {
       await client.delete("schedule_overrides", `profile_id=eq.${override.profileId}&shift_date=eq.${override.date}`);
@@ -800,6 +822,10 @@ async function loadRemoteState(client, session) {
   }));
   const currentProfile = mappedProfiles.find((profile) => profile.userId === session.user.id);
   const currentRole = roles.find((role) => role.user_id === session.user.id);
+  const lowDaysEnabled = statuses.some((status) => status.id === "low_day");
+  const calendar = lowDaysEnabled
+    ? fromDbLowDayCalendar(await client.rpc("get_low_day_calendar"), currentRole?.role === "admin")
+    : { publicHolidays: [], lowDayCredits: [] };
   if(currentRole?.role === "lead" && currentProfile?.seniorityLevel === "manager") {
     const permissions=await client.rpc("get_profile_structure_permissions");
     mappedProfiles.forEach(profile=>{const entry=(permissions||[]).find(row=>row.profile_id===profile.id);profile.structurePermissions={teams:entry?.can_edit_teams===true,position:entry?.can_edit_position===true};});
@@ -816,6 +842,8 @@ async function loadRemoteState(client, session) {
     userRoles: roles.map(fromDbUserRole),
     onboardingSubmissions,
     profiles: mappedProfiles,
+    lowDaysEnabled,
+    ...calendar,
     annualBalances: annualBalances.map(row => ({ profileId: row.profile_id, year: row.balance_year, allowance: row.allowance_days, remaining: row.remaining_days, source: row.source })),
     statuses: statuses.map(fromDbStatus),
     rotationVersions: rotations.map(fromDbRotation),
@@ -967,6 +995,23 @@ function toDbRotation(rotation) {
 
 function fromDbOverride(row) {
   return { id: row.id, profileId: row.profile_id, date: row.shift_date, statusId: row.status_id, note: row.note || "" };
+}
+
+function fromDbLowDayCredit(row) {
+  return { id: row.id, profileId: row.profile_id, workedDate: row.worked_date, dueDate: row.due_date,
+    workedStatusId: row.worked_status_id, reason: row.reason, replacementDate: row.replacement_date };
+}
+
+function fromDbLowDayCalendar(calendar, admin) {
+  const publicHolidays = (calendar.holidays || []).map(({ profileIds, ...holiday }) =>
+    admin ? holiday : { ...holiday, profileIds });
+  return { publicHolidays, lowDayCredits: (calendar.credits || []).map(fromDbLowDayCredit) };
+}
+
+function fromDbLowDayResult(result) {
+  return { credit: fromDbLowDayCredit(result.credit), previousDate: result.previousDate,
+    override: result.override?.id ? fromDbOverride(result.override) : null,
+    restoredOverride: result.restoredOverride?.id ? fromDbOverride(result.restoredOverride) : null };
 }
 
 function toDbOverride(override) {

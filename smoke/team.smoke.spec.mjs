@@ -114,6 +114,8 @@ test('Team tabs work with keyboard, preserve department and directory view, and 
   await expect(page.getByRole('tab', { name: 'Hierarchy', exact: true })).toBeFocused();
   expect(await page.locator('.team-structure-panel').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
   await page.keyboard.press('End');
+  await expect(page.getByRole('tab', { name: 'Alerts', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
   await expect(page.getByRole('button', { name: 'List', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#team-department-select')).toHaveValue('ops');
   await expect(page.locator('.person-list-row')).toHaveCount(3);
