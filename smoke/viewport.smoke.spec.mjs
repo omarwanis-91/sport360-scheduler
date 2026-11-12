@@ -98,6 +98,8 @@ for (const width of widths) {
 
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expectMainShellHealthy(page);
+    await page.getByRole("tab", { name: "Role Preview", exact: true }).click();
+    await expectMainShellHealthy(page);
     await expect(page.getByRole("heading", { name: "Preview as a role", exact: true })).toBeVisible();
     await expect(page.locator("#role-preview-form")).toBeVisible();
     await page.locator("#role-preview-profile").selectOption("emp-002");

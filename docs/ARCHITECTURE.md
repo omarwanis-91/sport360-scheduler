@@ -44,7 +44,7 @@ There is no frontend framework or bundler. A dependency-free Node build copies t
 6. Application state is rendered into `#app` using template functions.
 7. Event listeners call workflow functions and persistence methods.
 8. Successful writes update Supabase and then refresh or persist local state.
-9. An Admin-only Role Preview can substitute an effective Lead or Employee role, one department, and one existing representative profile for frontend rendering. A persistent read-only banner identifies the simulation, while the central mutation wrapper blocks writes and the real Supabase Admin session remains unchanged.
+9. Role Preview substitutes an effective role, existing linked profile, and department scope for frontend rendering. Admins choose an actual Lead or Employee in one department. Managers with Lead access choose an Employee and see only the teams they share. A persistent banner identifies the read-only preview. The central mutation wrapper blocks writes and Supabase keeps the original signed-in session.
 
 ## UI Structure
 
@@ -58,7 +58,7 @@ The application uses view-level render functions rather than routes. Primary vie
 - Activity
 - Settings
 
-Settings also contains the Admin-only Role Preview launcher. Preview mode is intentionally session-local and UI-only; production authorization remains enforced and tested through Supabase RLS/RPCs.
+Settings separates Schedule (Public Holidays and Shift Labels) from Role Preview. Preview mode is session-local. Migration 037's `get_scheduler_tools` RPC returns eligible linked Employee profiles and shared teams for Managers with Lead access. Production authorization remains enforced through Supabase RLS/RPCs.
 
 Team uses one shared department selection, a foldable parent/child department navigation list, and separate Hierarchy/Directory tabs. The list follows stored parent relationships; it does not infer membership or grant access to ancestors or siblings. Selecting a hidden department through the top selector expands its visible ancestors. Directory retains its four existing display modes.
 
@@ -119,11 +119,13 @@ For a person and date:
 4. Use the override when present. Otherwise, apply a configured public holiday day off for the person's teams.
 5. Use the rotation result on regular dates and holidays with scheduled coverage. If no rotation exists, show Unassigned.
 
-Migration 036 adds dated holidays and Low Days credits. Admin enters a holiday name, observed date, team scope, and day-off or scheduled-coverage treatment under Settings → Public Holidays. Any targeted team membership qualifies a hybrid profile. Existing daily overrides keep precedence, including approved Annual. The Scheduler names applicable holidays in date headers. Profiles can inspect the holiday in their calendar.
+Migration 036 adds dated holidays and Low Days credits. Admin enters a holiday name, observed date, team scope, and day-off or scheduled-coverage treatment under Settings → Schedule → Public Holidays. Any targeted team membership qualifies a hybrid profile. Existing daily overrides keep precedence, including approved Annual. The Scheduler names applicable holidays in date headers. Profiles can inspect the holiday in their calendar.
 
 Admin and scoped Leads can confirm a worked shift on an eligible day off or public holiday through the Scheduler. The RPC records the actual shift and issues one credit per person and date in the same transaction. A credit is due 30 calendar days after the worked date, with dates resolved in Africa/Cairo. Team → Alerts shows open and upcoming booked credits, counts those due within seven days and overdue, and lets authorized viewers choose a regular working day by the deadline. Moving or cancelling a booking restores the prior shift. Employees see their own history and deadlines in My Profile → Low Days. Overdue credits stay visible and cannot be booked beyond the deadline.
 
 The calendar and credit tables are private. The read RPC resolves holiday applicability against full memberships, including hidden hybrid memberships, and returns credit history only to its owner or an authorized manager. The Analytics snapshot carries scoped holiday applicability and counts both new exceptions as known off days. Annual request validation and approval share the holiday-aware workday calculation and exclude confirmed worked dates. Replacement-day actions never charge the Annual ledger.
+
+Scheduler → Low Days opens Team → Alerts, where Find worked day opens the person's shift details. Migration 037 adds a private events table, scoped reads, and audited event writes. Admin can create organization-wide or team events. Leads can change events scoped entirely to teams they manage. Scheduler date headers and Annual review use the same date-range overlay. Events have no effect on rotations, staffing calculations, or Annual deductions.
 
 ## Main Domain Data
 

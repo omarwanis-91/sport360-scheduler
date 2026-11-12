@@ -166,6 +166,7 @@ test('Manager with Lead access stays department scoped and Employee and Role Pre
   await expect(page.locator('[data-hierarchy-drag], [data-hierarchy-level-picker], [data-hierarchy-drop-level]')).toHaveCount(0);
   await page.locator('#user-switcher').selectOption('user-admin');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Role Preview', exact: true }).click();
   await page.locator('#role-preview-role').selectOption('lead');
   await page.locator('#role-preview-department').selectOption('ops');
   await page.locator('#role-preview-profile').selectOption('emp-002');
