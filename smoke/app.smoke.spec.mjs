@@ -231,6 +231,7 @@ test("Employee has department read access and own identity editing only", async 
 test("Admin can preview Employee access without changing the signed-in user", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("tab", { name: "Role Preview", exact: true }).click();
 
   await page.locator("#role-preview-role").selectOption("employee");
   await page.locator("#role-preview-department").selectOption("support");
@@ -239,7 +240,7 @@ test("Admin can preview Employee access without changing the signed-in user", as
 
   const banner = page.getByRole("region", { name: "Role Preview is active" });
   await expect(banner).toContainText("Previewing Employee · Customer Support");
-  await expect(banner).toContainText("Supabase session remains Admin");
+  await expect(banner).toContainText("Your sign-in stays active");
   await expect(page.locator("#department-select option")).toHaveCount(1);
   await expect(page.locator("#department-select")).toHaveValue("support");
   await expect(page.getByRole("button", { name: "Edit daily leads", exact: true })).toHaveCount(0);
@@ -265,9 +266,11 @@ test("Admin can preview Employee access without changing the signed-in user", as
 test("Admin can preview Lead scope for one selected department", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("tab", { name: "Role Preview", exact: true }).click();
 
   await page.locator("#role-preview-role").selectOption("lead");
   await page.locator("#role-preview-department").selectOption("ops");
+  await expect(page.locator('#role-preview-profile option[value]:not([value=""])')).toHaveText(["Mona Saleh"]);
   await page.locator("#role-preview-profile").selectOption("emp-002");
   await page.getByRole("button", { name: "Start Preview", exact: true }).click();
 

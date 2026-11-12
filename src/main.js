@@ -135,6 +135,7 @@ const ui = {
   analytics: { month:todayIso.slice(0,7), period:"month", departmentId:"all", key:"", status:"idle", snapshot:null, days:null, model:null, error:"", token:0, sort:{key:"name",direction:"asc"} },
   rolePreviewDraftRole: "lead",
   rolePreviewDraftDepartmentId: "",
+  settingsTab: "schedule",
   mutation: { key: "", status: "idle", message: "" }
 };
 
@@ -171,9 +172,13 @@ async function runMutation(key, messages, action) {
     if (state.lowDaysEnabled && dataStore.mode === "supabase" && isLead()
       && ["profile-save", "profile-remove-department", "department-members"].includes(key)) {
       try {
-        Object.assign(state, await dataStore.loadLowDayCalendar(false));
+        const [calendar, schedulerTools] = await Promise.all([
+          dataStore.loadLowDayCalendar(false),
+          state.eventsEnabled ? dataStore.loadSchedulerTools() : null
+        ]);
+        Object.assign(state, calendar, schedulerTools);
       } catch {
-        success += " Reload to refresh holidays and replacement days for the updated team.";
+        success += " Reload to refresh calendar tools for the updated team.";
       }
     }
     invalidateAnalytics();
@@ -212,7 +217,10 @@ function displayScheduleNote(note = "") {
 function normalizeStateForUi() {
   state.onboardingSubmissions ||= [];
   const annualStatus = byId(state.statuses, "vacation");
-  if (annualStatus) annualStatus.label = "Annual";
+  if (annualStatus) {
+    annualStatus.label = "Annual";
+    annualStatus.color = "#7edc98";
+  }
 }
 
 function loadState() {
@@ -429,8 +437,16 @@ function currentUser() {
   return byId(state.users, state.currentUserId);
 }
 
+function canStartRolePreview() {
+  const user = currentUser();
+  if (user?.role === "admin") return true;
+  const profile = byId(state.profiles, user?.profileId);
+  return user?.role === "lead" && profile?.seniorityLevel === "manager" && profileTeamIds(state, profile).length > 0
+    && (dataStore?.mode === "demo" || Array.isArray(state.managerPreviewProfiles));
+}
+
 function isRolePreviewActive() {
-  return Boolean(ui.rolePreview?.active && currentUser()?.role === "admin");
+  return Boolean(ui.rolePreview?.active && canStartRolePreview());
 }
 
 function effectiveRole() {
@@ -453,7 +469,8 @@ function profileDepartmentIds(profile) {
 }
 
 function profileDepartmentNames(profile) {
-  return profileTeamIds(state,profile).map((id) => byId(state.departments, id)?.name).filter(Boolean);
+  return profileTeamIds(state,profile).filter((id) => !isRolePreviewActive() || ui.rolePreview.departmentIds.includes(id))
+    .map((id) => byId(state.departments, id)?.name).filter(Boolean);
 }
 
 function directlySharesDepartment(firstProfile, secondProfile) {
@@ -463,7 +480,7 @@ function directlySharesDepartment(firstProfile, secondProfile) {
 
 function visibleDepartments() {
   if (isRolePreviewActive()) {
-    return state.departments.filter((department) => department.id === ui.rolePreview.departmentId);
+    return state.departments.filter((department) => ui.rolePreview.departmentIds.includes(department.id));
   }
   if (isAdmin()) return state.departments;
   const allowed = new Set(profileDepartmentIds(currentProfile()));
@@ -473,7 +490,7 @@ function visibleDepartments() {
 function canViewProfile(profile) {
   if (!profile) return false;
   if (isRolePreviewActive()) {
-    return profile.id === currentProfile()?.id || profileDepartmentIds(profile).includes(ui.rolePreview.departmentId);
+    return profile.id === currentProfile()?.id || profileDepartmentIds(profile).some((id) => ui.rolePreview.departmentIds.includes(id));
   }
   if (isAdmin() || profile.id === currentProfile()?.id) return true;
   if (isTeamManager() && profileTeamIds(state,profile).length === 0) return true;
@@ -884,8 +901,8 @@ function escapeHtml(value = "") {
     .replaceAll("'", "&#039;");
 }
 
-function rolePreviewDepartment() {
-  return byId(state.departments, ui.rolePreview?.departmentId);
+function rolePreviewTeamNames() {
+  return visibleDepartments().map((department) => department.name).join(", ");
 }
 
 function rolePreviewLabel() {
@@ -895,14 +912,13 @@ function rolePreviewLabel() {
 
 function renderRolePreviewBanner() {
   if (!isRolePreviewActive()) return "";
-  const department = rolePreviewDepartment();
   return `
     <section class="role-preview-banner" aria-label="Role Preview is active">
       <div class="role-preview-banner-copy">
         <span class="role-preview-badge">Read only</span>
         <div>
-          <strong>Previewing ${rolePreviewLabel()} · ${escapeHtml(department?.name || "Department")}</strong>
-          <span>UI visibility only. Your Supabase session remains Admin.</span>
+          <strong>Previewing ${escapeHtml(rolePreviewLabel())} · ${escapeHtml(rolePreviewTeamNames())}</strong>
+          <span>${escapeHtml(currentProfile()?.name || "")} · Your sign-in stays active.</span>
         </div>
       </div>
       <button type="button" class="ghost" data-exit-role-preview>Exit Preview</button>
@@ -916,7 +932,7 @@ function renderRolePreviewSidebar() {
     <section class="role-preview-sidebar" aria-label="Active role preview">
       <span class="eyebrow">Role Preview · Read only</span>
       <strong>${rolePreviewLabel()}</strong>
-      <span>${escapeHtml(rolePreviewDepartment()?.name || "Department")}</span>
+      <span>${escapeHtml(rolePreviewTeamNames())}</span>
       <button type="button" class="ghost wide" data-exit-role-preview>Exit Preview</button>
     </section>
   `;
@@ -1005,12 +1021,12 @@ function render() {
         ${navButton("rotations", "Rotations", icons.rotations)}
         ${canViewAnalytics() ? navButton("analytics", "Analytics", icons.activity) : ""}
         ${isAdmin() ? navButton("activity", "Activity", icons.activity) : ""}
-        ${isAdmin() ? navButton("settings", "Settings", icons.settings) : ""}
+        ${!isRolePreviewActive() && canStartRolePreview() ? navButton("settings", "Settings", icons.settings) : ""}
       </nav>
       ${dataStore.mode === "demo" ? isRolePreviewActive() ? `
         <div class="sidebar-card">
           <span class="eyebrow">Demo Access</span>
-          <p class="hint">Admin preview session</p>
+          <p class="hint">Role Preview session</p>
         </div>
       ` : `
         <div class="sidebar-card">
@@ -1023,7 +1039,7 @@ function render() {
       ` : `
         <div class="sidebar-card">
           <span class="eyebrow">Live Supabase</span>
-          <p class="hint">${isRolePreviewActive() ? `Admin session: ${escapeHtml(currentUser()?.email || "Signed in")}` : escapeHtml(currentUser()?.email || "Signed in")}</p>
+          <p class="hint">${escapeHtml(currentUser()?.email || "Signed in")}</p>
           ${isRolePreviewActive() ? "" : `<button class="ghost wide" id="sign-out">Sign out</button>`}
         </div>
       `}
@@ -1382,7 +1398,9 @@ function renderAnalytics() {
   const range=analyticsRange(a.month,a.period);
   a.model=a.status==="ready"?aggregateAnalytics(a.snapshot,a.days,a.month,a.period):null;
   const entering=a.justLoaded;a.justLoaded=false;
-  const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label><label>Month<input id="analytics-month" type="month" min="2000-01" max="2100-12" value="${a.month}"/></label><label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label><button class="ghost" id="analytics-refresh" aria-label="Refresh analytics">${icons.rotations}</button><button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button></div>`;
+  const months=Array.from({length:12},(_,index)=>{const id=String(index+1).padStart(2,"0");return `<option value="${id}" ${a.month.slice(5)===id?"selected":""}>${new Date(2026,index,1).toLocaleDateString("en-GB",{month:"long"})}</option>`;}).join("");
+  const years=Array.from({length:101},(_,index)=>2000+index).map(year=>`<option value="${year}" ${range.year===year?"selected":""}>${year}</option>`).join("");
+  const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label><label>Month<select id="analytics-month">${months}</select></label><label>Year<select id="analytics-year">${years}</select></label><label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label><button class="ghost" id="analytics-refresh" aria-label="Refresh analytics">${icons.rotations}</button><button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button></div>`;
   const scope=context.params.departmentId?context.departments.find(d=>d.id===context.params.departmentId)?.name:"All teams";
   return `${renderTopbar("Analytics",`${escapeHtml(scope)} · ${range.label} · Planned from saved schedules`,controls)}
     ${a.status==="error"?`<section class="empty-state analytics-error" role="alert"><strong>Analytics could not load</strong><span>${escapeHtml(a.error)}</span><span>For a new deployment, apply migration 034 and audit 022 first.</span><button class="primary" id="analytics-retry">Retry</button></section>`:a.model?renderAnalyticsDashboard(a.model,a.sort,entering):'<section class="analytics-loading" role="status" aria-live="polite"><span>Loading schedule analytics…</span><div></div><div></div><div></div></section>'}`;
@@ -1392,13 +1410,13 @@ function bindAnalyticsEvents() {
   if(ui.activeView!=="analytics"||!canViewAnalytics())return;
   const a=ui.analytics;
   const updateAndFocus=selector=>{render();document.querySelector(selector)?.focus({preventScroll:true});};
-  for(const [selector,field] of [["#analytics-month","month"],["#analytics-period","period"],["#analytics-department","departmentId"]]) {
+  for(const [selector,field] of [["#analytics-month","monthPart"],["#analytics-year","year"],["#analytics-period","period"],["#analytics-department","departmentId"]]) {
     document.querySelector(selector)?.addEventListener("change",event=>{
       if(!event.target.value||!event.target.checkValidity())return;
-      if(field==="month") {
-        try { analyticsRange(event.target.value); } catch { notify("Choose a month between January 2000 and December 2100.","warning");return; }
-      }
-      a[field]=event.target.value;updateAndFocus(selector);
+      if(field==="monthPart") a.month=`${a.month.slice(0,4)}-${event.target.value}`;
+      else if(field==="year") a.month=`${event.target.value}-${a.month.slice(5)}`;
+      else a[field]=event.target.value;
+      updateAndFocus(selector);
     });
   }
   for(const id of ["#analytics-retry","#analytics-refresh"])document.querySelector(id)?.addEventListener("click",()=>{invalidateAnalytics();render();});
@@ -1426,31 +1444,21 @@ function renderMyProfile() {
       </section>
     `;
   }
-  const department = byId(state.departments, profile.departmentId);
-  const departmentSummary = profileDepartmentNames(profile).join(", ") || "No department";
-  const upcoming = datesInRange().slice(0, 7);
+  const upcoming = datesBetween(todayIso, addDays(todayIso, 6));
   return `
     ${renderTopbar("My Profile", "Your profile, annual balance, and upcoming shifts.", `<button class="primary" data-open-drawer="profile" data-profile-id="${profile.id}">Edit My Profile</button>`)}
     <section class="my-profile-layout">
-      <div class="my-profile-side">
+      <div class="my-profile-overview">
         ${renderProfileHero(profile)}
         ${renderProfileQuickStats(profile)}
         ${renderProfileInfoCards(profile, "compact")}
+      </div>
+      <div class="my-profile-side">
         ${state.lowDaysEnabled ? renderMyLowDays(profile) : ""}
-      <template>
-      <article class="my-profile-hero">
-        <div class="avatar xlarge">${avatar(profile)}</div>
-        <div>
-          <span class="eyebrow">${roleForProfile(profile)}</span>
-          <h2>${profile.name}</h2>
-          <p>${profile.title} · ${department?.name || "No department"}</p>
-        </div>
-      </article>
-      </template>
-      <section class="list-panel my-shifts">
-        <span class="eyebrow">Upcoming</span>
-        ${upcoming.map((date) => renderUpcomingShiftRow(profile, date)).join("")}
-      </section>
+        <section class="list-panel my-shifts">
+          <span class="eyebrow">Upcoming</span>
+          ${upcoming.map((date) => renderUpcomingShiftRow(profile, date)).join("")}
+        </section>
       </div>
       ${renderPersonMonthCalendar(profile, "page")}
     </section>
@@ -1656,7 +1664,7 @@ function renderCalendarDay(profile, date) {
     && ui.drawer.date === date;
   const sourceClass = schedule.source.toLowerCase().replace(/\s+/g, "-");
   const dayClass = schedule.id === "ground" ? "away" : schedule.kind;
-  const weekendClass = weekdayIndex(date) >= 5 ? "weekend-day" : "";
+  const weekendClass = schedule.kind !== "working" && weekdayIndex(date) >= 5 ? "weekend-day" : "";
   const calendarClass = `month-day ${dayClass} ${presentation.visualId} ${sourceClass} ${weekendClass} ${approvedVacation ? "approved-vacation" : ""} ${date === todayIso ? "today" : ""} ${pendingVacation ? "pending" : ""} ${isSelected ? "selected" : ""}`;
   return `
     <button type="button" class="${calendarClass}${holiday ? " holiday-marked" : ""}" data-open-drawer="calendar-day" data-profile-id="${profile.id}" data-date="${date}" aria-pressed="${isSelected}" title="${presentation.label} - ${presentation.source}${holiday ? ` · ${escapeHtml(holiday.name)}` : ""}">
@@ -1721,9 +1729,13 @@ function renderScheduler() {
   if (!department) {
     return renderTopbar("No Departments", "Create at least one department in Supabase before building schedules.", "");
   }
+  const actions = `<div class="top-actions scheduler-top-actions">
+    ${state.lowDaysEnabled && (isAdmin() || isLead()) ? '<button class="ghost" id="scheduler-low-days">Low Days</button>' : ""}
+    ${state.eventsEnabled ? '<button class="ghost" data-open-drawer="events">Events</button>' : ""}
+  </div>`;
 
   return `
-    ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.")}
+    ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.", actions)}
     ${ui.schedulerEditMode ? renderSchedulerEditCommitBar() : ""}
     <section class="scheduler-toolbar" aria-label="Schedule controls">
         <div class="month-corner">
@@ -1811,11 +1823,13 @@ function renderDateHead(date) {
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
   const holiday = holidayForDepartment(ui.selectedDepartmentId, date);
+  const events = scopedEvents(departmentScopeIds(ui.selectedDepartmentId), date, date);
   return `
-    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${leadLabel}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}">
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${leadLabel}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}${events.length ? `. Events: ${escapeHtml(events.map((event) => event.title).join(", "))}` : ""}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
       ${holiday ? `<em class="holiday-date-label" title="${escapeHtml(holiday.name)}">${escapeHtml(holiday.name)}</em>` : ""}
+      ${renderEventDateMarker(events)}
     </button>
   `;
 }
@@ -2919,68 +2933,122 @@ function latestRotationForProfile(profileId) {
     .sort((a, b) => b.effectiveStart.localeCompare(a.effectiveStart))[0];
 }
 
+function managerPreviewOptions() {
+  if (dataStore.mode === "supabase") return state.managerPreviewProfiles || [];
+  const actor = byId(state.profiles, currentUser()?.profileId);
+  const ownTeams = new Set(profileTeamIds(state, actor));
+  return state.profiles.filter((profile) => profile.userId && roleForProfile(profile) === "employee")
+    .map((profile) => ({
+      profileId: profile.id,
+      departmentIds: profileTeamIds(state, profile).filter((id) => ownTeams.has(id))
+    })).filter((item) => item.departmentIds.length);
+}
+
+function adminPreviewProfiles(role, departmentId) {
+  return state.profiles.filter((profile) => profile.userId && roleForProfile(profile) === role
+    && profileTeamIds(state, profile).includes(departmentId));
+}
+
 function renderSettings() {
-  const selectedDepartment = state.departments.find((department) => department.id === ui.rolePreviewDraftDepartmentId) || state.departments[0];
-  const previewProfiles = state.profiles
-    .filter((profile) => profileDepartmentIds(profile).includes(selectedDepartment?.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  if (isRolePreviewActive() || !canStartRolePreview()) return renderScheduler();
+  const admin = isAdmin();
+  const activeTab = admin ? ui.settingsTab : "preview";
+  const tab = (key, label) => `<button type="button" role="tab" id="settings-${key}-tab" data-settings-tab="${key}"
+    aria-selected="${activeTab === key}" aria-controls="settings-${key}-panel" tabindex="${activeTab === key ? 0 : -1}">${label}</button>`;
   return `
-    ${renderTopbar("Settings", "Manage status labels and safely inspect role-scoped interface access.", canManageSystemSettings() ? `<button class="primary" data-open-drawer="status">${icons.plus} New Status</button>` : "")}
-    <section class="list-panel role-preview-panel" aria-labelledby="role-preview-title">
-      <div class="role-preview-panel-copy">
-        <span class="eyebrow">Admin tool · Read only</span>
-        <h2 id="role-preview-title">Preview as a role</h2>
-        <p class="hint">Choose a department and an existing profile to inspect the Lead or Employee interface. Your real Supabase session stays Admin and all writes are blocked until you exit.</p>
+    ${renderTopbar("Settings", admin ? "Manage the schedule and preview access." : "Preview your employees’ workspace.")}
+    <div class="team-tabs settings-tabs" role="tablist" aria-label="Settings">
+      ${admin ? tab("schedule", "Schedule") : ""}${tab("preview", "Role Preview")}
+    </div>
+    ${activeTab === "preview" ? renderRolePreviewSettings(admin) : `
+      <div class="settings-panels" id="settings-schedule-panel" role="tabpanel" aria-labelledby="settings-schedule-tab">
+        ${state.lowDaysEnabled ? renderHolidaySettings() : ""}
+        <section class="list-panel calendar-workflow-panel" aria-labelledby="settings-shift-labels">
+          <div class="team-section-head"><h2 id="settings-shift-labels">Shift Labels</h2>
+            <button class="primary" data-open-drawer="status">${icons.plus} New Status</button>
+          </div>
+          <div class="status-grid">
+            ${state.statuses.filter((status) => status.id !== "low_day").map((status) => `
+              <button class="status-card ${status.id === "vacation" ? "annual-status-card" : ""}" data-open-drawer="status-detail" data-status-id="${status.id}">
+                <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
+                <strong>${escapeHtml(displayStatusLabel(status))}</strong>
+                <em>${escapeHtml(status.kind)}</em>
+              </button>
+            `).join("")}
+          </div>
+        </section>
       </div>
-      <form id="role-preview-form" class="role-preview-form">
-        <label>Role
-          <select name="role" id="role-preview-role">
-            <option value="lead" ${ui.rolePreviewDraftRole === "lead" ? "selected" : ""}>Lead</option>
-            <option value="employee" ${ui.rolePreviewDraftRole === "employee" ? "selected" : ""}>Employee</option>
-          </select>
-        </label>
-        <label>Department
-          <select name="departmentId" id="role-preview-department" ${state.departments.length ? "" : "disabled"}>
-            ${state.departments.map((department) => `<option value="${department.id}" ${department.id === selectedDepartment?.id ? "selected" : ""}>${escapeHtml(departmentLabel(department))}</option>`).join("")}
-          </select>
-        </label>
-        <label>Representative profile
-          <select name="profileId" id="role-preview-profile" ${previewProfiles.length ? "" : "disabled"}>
-            ${previewProfiles.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.name)}</option>`).join("")}
-          </select>
-        </label>
-        <button type="submit" class="primary" ${selectedDepartment && previewProfiles.length ? "" : "disabled"}>Start Preview</button>
-      </form>
-      ${selectedDepartment && !previewProfiles.length ? `<p class="form-error" role="status">This department has no profiles to represent yet.</p>` : ""}
-    </section>
-    ${state.lowDaysEnabled && canManageSystemSettings() ? renderHolidaySettings() : ""}
-    <section class="status-grid">
-      ${state.statuses.filter((status) => status.id !== "low_day").map((status) => `
-        <button class="status-card" data-open-drawer="status-detail" data-status-id="${status.id}">
-          <span class="shift-icon">${statusIcons[status.id] || icons.scheduler}</span>
-          <strong>${displayStatusLabel(status)}</strong>
-          <em>${status.kind}</em>
-        </button>
-      `).join("")}
-    </section>
+    `}
   `;
 }
 
-function startRolePreview(event) {
-  event.preventDefault();
-  if (currentUser()?.role !== "admin") return;
-  const form = new FormData(event.currentTarget);
-  const role = form.get("role");
-  const departmentId = form.get("departmentId");
-  const profileId = form.get("profileId");
-  const department = byId(state.departments, departmentId);
-  const profile = byId(state.profiles, profileId);
-  if (!["lead", "employee"].includes(role) || !department || !profileDepartmentIds(profile).includes(departmentId)) {
-    notify("Choose a valid role, department, and representative profile.", "error");
-    return;
-  }
+function renderRolePreviewSettings(admin) {
+  const teams = assignableDepartments(state);
+  const selectedTeam = teams.find((team) => team.id === ui.rolePreviewDraftDepartmentId) || teams[0];
+  const role = ui.rolePreviewDraftRole;
+  const profiles = admin ? adminPreviewProfiles(role, selectedTeam?.id)
+    : managerPreviewOptions().map((item) => byId(state.profiles, item.profileId)).filter(Boolean);
+  profiles.sort((first, second) => first.name.localeCompare(second.name));
+  return `<section class="list-panel role-preview-panel" id="settings-preview-panel" role="tabpanel" aria-labelledby="settings-preview-tab">
+    <div class="role-preview-panel-copy">
+      <h2>Preview as a role</h2>
+      <p class="hint">${admin ? "Choose a role, team, and person with that access." : "Choose an employee from your teams."} Preview is read-only.</p>
+    </div>
+    <form id="role-preview-form" class="role-preview-form ${admin ? "" : "manager-preview-form"}">
+      ${admin ? `
+        <label>Role<select name="role" id="role-preview-role">
+          <option value="lead" ${role === "lead" ? "selected" : ""}>Lead</option>
+          <option value="employee" ${role === "employee" ? "selected" : ""}>Employee</option>
+        </select></label>
+        <label>Department<select name="departmentId" id="role-preview-department" ${teams.length ? "" : "disabled"}>
+          ${teams.map((team) => `<option value="${team.id}" ${team.id === selectedTeam?.id ? "selected" : ""}>${escapeHtml(team.name)}</option>`).join("")}
+        </select></label>
+      ` : ""}
+      <label>${admin ? "Representative profile" : "Person"}<select name="profileId" id="role-preview-profile" required ${profiles.length ? "" : "disabled"}>
+        <option value="">${profiles.length ? "Choose person" : "No matching people"}</option>
+        ${profiles.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.name)}</option>`).join("")}
+      </select></label>
+      <button type="submit" class="primary" ${profiles.length ? "" : "disabled"}>Start Preview</button>
+    </form>
+  </section>`;
+}
 
-  ui.rolePreview = { active: true, role, departmentId, profileId };
+async function startRolePreview(event) {
+  event.preventDefault();
+  if (!canStartRolePreview() || isRolePreviewActive() || isMutationPending()) return;
+  const form = new FormData(event.currentTarget);
+  const profileId = form.get("profileId");
+  const admin = isAdmin();
+  const role = admin ? form.get("role") : "employee";
+  let departmentIds;
+  if (admin) {
+    const departmentId = form.get("departmentId");
+    if (!["lead", "employee"].includes(role)
+      || !adminPreviewProfiles(role, departmentId).some((profile) => profile.id === profileId)) {
+      notify("Choose a person who matches the selected role and department.", "error");
+      return;
+    }
+    departmentIds = [departmentId];
+  } else {
+    if (dataStore.mode === "supabase") {
+      const actorId = state.currentUserId;
+      try {
+        const fresh = await dataStore.loadSchedulerTools();
+        if (state.currentUserId !== actorId || ui.activeView !== "settings" || isRolePreviewActive()) return;
+        Object.assign(state, fresh);
+      } catch (error) {
+        notify(error.message || "Unable to check preview access.", "error");
+        return;
+      }
+    }
+    departmentIds = managerPreviewOptions().find((item) => item.profileId === profileId)?.departmentIds;
+    if (!departmentIds?.length) {
+      notify("Choose an employee from your own teams.", "error");
+      return;
+    }
+  }
+  const departmentId = departmentIds.includes(ui.selectedDepartmentId) ? ui.selectedDepartmentId : departmentIds[0];
+  ui.rolePreview = { active: true, role, departmentId, departmentIds, profileId, returnDepartmentId: ui.selectedDepartmentId };
   ui.rotationClipboard = null;
   ui.rotationLeadDraftPattern = null;
   ui.rolePreviewDraftRole = role;
@@ -2989,7 +3057,7 @@ function startRolePreview(event) {
   ui.selectedDepartmentId = departmentId;
   ui.peopleDepartmentId = "all";
   ui.departmentFocusId = departmentId;
-  ui.hierarchyDepartmentIds = [departmentId];
+  ui.hierarchyDepartmentIds = departmentIds;
   ui.schedulerEditMode = false;
   ui.schedulerLeadDrafts = [];
   ui.drawer = null;
@@ -2999,19 +3067,21 @@ function startRolePreview(event) {
 
 function exitRolePreview() {
   if (!isRolePreviewActive()) return;
+  const previousDepartmentId = ui.rolePreview.returnDepartmentId;
   ui.rolePreview = null;
   ui.rotationClipboard = null;
   ui.rotationLeadDraftPattern = null;
-  const firstDepartment = state.departments[0];
+  const teams = visibleDepartments();
+  const firstDepartment = teams.find((department) => department.id === previousDepartmentId) || teams[0];
   ui.activeView = "scheduler";
   ui.selectedDepartmentId = firstDepartment?.id || "";
   ui.peopleDepartmentId = "all";
   ui.departmentFocusId = firstDepartment?.id || "";
-  ui.hierarchyDepartmentIds = state.departments.map((department) => department.id);
+  ui.hierarchyDepartmentIds = teams.map((department) => department.id);
   ui.schedulerEditMode = false;
   ui.schedulerLeadDrafts = [];
   ui.drawer = null;
-  ui.notice = "Returned to Admin access.";
+  ui.notice = "Role Preview closed.";
   ui.noticeKind = "success";
   render();
 }
@@ -3064,7 +3134,7 @@ function renderActivityItem(entry) {
           <strong>${activityVerb(entry)}</strong>
           <em>${activityTypeLabel(entry)}</em>
         </div>
-        <span>${activityDetail(entry)}</span>
+        <span>${escapeHtml(activityDetail(entry))}</span>
       </div>
       <time>${formatDateTime(entry.createdAt)}</time>
     </${tag}>
@@ -3189,7 +3259,7 @@ function renderMiniActivity(entries) {
       ${entries.length ? entries.map((entry) => `
         <div class="mini-activity-item">
           <strong>${formatAction(entry.action)}</strong>
-          <span>${entry.detail}</span>
+          <span>${escapeHtml(entry.detail)}</span>
           <time>${formatDateTime(entry.createdAt)}</time>
         </div>
       `).join("") : `<p class="hint">No recent activity for this item.</p>`}
@@ -3212,6 +3282,10 @@ function renderDrawer() {
     lead: "Lead Assignment",
     "calendar-day": "Day Details",
     "low-day-work": "Confirm Worked Day",
+    "low-day-find": "Find a Worked Day",
+    events: "Schedule Events",
+    event: ui.drawer.eventId ? "Edit Event" : "New Event",
+    "event-remove": "Remove Event",
     "low-day-book": "Replacement Day",
     "holiday": ui.drawer.holidayId ? "Edit Public Holiday" : "Add Public Holiday",
     "holiday-remove": "Remove Public Holiday",
@@ -3259,6 +3333,9 @@ function drawerBody() {
   if (ui.drawer.type === "request-detail") return requestDetailDrawer();
   if (ui.drawer.type === "calendar-day") return calendarDayDrawer();
   if (ui.drawer.type === "low-day-work") return lowDayWorkDrawer();
+  if (ui.drawer.type === "low-day-find") return lowDayFindDrawer();
+  if (ui.drawer.type === "events") return eventsDrawer();
+  if (ui.drawer.type === "event" || ui.drawer.type === "event-remove") return eventFormDrawer();
   if (ui.drawer.type === "low-day-book") return lowDayBookingDrawer();
   if (ui.drawer.type === "holiday" || ui.drawer.type === "holiday-remove") return publicHolidayDrawer();
   if (ui.drawer.type === "lead") return leadDrawer();
@@ -3311,7 +3388,9 @@ function renderMyLowDays(profile) {
 
 function renderTeamAlerts(credits, motion) {
   return `<section class="team-directory-panel${motion}" id="team-alerts-panel" role="tabpanel" aria-labelledby="team-alerts-tab">
-    <div class="team-section-head"><h2>Replacement days</h2><span>${credits.length} to track</span></div>
+    <div class="team-section-head"><h2>Replacement days</h2>
+      ${!isRolePreviewActive() ? '<button class="ghost" data-open-drawer="low-day-find">Find worked day</button>' : ""}
+    </div>
     ${credits.length ? credits.map((credit) => renderLowDayRow(credit, true)).join("") : '<p class="hint">No open or upcoming replacement days for this team.</p>'}
   </section>`;
 }
@@ -3321,8 +3400,26 @@ function renderWorkedDayAction(profile, date) {
   const credit = state.lowDayCredits.find((item) => item.profileId === profile.id
     && (item.workedDate === date || item.replacementDate === date));
   if (credit) return `<button type="button" class="ghost wide" data-open-drawer="low-day-book" data-credit-id="${credit.id}">View Low Days credit</button>`;
-  if (!canConfirmWorkedDay(state, profile.id, date)) return "";
+  if (!canConfirmWorkedDay(state, profile.id, date)) {
+    const status = scheduleFor(profile.id, date);
+    const message = ["vacation", "sick", "low_day"].includes(status.id)
+      ? `This date is recorded as ${displayStatusLabel(status)}.`
+      : date > cairoDate() ? "Work can be confirmed on or after the worked date." : "Choose a scheduled day off or a public holiday.";
+    return `<div class="shift-low-day-context"><strong>Low Days</strong><p class="hint">${escapeHtml(message)}</p></div>`;
+  }
   return `<button type="button" class="ghost wide" data-open-drawer="low-day-work" data-profile-id="${profile.id}" data-date="${date}">Confirm worked day</button>`;
+}
+
+function lowDayFindDrawer() {
+  const people = visibleProfiles().filter((profile) => canManageLowDay(profile)
+    && (ui.peopleDepartmentId === "all" || profileBelongsToDepartment(profile, ui.peopleDepartmentId)));
+  if (!people.length) return '<p class="hint">Select a team with employees you manage.</p>';
+  return `<form class="drawer-form" id="low-day-find-form">
+    <label>Person<select name="profileId">${people.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.name)}</option>`).join("")}</select></label>
+    <label>Worked date<input type="date" name="date" max="${cairoDate()}" required></label>
+    <p class="hint">Select the date the person worked on their scheduled day off or a public holiday.</p>
+    <button class="primary wide">Open Shift Details</button>
+  </form>`;
 }
 
 function lowDayWorkDrawer() {
@@ -3414,14 +3511,95 @@ function publicHolidayDrawer() {
   </form>`;
 }
 
+function scopedEvents(departmentIds, start = "", end = "") {
+  if (!state.scheduleEvents?.length) return [];
+  const visibleIds = new Set(visibleDepartments().map((team) => team.id));
+  const scope = new Set(departmentIds.filter((id) => visibleIds.has(id)));
+  return state.scheduleEvents.filter((event) =>
+    (event.organizationWide || event.departmentIds.some((id) => scope.has(id)))
+    && (!start || event.endsOn >= start) && (!end || event.startsOn <= end));
+}
+
+function renderEventDateMarker(events) {
+  if (!events.length) return "";
+  return `<em class="schedule-event-label" title="${escapeHtml(events.map((event) => event.title).join(", "))}">
+    ${escapeHtml(events[0].title)}${events.length > 1 ? ` +${events.length - 1}` : ""}
+  </em>`;
+}
+
+function canEditScheduleEvent(event) {
+  if (!state.eventsEnabled || isRolePreviewActive()) return false;
+  if (isAdmin()) return true;
+  if (!isLead()) return false;
+  if (!event) return assignableDepartments(state).some((team) => canManageDepartment(team.id));
+  if (dataStore.mode === "supabase") return event.editable === true;
+  return !event.organizationWide && event.departmentIds.every(canManageDepartment);
+}
+
+function renderEventRows(events, editable = false) {
+  return events.map((event) => `<div class="calendar-workflow-row">
+    <div><strong>${escapeHtml(event.title)}</strong>
+      <span>${event.startsOn === event.endsOn ? event.startsOn : `${event.startsOn} to ${event.endsOn}`}</span>
+    </div>
+    ${editable && canEditScheduleEvent(event) ? `<button class="ghost" data-open-drawer="event" data-event-id="${event.id}"
+      aria-label="Edit ${escapeHtml(event.title)}">Edit</button>` : ""}
+  </div>`).join("");
+}
+
+function eventsDrawer() {
+  const events = scopedEvents(departmentScopeIds(ui.selectedDepartmentId));
+  return `<div class="drawer-stack">
+    ${canEditScheduleEvent() ? '<button class="primary wide" data-open-drawer="event">New Event</button>' : ""}
+    ${events.length ? renderEventRows(events, true) : '<p class="hint">No events for this team.</p>'}
+  </div>`;
+}
+
+function eventFormDrawer() {
+  const saved = byId(state.scheduleEvents, ui.drawer.eventId);
+  if (!canEditScheduleEvent(saved) || (ui.drawer.eventId && !saved)) return "";
+  const teams = assignableDepartments(state).filter((team) => canManageDepartment(team.id));
+  const scope = new Set(departmentScopeIds(ui.selectedDepartmentId));
+  const defaults = teams.filter((team) => scope.has(team.id)).map((team) => team.id);
+  const item = ui.drawer.eventDraft || saved || {
+    startsOn: ui.startDate || todayIso, endsOn: ui.startDate || todayIso, departmentIds: defaults,
+    organizationWide: isAdmin() && !defaults.length
+  };
+  if (ui.drawer.type === "event-remove") {
+    return `<form id="event-remove-form" class="drawer-form">
+      <p>Remove ${escapeHtml(saved.title)} from the schedule?</p>
+      <button class="danger wide" ${isMutationPending() ? "disabled" : ""}>Remove Event</button>
+      <button type="button" class="ghost wide" data-open-drawer="event" data-event-id="${saved.id}">Keep Event</button>
+    </form>`;
+  }
+  return `<form id="event-form" class="drawer-form">
+    <label>Event name<input name="title" maxlength="100" required value="${escapeHtml(item.title || "")}"></label>
+    <div class="form-grid two">
+      <label>Starts<input name="startsOn" type="date" required value="${item.startsOn}"></label>
+      <label>Ends<input name="endsOn" type="date" required value="${item.endsOn}"></label>
+    </div>
+    ${isAdmin() ? `<label>Applies to<select name="scope">
+      <option value="teams" ${item.organizationWide ? "" : "selected"}>Selected teams</option>
+      <option value="all" ${item.organizationWide ? "selected" : ""}>Entire organization</option>
+    </select></label>` : ""}
+    <fieldset class="department-memberships" id="event-teams" ${item.organizationWide ? "hidden" : ""}>
+      <legend>Affected teams</legend>
+      ${teams.map((team) => `<label><input name="team" type="checkbox" value="${team.id}" ${item.departmentIds.includes(team.id) ? "checked" : ""}>${escapeHtml(team.name)}</label>`).join("")}
+    </fieldset>
+    <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Save Event</button>
+    ${saved ? `<button type="button" class="ghost wide" data-open-drawer="event-remove" data-event-id="${saved.id}">Remove Event</button>` : ""}
+  </form>`;
+}
+
 function coverageDrawer() {
   const department = byId(state.departments, ui.selectedDepartmentId);
   const profiles = visibleProfiles().filter((profile) => profileDepartmentIds(profile).includes(ui.selectedDepartmentId));
   const groups = coverageGroupsForDate(profiles, ui.drawer.date);
   const target = coverageTargetForDepartment(department);
+  const events = scopedEvents(departmentScopeIds(department.id), ui.drawer.date, ui.drawer.date);
   return `
     <div class="drawer-stack">
       <p class="hint">${formatDay(ui.drawer.date)}, ${formatDate(ui.drawer.date)} coverage for ${department.name}.</p>
+      ${events.length ? `<section aria-label="Events on this date">${renderEventRows(events, true)}</section>` : ""}
       <div class="coverage-summary-card ${groups.available.length < target ? "low" : ""}">
         <span>Available</span>
         <strong>${groups.available.length} / ${target}</strong>
@@ -3459,7 +3637,13 @@ function shiftDrawer() {
   const rotationStatus = schedule.rotationStatus;
   const existingOverride = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === ui.drawer.date);
   const pendingVacation = pendingAnnualForWorkingDate(profile.id, ui.drawer.date, schedule);
-  const history = relatedAuditEntries((entry) => entry.detail.includes(ui.drawer.date) || entry.entityId === existingOverride?.id);
+  const dayRequests = new Set(state.vacationRequests.filter((request) =>
+    request.profileId === profile.id && request.startDate <= ui.drawer.date && request.endDate >= ui.drawer.date
+  ).map((request) => request.id));
+  const history = relatedAuditEntries((entry) =>
+    (entry.entityType === "schedule_override" && entry.entityId === existingOverride?.id)
+    || (entry.entityType === "vacation_request" && dayRequests.has(entry.entityId))
+  );
   return `
     <form id="shift-form" class="drawer-form">
       <div class="person-summary">
@@ -3853,6 +4037,7 @@ function requestDetailDrawer() {
   const approvable = request.status === "pending" && canManageProfileDepartment(profile);
   const enoughBalance = impact.yearBalances.every(part => part.after !== null && part.after >= 0);
   const hasCoverageRisk = impact.lowCoverageRows.length > 0;
+  const events = scopedEvents(profileTeamIds(state, profile), request.startDate, request.endDate);
   return `
     <div class="drawer-stack vacation-approval">
       <div class="person-summary approval-person">
@@ -3877,7 +4062,11 @@ function requestDetailDrawer() {
       </div>`).join("")}
       ${!enoughBalance ? `<p class="form-error">This request exceeds the employee's remaining annual balance.</p>` : ""}
       ${hasCoverageRisk ? `<div class="approval-risk"><strong>${impact.lowCoverageRows.length} coverage risk${impact.lowCoverageRows.length === 1 ? "" : "s"}</strong><span>Approval drops available people below target on highlighted dates.</span></div>` : ""}
-      <p class="hint">${request.reason || "No reason provided."}</p>
+      <p class="hint">${escapeHtml(request.reason || "No reason provided.")}</p>
+      ${events.length ? `<section class="drawer-stack" aria-labelledby="approval-events-title">
+        <h3 id="approval-events-title">Scheduled events</h3>
+        ${renderEventRows(events)}
+      </section>` : ""}
       ${renderVacationTeamImpact(request, profile, department, impact)}
       <div class="impact-section">
         <div class="section-title">
@@ -3922,6 +4111,7 @@ function renderVacationTeamImpact(request, requestedProfile, department, impact)
                 <span>${formatDay(row.date)}</span>
                 <strong>${formatDate(row.date)}</strong>
                 <small>${available}/${row.target || "-"}</small>
+                ${renderEventDateMarker(scopedEvents(profileTeamIds(state, requestedProfile), row.date, row.date))}
               </div>
             `;
           }).join("")}
@@ -4415,11 +4605,31 @@ function bindEvents() {
   document.querySelector("#role-preview-form")?.addEventListener("submit", startRolePreview);
   document.querySelector("#role-preview-role")?.addEventListener("change", (event) => {
     ui.rolePreviewDraftRole = event.target.value;
+    render();
+    document.querySelector("#role-preview-role")?.focus();
   });
   document.querySelector("#role-preview-department")?.addEventListener("change", (event) => {
     ui.rolePreviewDraftDepartmentId = event.target.value;
     render();
+    document.querySelector("#role-preview-department")?.focus();
   });
+  const settingsTabs = [...document.querySelectorAll("[data-settings-tab]")];
+  for (const [index, button] of settingsTabs.entries()) {
+    const activate = (key) => {
+      ui.settingsTab = key;
+      render();
+      document.querySelector(`[data-settings-tab="${key}"]`)?.focus();
+    };
+    button.addEventListener("click", () => activate(button.dataset.settingsTab));
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const step = event.key === "ArrowLeft" ? -1 : 1;
+      const next = event.key === "Home" ? settingsTabs[0] : event.key === "End" ? settingsTabs.at(-1)
+        : settingsTabs[(index + step + settingsTabs.length) % settingsTabs.length];
+      activate(next.dataset.settingsTab);
+    });
+  }
 
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -4714,6 +4924,26 @@ function bindEvents() {
     document.querySelector(".app-notice")?.remove();
   });
   document.querySelector("#shift-form")?.addEventListener("submit", saveShiftOverride);
+  document.querySelector("#scheduler-low-days")?.addEventListener("click", () => {
+    ui.activeView = "team";
+    ui.teamTab = "alerts";
+    ui.peopleDepartmentId = ui.selectedDepartmentId || "all";
+    ui.drawer = null;
+    render();
+  });
+  document.querySelector("#low-day-find-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const profile = byId(state.profiles, form.get("profileId"));
+    if (!canManageLowDay(profile)) return;
+    const date = form.get("date");
+    const team = profileDepartmentIds(profile).find(canManageDepartment);
+    if (team) ui.selectedDepartmentId = team;
+    ui.activeView = "scheduler";
+    ui.startDate = date;
+    ui.drawer = { type: editableDate(date) ? "shift" : "calendar-day", profileId: profile.id, date };
+    render();
+  });
   document.querySelector("#low-day-work-form")?.addEventListener("submit", confirmWorkedDay);
   document.querySelector("#low-day-book-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -4728,6 +4958,12 @@ function bindEvents() {
     document.querySelector("#holiday-teams").hidden = event.target.value !== "teams";
   });
   document.querySelector("#holiday-remove-form")?.addEventListener("submit", (event) => void saveHoliday(event, true));
+  const eventForm = document.querySelector("#event-form");
+  eventForm?.addEventListener("submit", (event) => void saveEvent(event, false));
+  eventForm?.elements.scope?.addEventListener("change", (event) => {
+    document.querySelector("#event-teams").hidden = event.target.value === "all";
+  });
+  document.querySelector("#event-remove-form")?.addEventListener("submit", (event) => void saveEvent(event, true));
   document.querySelector("#clear-override")?.addEventListener("click", clearShiftOverride);
   document.querySelector("#unlink-profile")?.addEventListener("click", unlinkProfileAccount);
   document.querySelector("#delete-profile")?.addEventListener("click", deleteProfile);
@@ -5217,6 +5453,43 @@ async function saveHoliday(event, remove) {
     }
     await saveState();
     ui.drawer = null;
+  });
+}
+
+async function saveEvent(event, remove) {
+  event.preventDefault();
+  const saved = byId(state.scheduleEvents, ui.drawer.eventId);
+  if (!canEditScheduleEvent(saved) || (ui.drawer.eventId && !saved) || (remove && !saved)) return;
+  const form = new FormData(event.currentTarget);
+  const organizationWide = isAdmin() && form.get("scope") === "all";
+  const item = remove ? saved : {
+    id: saved?.id, title: String(form.get("title") || "").trim(),
+    startsOn: form.get("startsOn"), endsOn: form.get("endsOn"),
+    departmentIds: organizationWide ? [] : form.getAll("team"), organizationWide
+  };
+  if (!remove && (!item.title || !item.startsOn || !item.endsOn || item.endsOn < item.startsOn
+    || (!organizationWide && !item.departmentIds.length))) {
+    notify("Enter a name and a valid date range, and choose the affected teams.", "error");
+    return;
+  }
+  if (!remove) ui.drawer.eventDraft = item;
+  await runMutation("schedule-event", {
+    pending: "Updating events…", success: remove ? "Event removed." : "Event saved.",
+    failure: "The event could not be updated."
+  }, async () => {
+    if (dataStore.mode === "demo") {
+      state.scheduleEvents = state.scheduleEvents.filter((existing) => existing.id !== item.id);
+      if (!remove) {
+        item.id ||= crypto.randomUUID();
+        state.scheduleEvents.push(item);
+        state.scheduleEvents.sort((first, second) => first.startsOn.localeCompare(second.startsOn));
+      }
+      audit(remove ? "event.deleted" : "event.saved", "schedule_event", item.id, item.title);
+    } else {
+      Object.assign(state, await dataStore.saveScheduleEvent(item, remove));
+    }
+    await saveState();
+    ui.drawer = { type: "events" };
   });
 }
 

@@ -537,3 +537,12 @@ Open profile editing as a centered blocking modal with focus containment, restra
 Confirming work on a scheduled day off or a configured public holiday records the working shift and earns one Low Days credit per person and worked date. The replacement day must be taken by the date 30 calendar days after work, inclusive, using the Cairo calendar. The replacement is a separate schedule exception with no Annual deduction. Admin and Leads can book, move, or cancel an upcoming replacement within their team scope. Past bookings and earned credits remain in history. Overdue credits remain visible for review and the deadline stays enforced.
 
 Show due-soon credits within seven days and overdue credits in Team Alerts for Admin and Leads. Employees see their own balance and deadlines in My Profile. Admin enters the observed holiday name and date, chooses organization-wide or selected teams, and decides between a day off and scheduled coverage. Existing daily changes take precedence. Holiday days off and replacement days are excluded from Annual eligibility and treated as known off days in Analytics.
+
+## D-069 - Schedule Events and Scoped Role Preview
+
+**Date:** 2026-11-12
+**Status:** Accepted
+
+Events have a name, inclusive date range, and scope covering selected teams or the entire organization. They appear on Scheduler date headers and in Annual review for affected teams. Event changes are audited and leave rotations, scheduled shifts, and balances intact.
+
+Role Preview has its own Settings tab. Admin selects the actual role and a department before choosing a linked profile. Managers with Lead access select an Employee from the teams they share. Preview stays read-only and keeps the original Supabase session.

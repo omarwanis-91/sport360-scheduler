@@ -17,6 +17,7 @@ Build a dark, compact, Supabase-backed workforce scheduler that supports:
 - Daily schedule overrides and exceptions.
 - Annual requests, approval, balance deduction, and schedule impact.
 - Public holidays, replacement days for confirmed work on a day off, and deadline alerts.
+- Team and organization events visible on the schedule and during Annual review.
 - Personal and employee calendar views.
 - Clear activity history for important operational changes.
 - Admin/Lead-only schedule analytics for staffing, shift distribution, and dated leave, within each viewer's department scope.

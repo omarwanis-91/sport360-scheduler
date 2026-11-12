@@ -35,6 +35,8 @@ function createLocalStore() {
       state.publicHolidays ||= [];
       state.lowDayCredits ||= [];
       state.lowDaysEnabled = true;
+      state.scheduleEvents ||= [];
+      state.eventsEnabled = true;
       localStorage.setItem(storageKey, JSON.stringify(state));
       return state;
     },
@@ -323,6 +325,16 @@ function createRemoteStore(client) {
     },
     async loadLowDayCalendar(admin) {
       return fromDbLowDayCalendar(await client.rpc("get_low_day_calendar"), admin);
+    },
+    async loadSchedulerTools() {
+      return await readSchedulerTools(client);
+    },
+    async saveScheduleEvent(event, remove) {
+      const result = await client.rpc("save_schedule_event", {
+        p_id: event.id || null, p_title: event.title || null, p_start: event.startsOn || null,
+        p_end: event.endsOn || null, p_department_ids: event.departmentIds || [], p_delete: remove
+      });
+      return fromDbSchedulerTools(result);
     },
     async deleteScheduleOverride(override) {
       await client.delete("schedule_overrides", `profile_id=eq.${override.profileId}&shift_date=eq.${override.date}`);
@@ -826,6 +838,7 @@ async function loadRemoteState(client, session) {
   const calendar = lowDaysEnabled
     ? fromDbLowDayCalendar(await client.rpc("get_low_day_calendar"), currentRole?.role === "admin")
     : { publicHolidays: [], lowDayCredits: [] };
+  const schedulerTools = lowDaysEnabled ? await readSchedulerTools(client) : {};
   if(currentRole?.role === "lead" && currentProfile?.seniorityLevel === "manager") {
     const permissions=await client.rpc("get_profile_structure_permissions");
     mappedProfiles.forEach(profile=>{const entry=(permissions||[]).find(row=>row.profile_id===profile.id);profile.structurePermissions={teams:entry?.can_edit_teams===true,position:entry?.can_edit_position===true};});
@@ -844,6 +857,7 @@ async function loadRemoteState(client, session) {
     profiles: mappedProfiles,
     lowDaysEnabled,
     ...calendar,
+    ...schedulerTools,
     annualBalances: annualBalances.map(row => ({ profileId: row.profile_id, year: row.balance_year, allowance: row.allowance_days, remaining: row.remaining_days, source: row.source })),
     statuses: statuses.map(fromDbStatus),
     rotationVersions: rotations.map(fromDbRotation),
@@ -1006,6 +1020,19 @@ function fromDbLowDayCalendar(calendar, admin) {
   const publicHolidays = (calendar.holidays || []).map(({ profileIds, ...holiday }) =>
     admin ? holiday : { ...holiday, profileIds });
   return { publicHolidays, lowDayCredits: (calendar.credits || []).map(fromDbLowDayCredit) };
+}
+
+function fromDbSchedulerTools(result) {
+  return { eventsEnabled: true, scheduleEvents: result.events || [], managerPreviewProfiles: result.previewProfiles };
+}
+
+async function readSchedulerTools(client) {
+  try {
+    return fromDbSchedulerTools(await client.rpc("get_scheduler_tools"));
+  } catch (error) {
+    if (/schema cache|could not find the function/i.test(error.message)) return {};
+    throw error;
+  }
 }
 
 function fromDbLowDayResult(result) {

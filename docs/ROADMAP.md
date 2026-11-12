@@ -118,7 +118,8 @@ Feature development normally freezes after Phase 3 while this production hardeni
 - ✅ User confirmed migration 033 applied and all five audit 021 checks true on 2026-11-09, including the active Supabase Cron job, clearing the database gate for the matching yearly-balance client in PR #36.
 - ✅ Build Admin/Lead-only Analytics with saved shift mix, daily/weekday staffing, monthly dated leave, person totals, accessible SVG charts, and CSV. User confirmed migration 034 applied and all five audit 022 checks true on 2026-11-10, clearing the database gate for PR #37. Production role-scope verification remains open.
 - ✅ Team/profile structure is live on Vercel after migration 035 and all five audit 024 checks passed. PR #39 shipped nonassignable containers, automatic titles, and the centered editor. PR #40 grouped Video Unit grids and simplified Scheduler person rows.
-- Low Days, Team Alerts, and Public Holidays were approved for Phase 4. Apply migration 036 and verify audit 025 before activating the matching UI.
+- ✅ Low Days, Team Alerts, and Public Holidays shipped in PR #41 after migration 036 and all five audit 025 checks passed.
+- ⏳ Review Events, scoped Manager preview, and the Scheduler/Profile/Analytics UI fixes. Apply migration 037 and verify audit 026 before activating Events and Manager preview.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.

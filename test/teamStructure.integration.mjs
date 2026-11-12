@@ -206,5 +206,53 @@ equal(await eligible(pe, replacement), 1);
 equal((await profile()).remaining_vacation_days, balanceBefore);
 await login(null, 'anon');
 await deny(calendar, /permission denied/);
-await db.close();
 console.log(`${checks - beforeCalendarChecks} Low Days and public holidays PostgreSQL checks passed.`);
+
+const beforeEventChecks = checks;
+await db.exec('reset role');
+await db.exec(file('../supabase/migrations/037_schedule_events_and_manager_preview.sql'));
+equal((await rows(file('../supabase/audit/026_schedule_events_and_manager_preview_audit.sql')))
+  .map((result) => result.passed), [true, true, true, true, true]);
+const schedulerTools = async () => (await rows('select public.get_scheduler_tools() value'))[0].value;
+const saveEvent = async (name, teamIds, eventId = null, remove = false, endDate = deadline) =>
+  (await rows('select public.save_schedule_event($1,$2,$3,$4,$5::uuid[],$6) value',
+    [eventId, name, today, endDate, teamIds, remove]))[0].value;
+
+const operationalBefore = await original();
+await login(admin);
+await deny(() => saveEvent('Invalid team', [unit]), /Choose valid teams/);
+await deny(() => saveEvent('Invalid dates', [edit], null, false, worked), /valid date range/);
+await saveEvent('Company event', []);
+await saveEvent('Motion event', [motion]);
+const joint = (await saveEvent('Joint championship', [edit, motion])).events.find((e) => e.title === 'Joint championship');
+equal(joint.departmentIds, [edit, motion]);
+equal(joint.endsOn, deadline);
+await deny(() => rows('select * from public.schedule_events'), /permission denied/);
+await login(manager);
+const managerTools = await schedulerTools();
+equal(managerTools.previewProfiles.find((p) => p.profileId === pe), { profileId: pe, departmentIds: [edit] });
+equal(managerTools.previewProfiles.some((p) => [pa, pm, pl, phm, outsider, hybrid].includes(p.profileId)), false);
+equal(managerTools.events.map((e) => [e.title, e.departmentIds, e.editable]),
+  [['Company event', [], false], ['Joint championship', [edit], false]]);
+await deny(() => saveEvent('Company event', []), /Choose only teams/);
+await deny(() => saveEvent('Rename', [edit], joint.id), /within your teams/);
+const live = (await saveEvent('Live match', [edit])).events.find((e) => e.title === 'Live match');
+equal(live.editable, true);
+await saveEvent('Live final', [edit], live.id);
+await login(lead);
+equal((await schedulerTools()).previewProfiles, null);
+await login(employeeManager);
+equal((await schedulerTools()).previewProfiles, null);
+await login(artist);
+equal((await schedulerTools()).events.map((e) => e.title), ['Company event', 'Joint championship', 'Live final']);
+await deny(() => saveEvent('Employee event', [edit]), /Only Admin and Lead/);
+await login(admin);
+await saveEvent(null, [], live.id, true);
+equal((await schedulerTools()).events.some((e) => e.id === live.id), false);
+equal((await inspect("select count(*)::int n from public.audit_log where entity_type='schedule_event'"))[0].n, 6);
+await login(null, 'anon');
+await deny(schedulerTools, /permission denied/);
+await db.exec('reset role');
+equal(await original(), operationalBefore);
+await db.close();
+console.log(`${checks - beforeEventChecks} Scheduler events and manager preview PostgreSQL checks passed.`);
