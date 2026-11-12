@@ -90,6 +90,7 @@ test('Employees and role preview cannot edit or paste rotations', async ({ page 
   await expect(page.locator('.rotation-cell-open, [data-copy-rotation], [data-paste-rotation], #paste-department-rotation, .lead-shift-button')).toHaveCount(0);
   await page.locator('#user-switcher').selectOption('user-admin');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Role Preview', exact: true }).click();
   await page.locator('#role-preview-role').selectOption('lead');
   await page.locator('#role-preview-profile').selectOption('emp-002');
   await page.getByRole('button', { name: 'Start Preview', exact: true }).click();
