@@ -1,4 +1,4 @@
-import { addDays, datesBetween, publicHolidayForProfile, scheduleFor, toIso } from "./scheduleLogic.mjs";
+import { addDays, datesBetween, holidayAppliesToProfile, publicHolidayForProfile, scheduleFor } from "./scheduleLogic.mjs";
 
 const cairoCalendar = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit"
@@ -17,8 +17,8 @@ export function lowDayStatus(credit, today = cairoDate()) {
 export function canConfirmWorkedDay(state, profileId, date, today = cairoDate()) {
   if (date > today || state.lowDayCredits?.some((credit) => credit.profileId === profileId && credit.workedDate === date)) return false;
   const shift = scheduleFor(state, profileId, date);
-  if (["vacation", "sick", "low_day"].includes(shift.id)) return false;
-  return shift.id === "weekend" || shift.rotationStatus?.id === "weekend"
+  if (shift.id === "low_day") return false;
+  return ["weekend", "vacation", "sick"].includes(shift.id) || shift.rotationStatus?.id === "weekend"
     || Boolean(publicHolidayForProfile(state, profileId, date));
 }
 
@@ -40,11 +40,28 @@ export function confirmDemoLowDay(state, { profileId, date, statusId, note }) {
     throw new Error("Choose a working shift on an eligible day off or public holiday.");
   }
   const prior = state.scheduleOverrides.find((row) => row.profileId === profileId && row.date === date);
+  const request = prior?.statusId === "vacation" && state.vacationRequests.find((item) =>
+    item.profileId === profileId && item.status === "approved" && item.deductedDays > 0
+    && date >= item.startDate && date <= item.endDate && prior.note === `Vacation request ${item.id}`);
+  const year = Number(date.slice(0, 4));
+  const charge = request?.deductedDaysByYear?.[year];
+  const legacy = request && !Object.keys(request.deductedDaysByYear || {}).length;
+  let refund;
+  if (request && (legacy || charge > 0)) {
+    const balance = state.annualBalances?.find((item) => item.profileId === profileId && item.year === year);
+    if (!balance) throw new Error(`The Annual balance for ${year} is unavailable. Review it before overriding this leave.`);
+    refund = {
+      request: { ...request, deductedDays: request.deductedDays - 1,
+        deductedDaysByYear: legacy ? request.deductedDaysByYear : { ...request.deductedDaysByYear, [year]: charge - 1 } },
+      balance: { ...balance, remaining: balance.remaining + 1 }
+    };
+  }
   return {
+    refund,
     credit: { id: crypto.randomUUID(), profileId, workedDate: date, dueDate: addDays(date, 30),
       workedStatusId: statusId, reason: publicHolidayForProfile(state, profileId, date) ? "public_holiday" : "day_off" },
     override: { id: prior?.id || crypto.randomUUID(), profileId, date, statusId,
-      note: note.trim() || (prior?.statusId !== "weekend" ? prior?.note : "") || "" }
+      note: note.trim() || (!["weekend", "vacation", "sick"].includes(prior?.statusId) ? prior?.note : "") || "" }
   };
 }
 
@@ -78,4 +95,29 @@ export function saveDemoHoliday(state, holiday, remove) {
     throw new Error("A replacement day is booked for this date. Reschedule it before saving the holiday.");
   }
   return holidays.sort((first, second) => first.date.localeCompare(second.date));
+}
+
+export function saveDemoHolidaySelection(state, { batchId, name, cells }, remove) {
+  if (batchId && !state.publicHolidays.some((holiday) => holiday.batchId === batchId)) {
+    throw new Error("This holiday is no longer available.");
+  }
+  const existing = state.publicHolidays.filter((holiday) => !batchId || holiday.batchId !== batchId);
+  if (remove) return { holidays: existing, batchId };
+  const selectedByDate = new Map();
+  for (const { profileId, date } of cells) {
+    if (existing.some((holiday) => holiday.date === date && holiday.dayOff && holidayAppliesToProfile(state, holiday, profileId))) {
+      throw new Error("A selected shift already has a public holiday. Review the existing holiday first.");
+    }
+    if (date >= cairoDate() && state.lowDayCredits.some((credit) => credit.profileId === profileId && credit.replacementDate === date)) {
+      throw new Error("A replacement day is booked on a selected shift. Reschedule it first.");
+    }
+    if (!selectedByDate.has(date)) selectedByDate.set(date, new Set());
+    selectedByDate.get(date).add(profileId);
+  }
+  const batch = batchId || crypto.randomUUID();
+  const saved = [...selectedByDate].map(([date, profileIds]) => ({
+    id: crypto.randomUUID(), batchId: batch, date, name, dayOff: true,
+    organizationWide: false, departmentIds: [], profileIds: [...profileIds]
+  }));
+  return { holidays: [...existing, ...saved].sort((first, second) => first.date.localeCompare(second.date)), batchId: batch };
 }

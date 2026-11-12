@@ -198,14 +198,16 @@ export function departmentLeadForDate(state, departmentId, dateIso) {
   return { profile, source: rotation && profile ? "Lead rotation" : "Unassigned", rotation };
 }
 
-export function publicHolidayForProfile(state, profileId, dateIso) {
-  const holiday = state.publicHolidays?.find((item) => item.date === dateIso);
-  if (!holiday) return null;
-  if (holiday.organizationWide) return holiday;
-  const applies = Array.isArray(holiday.profileIds)
+export function holidayAppliesToProfile(state, holiday, profileId) {
+  return holiday.organizationWide || (Array.isArray(holiday.profileIds)
     ? holiday.profileIds.includes(profileId)
-    : profileDepartmentIds(byId(state.profiles, profileId)).some((id) => holiday.departmentIds.includes(id));
-  return applies ? holiday : null;
+    : profileDepartmentIds(byId(state.profiles, profileId)).some((id) => holiday.departmentIds.includes(id)));
+}
+
+export function publicHolidayForProfile(state, profileId, dateIso) {
+  const matches = (state.publicHolidays || []).filter((holiday) =>
+    holiday.date === dateIso && holidayAppliesToProfile(state, holiday, profileId));
+  return matches.find((holiday) => holiday.dayOff) || matches[0] || null;
 }
 
 export function scheduleFor(state, profileId, dateIso) {
@@ -215,6 +217,13 @@ export function scheduleFor(state, profileId, dateIso) {
     ? rotation.pattern[weekdayIndex(dateIso)]
     : rotation.pattern[Math.max(0, dateDiff(rotation.effectiveStart, dateIso)) % rotation.pattern.length]) : null;
   const confirmedWork = state.lowDayCredits?.some((credit) => credit.profileId === profileId && credit.workedDate === dateIso);
+  const holiday = publicHolidayForProfile(state, profileId, dateIso);
+  const protectedOverride = ["vacation", "sick", "low_day"].includes(override?.statusId);
+
+  if (holiday?.dayOff && (!override || (holiday.batchId && !protectedOverride && !confirmedWork))) {
+    return { id: "public_holiday", label: "Public Holiday", kind: "off", color: "#d4ac74",
+      source: "Public holiday", note: holiday.name, rotation, rotationStatus };
+  }
 
   if (override) {
     if (override.statusId === "low_day") {
@@ -230,12 +239,6 @@ export function scheduleFor(state, profileId, dateIso) {
       rotation,
       rotationStatus
     };
-  }
-
-  const holiday = publicHolidayForProfile(state, profileId, dateIso);
-  if (holiday?.dayOff) {
-    return { id: "public_holiday", label: "Public Holiday", kind: "off", color: "#d4ac74",
-      source: "Public holiday", note: holiday.name, rotation, rotationStatus };
   }
 
   if (!rotation) return { id: "empty", label: "Unassigned", color: "#3f3f46", kind: "off", source: "No rotation" };

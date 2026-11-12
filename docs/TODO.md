@@ -6,7 +6,8 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 
 - [ ] Verify the centered editor and Manager-with-Lead boundaries in production. Migration 035 and all five audit 024 checks passed before merging PR #39.
 - [ ] Verify holiday setup, worked-day confirmation, booking, and role-scoped Alerts in production. Migration 036 and all five audit 025 checks passed before merging PR #41.
-- [ ] Apply `037_schedule_events_and_manager_preview.sql`, run audit 026, and verify Events, Manager preview, and the Analytics readability changes carried forward from PR #38.
+- [ ] Verify production Events, Manager preview, and Analytics readability. Migration 037 and audit 026 passed before merging PR #42.
+- [ ] Apply `038_scheduler_holiday_selections.sql`, run audit 027, and verify Scheduler holiday ranges and selections, per-team alerts, and worked leave credits.
 - [ ] Review the three confirmed pending onboarding submissions in Admin Team → Pending profiles and link each to the correct existing operational profile. Diagnosis is complete; avoid duplicate profiles and preserve their schedules/balances.
 
 - [ ] Verify production Analytics after PR #37 deployment: inspect Admin all-team/department views and Lead-only scope. Employees must have no Analytics access. Migration 034 and all five audit 022 rows are confirmed applied. See `docs/ANALYTICS.md`.

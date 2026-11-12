@@ -1,4 +1,4 @@
-import { datesBetween, scheduleFor, departmentLeadForDate, publicHolidayForProfile, weekdayIndex, toIso } from './scheduleLogic.mjs';
+import { datesBetween, scheduleFor, departmentLeadForDate, holidayAppliesToProfile, weekdayIndex, toIso } from './scheduleLogic.mjs';
 
 export const shiftSeries = [
   { id:'morning', label:'Morning', color:'#d9b95f' },
@@ -29,8 +29,10 @@ export function scopedAnalyticsState(state, { year, departmentId=null, directOnl
   const visible=new Set(profiles.map(p=>p.id));
   const allowed=(rows,field)=>rows.filter(r=>visible.has(r.profileId)&&(!field||r[field].slice(0,4)===String(year)));
   const publicHolidays = (state.publicHolidays || []).filter(holiday => holiday.date.slice(0, 4) === String(year))
-    .map(holiday => ({ date: holiday.date, dayOff: holiday.dayOff,
-      profileIds: profiles.filter(person => publicHolidayForProfile(state, person.id, holiday.date)).map(person => person.id) }))
+    .map(holiday => ({ date: holiday.date, dayOff: holiday.dayOff, batchId: holiday.batchId,
+      profileIds: profiles.filter(person => holidayAppliesToProfile(state, holiday, person.id)
+        && (!holiday.batchId || !state.lowDayCredits?.some(credit => credit.profileId === person.id && credit.workedDate === holiday.date)))
+        .map(person => person.id) }))
     .filter(holiday => holiday.profileIds.length);
   return { year, departments, profiles, statuses:state.statuses.map(({id,label,kind})=>({id,label,kind})),
     publicHolidays,

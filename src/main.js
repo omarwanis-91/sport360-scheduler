@@ -4,12 +4,13 @@ import { createSupabaseStore } from "./supabaseStore.js";
 import { annualYear, annualBalanceImpact, deductDemoAnnual } from "./annualBalances.mjs";
 import { assignableDepartments, derivedProfileTitle, isDepartmentContainer, profileTeamIds } from "./profileStructure.mjs";
 import { analyticsRange, resolveAnalyticsDays, aggregateAnalytics, analyticsCsv } from "./analyticsLogic.mjs";
-import { availableReplacementDates, bookDemoLowDay, cairoDate, canConfirmWorkedDay, confirmDemoLowDay, lowDayStatus, saveDemoHoliday } from "./lowDays.mjs";
+import { availableReplacementDates, bookDemoLowDay, cairoDate, canConfirmWorkedDay, confirmDemoLowDay, lowDayStatus, saveDemoHoliday, saveDemoHolidaySelection } from "./lowDays.mjs";
 import { renderAnalyticsDashboard, bindAnalyticsProbe } from "./analyticsView.mjs";
 import {
   addDays as addDaysLogic,
   annualEligibleDates as annualEligibleDatesLogic,
   byId,
+  holidayAppliesToProfile,
   dateDiff as dateDiffLogic,
   datesBetween as datesBetweenLogic,
   departmentLeadForDate as departmentLeadForDateLogic,
@@ -118,6 +119,7 @@ const ui = {
   rotationDrafts: [],
   rotationDraftsOwner: null,
   schedulerEditMode: false,
+  holidaySelection: null,
   schedulerLeadDrafts: [],
   pendingPhotoFile: null,
   pendingPhotoDataUrl: "",
@@ -211,7 +213,10 @@ function displayScheduleSource(source) {
 }
 
 function displayScheduleNote(note = "") {
-  return escapeHtml(note.replace(/^Vacation request\b/i, "Annual request"));
+  const internalRequest = note.match(/^(?:Vacation|Annual) request\s+(\S+)$/i)?.[1];
+  const isId = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(internalRequest || "");
+  return escapeHtml(isId || (internalRequest && byId(state.vacationRequests, internalRequest))
+    ? "Annual request" : note.replace(/^Vacation request\b/i, "Annual request"));
 }
 
 function normalizeStateForUi() {
@@ -1730,12 +1735,16 @@ function renderScheduler() {
     return renderTopbar("No Departments", "Create at least one department in Supabase before building schedules.", "");
   }
   const actions = `<div class="top-actions scheduler-top-actions">
+    ${canManageSystemSettings() && state.lowDaysEnabled && !ui.holidaySelection ? state.holidaySelectionEnabled
+      ? '<button class="ghost" id="enter-public-holiday">Enter Public Holiday</button>'
+      : '<button class="ghost" data-open-drawer="holidays">Public Holidays</button>' : ""}
     ${state.lowDaysEnabled && (isAdmin() || isLead()) ? '<button class="ghost" id="scheduler-low-days">Low Days</button>' : ""}
     ${state.eventsEnabled ? '<button class="ghost" data-open-drawer="events">Events</button>' : ""}
   </div>`;
 
   return `
     ${renderTopbar(department.name, "Hybrid schedule board with employees on rows and dates across the timeline.", actions)}
+    ${ui.holidaySelection ? renderHolidaySelectionBar() : ""}
     ${ui.schedulerEditMode ? renderSchedulerEditCommitBar() : ""}
     <section class="scheduler-toolbar" aria-label="Schedule controls">
         <div class="month-corner">
@@ -1757,20 +1766,21 @@ function renderScheduler() {
             <output aria-label="Schedule zoom level" title="${ui.rangeDays}-day range">${ui.rangeDays === 7 ? "200" : ui.rangeDays === 14 ? "100" : "50"}%</output>
             <button class="ghost icon-button" id="zoom-in-range" aria-label="Zoom in" title="Zoom in" ${ui.rangeDays === 7 ? "disabled" : ""}>${icons.plus}</button>
           </div>
-          ${canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
+          ${!ui.holidaySelection && canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
             <button class="primary" id="save-scheduler-edit">${icons.lead} Save</button>
             <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
           ` : `<button class="primary" id="toggle-scheduler-edit">${icons.lead} Edit daily leads</button>` : ""}
         </div>
     </section>
-    <section class="scheduler-shell">
+    <section class="scheduler-shell ${ui.holidaySelection ? "is-selecting-holiday" : ""}">
       <div class="schedule-grid ${schedulerRangeClass()} ${ui.schedulerEditMode ? "is-editing" : ""}" style="--days: ${dates.length}">
         ${renderSchedulerWeekBands(dates)}
         <div class="employee-head">
           <span>People</span>
           <strong>${profiles.length} profiles</strong>
         </div>
-        ${dates.map((date) => renderDateHead(date)).join("")}
+        ${dates.map((date) => renderDateHead(date, profiles)).join("")}
+        ${renderScheduleEventRow(dates)}
         ${renderDepartmentScheduleRows(department, profiles, (profile) => renderProfileRow(profile, dates))}
       </div>
     </section>
@@ -1812,7 +1822,7 @@ function coverageTargetForDepartment(department) {
   return Number(department?.coverageTarget ?? coverageTargets[department?.id] ?? 1);
 }
 
-function renderDateHead(date) {
+function renderDateHead(date, profiles) {
   const leads = departmentLeadsForDate(ui.selectedDepartmentId, date);
   const isToday = date === todayIso;
   const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
@@ -1823,24 +1833,41 @@ function renderDateHead(date) {
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
   const holiday = holidayForDepartment(ui.selectedDepartmentId, date);
-  const events = scopedEvents(departmentScopeIds(ui.selectedDepartmentId), date, date);
+  const selected = ui.holidaySelection && profiles.length > 0
+    && profiles.every((profile) => ui.holidaySelection.cells.has(`${date}/${profile.id}`));
+  const action = ui.holidaySelection
+    ? `data-holiday-date aria-pressed="${selected}" ${profiles.length ? "" : "disabled"}`
+    : `data-open-drawer="${drawerType}" data-department-id="${leadDepartmentId}"`;
   return `
-    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" data-open-drawer="${drawerType}" data-date="${date}" data-department-id="${leadDepartmentId}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${leadLabel}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}${events.length ? `. Events: ${escapeHtml(events.map((event) => event.title).join(", "))}` : ""}">
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" ${action} data-date="${date}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${ui.holidaySelection ? "Toggle this date for all people shown" : leadLabel}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
       ${holiday ? `<em class="holiday-date-label" title="${escapeHtml(holiday.name)}">${escapeHtml(holiday.name)}</em>` : ""}
-      ${renderEventDateMarker(events)}
     </button>
   `;
 }
 
 function holidayForDepartment(departmentId, date) {
-  const holiday = state.publicHolidays?.find((item) => item.date === date);
-  if (!holiday) return null;
   const scope = departmentScopeIds(departmentId);
-  if (holiday.organizationWide || holiday.departmentIds.some((id) => scope.includes(id))) return holiday;
-  return visibleProfiles().some((profile) => profileBelongsToDepartment(profile, departmentId)
-    && publicHolidayForProfile(state, profile.id, date)) ? holiday : null;
+  const profiles = visibleProfiles().filter((profile) => profileBelongsToDepartment(profile, departmentId));
+  return (state.publicHolidays || []).find((holiday) => holiday.date === date && (
+    holiday.organizationWide || holiday.departmentIds.some((id) => scope.includes(id))
+    || profiles.some((profile) => holidayAppliesToProfile(state, holiday, profile.id))));
+}
+
+function renderScheduleEventRow(dates) {
+  const events = scopedEvents(departmentScopeIds(ui.selectedDepartmentId), dates[0], dates.at(-1));
+  if (!events.length) return "";
+  return `<div class="schedule-events-heading">Events</div>${dates.map((date) => {
+    const active = events.filter((event) => event.startsOn <= date && event.endsOn >= date);
+    const classes = `schedule-events-cell ${isWeekStart(date) ? "week-start" : ""}`;
+    if (!active.length) return `<div class="${classes}" aria-hidden="true"></div>`;
+    const names = escapeHtml(active.map((event) => event.title).join(", "));
+    return `<button class="${classes} has-events" data-open-drawer="coverage" data-date="${date}"
+      title="${names}" aria-label="${formatDate(date)} events: ${names}">
+      ${escapeHtml(active[0].title)}${active.length > 1 ? ` <small>+${active.length - 1}</small>` : ""}
+    </button>`;
+  }).join("")}`;
 }
 
 function renderProfileRow(profile, dates) {
@@ -1871,8 +1898,11 @@ function renderShiftCell(profile, date) {
   const drawerType = canManageProfileDepartment(profile) && editableDate(date) && !isRolePreviewActive()
     ? "shift"
     : "calendar-day";
+  const action = ui.holidaySelection
+    ? `data-holiday-cell aria-pressed="${ui.holidaySelection.cells.has(`${date}/${profile.id}`)}" aria-label="${escapeHtml(profile.name)}, ${formatDate(date)}, toggle public holiday"`
+    : `data-open-drawer="${drawerType}"`;
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" data-open-drawer="${drawerType}" data-profile-id="${profile.id}" data-date="${date}" title="${profile.name}, ${formatDate(date)}, ${label}${drawerType === "shift" ? ". Click to edit this day" : ""}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" ${action} data-profile-id="${profile.id}" data-date="${date}" title="${escapeHtml(profile.name)}, ${formatDate(date)}, ${label}">
       <span class="shift-icon">${icon}</span>
       <span class="shift-label">${label}</span>
       <small>${source}</small>
@@ -1970,7 +2000,9 @@ function renderTeam() {
   const showAlerts = state.lowDaysEnabled && (isAdmin() || isLead());
   const activeTab = !showAlerts && ui.teamTab === "alerts" ? "hierarchy" : ui.teamTab;
   const teamCredits = showAlerts ? teamLowDayCredits(profiles) : [];
-  const alertCount = teamCredits.filter((credit) => ["due", "overdue"].includes(lowDayStatus(credit))).length;
+  const alertTeams = selectedDepartment ? departments.filter((team) => departmentScopeIds(selectedDepartment.id).includes(team.id)) : departments;
+  const holidayAlerts = showAlerts ? unevenHolidayAllocations(alertTeams, profiles) : [];
+  const alertCount = teamCredits.filter((credit) => ["due", "overdue"].includes(lowDayStatus(credit))).length + holidayAlerts.length;
   const panelMotion = ui.teamTabAnimate ? " team-panel-enter" : "";
   ui.teamTabAnimate = false;
   const actions = `
@@ -2013,7 +2045,7 @@ function renderTeam() {
             ${renderHierarchyDepartment(hierarchySection, levels)}
           </div>
           ${profiles.some(canEditHierarchy) && !isRolePreviewActive() ? `<p class="hint hierarchy-edit-hint">Drag between positions, or use a person's position menu. Structure changes are limited to Admin and team managers with Lead access.</p>` : ""}
-        </section>` : activeTab === "alerts" ? renderTeamAlerts(teamCredits, panelMotion) : `<section class="team-directory-panel${panelMotion}" id="team-directory-panel" role="tabpanel" aria-labelledby="team-directory-tab">
+        </section>` : activeTab === "alerts" ? renderTeamAlerts(teamCredits, holidayAlerts, panelMotion) : `<section class="team-directory-panel${panelMotion}" id="team-directory-panel" role="tabpanel" aria-labelledby="team-directory-tab">
           <div class="team-section-head">
             <div>
               <span class="eyebrow">People</span>
@@ -2956,13 +2988,12 @@ function renderSettings() {
   const tab = (key, label) => `<button type="button" role="tab" id="settings-${key}-tab" data-settings-tab="${key}"
     aria-selected="${activeTab === key}" aria-controls="settings-${key}-panel" tabindex="${activeTab === key ? 0 : -1}">${label}</button>`;
   return `
-    ${renderTopbar("Settings", admin ? "Manage the schedule and preview access." : "Preview your employees’ workspace.")}
+    ${renderTopbar("Settings", admin ? "Manage shift labels and preview access." : "Preview your employees’ workspace.")}
     <div class="team-tabs settings-tabs" role="tablist" aria-label="Settings">
       ${admin ? tab("schedule", "Schedule") : ""}${tab("preview", "Role Preview")}
     </div>
     ${activeTab === "preview" ? renderRolePreviewSettings(admin) : `
       <div class="settings-panels" id="settings-schedule-panel" role="tabpanel" aria-labelledby="settings-schedule-tab">
-        ${state.lowDaysEnabled ? renderHolidaySettings() : ""}
         <section class="list-panel calendar-workflow-panel" aria-labelledby="settings-shift-labels">
           <div class="team-section-head"><h2 id="settings-shift-labels">Shift Labels</h2>
             <button class="primary" data-open-drawer="status">${icons.plus} New Status</button>
@@ -3281,14 +3312,16 @@ function renderDrawer() {
     "request-detail": "Annual Request",
     lead: "Lead Assignment",
     "calendar-day": "Day Details",
-    "low-day-work": "Confirm Worked Day",
-    "low-day-find": "Find a Worked Day",
+    "low-day-work": "Override Day Off",
     events: "Schedule Events",
     event: ui.drawer.eventId ? "Edit Event" : "New Event",
     "event-remove": "Remove Event",
     "low-day-book": "Replacement Day",
     "holiday": ui.drawer.holidayId ? "Edit Public Holiday" : "Add Public Holiday",
     "holiday-remove": "Remove Public Holiday",
+    holidays: "Public Holidays",
+    "holiday-selection": "Save Public Holiday",
+    "holiday-selection-remove": "Remove Public Holiday",
     coverage: "Coverage",
     department: "New Department",
     "department-detail": "Department",
@@ -3333,7 +3366,8 @@ function drawerBody() {
   if (ui.drawer.type === "request-detail") return requestDetailDrawer();
   if (ui.drawer.type === "calendar-day") return calendarDayDrawer();
   if (ui.drawer.type === "low-day-work") return lowDayWorkDrawer();
-  if (ui.drawer.type === "low-day-find") return lowDayFindDrawer();
+  if (ui.drawer.type === "holidays") return renderHolidayList();
+  if (ui.drawer.type === "holiday-selection" || ui.drawer.type === "holiday-selection-remove") return holidaySelectionDrawer();
   if (ui.drawer.type === "events") return eventsDrawer();
   if (ui.drawer.type === "event" || ui.drawer.type === "event-remove") return eventFormDrawer();
   if (ui.drawer.type === "low-day-book") return lowDayBookingDrawer();
@@ -3386,13 +3420,52 @@ function renderMyLowDays(profile) {
   </section>`;
 }
 
-function renderTeamAlerts(credits, motion) {
+function unevenHolidayAllocations(departments, profiles) {
+  const teams = departments.filter((team) => canManageDepartment(team.id) && !isDepartmentContainer(state, team.id));
+  const alerts = [];
+  for (const rows of holidayBatches().values()) {
+    for (const team of teams) {
+      const people = profiles.filter((profile) => profileTeamIds(state, profile).includes(team.id));
+      if (!rows.some((holiday) => people.some((profile) => holiday.profileIds.includes(profile.id)))) continue;
+      const groups = new Map();
+      for (const profile of people) {
+        const count = rows.filter((holiday) => holiday.profileIds.includes(profile.id)
+          && scheduleFor(profile.id, holiday.date).id === "public_holiday").length;
+        if (!groups.has(count)) groups.set(count, []);
+        groups.get(count).push(profile.name);
+      }
+      if (groups.size > 1) alerts.push({ team: team.name, name: rows[0].name, groups });
+    }
+  }
+  return alerts;
+}
+
+function renderTeamAlerts(credits, holidayAlerts, motion) {
   return `<section class="team-directory-panel${motion}" id="team-alerts-panel" role="tabpanel" aria-labelledby="team-alerts-tab">
+    ${holidayAlerts.length ? `<section class="holiday-alerts" aria-label="Uneven public holidays">
+      <h2>Uneven public holidays</h2>
+      ${holidayAlerts.map(({ team, name, groups }) => `<div class="calendar-workflow-row">
+        <div><strong>${escapeHtml(name)} · ${escapeHtml(team)}</strong>
+          ${[...groups].sort(([a], [b]) => b - a).map(([count, names]) =>
+            `<span>${escapeHtml(names.join(", "))} received <b>${count} ${count === 1 ? "day" : "days"}</b></span>`).join("")}
+        </div></div>`).join("")}
+    </section>` : ""}
     <div class="team-section-head"><h2>Replacement days</h2>
-      ${!isRolePreviewActive() ? '<button class="ghost" data-open-drawer="low-day-find">Find worked day</button>' : ""}
+      ${!isRolePreviewActive() ? '<button class="ghost" data-view="scheduler">Open Scheduler</button>' : ""}
     </div>
     ${credits.length ? credits.map((credit) => renderLowDayRow(credit, true)).join("") : '<p class="hint">No open or upcoming replacement days for this team.</p>'}
   </section>`;
+}
+
+function canOverrideDayOff(profile, date) {
+  return canManageLowDay(profile) && canConfirmWorkedDay(state, profile.id, date)
+    && (state.holidaySelectionEnabled || !["vacation", "sick"].includes(scheduleFor(profile.id, date).id));
+}
+
+function protectedDailyShift(profileId, date) {
+  const shift = scheduleFor(profileId, date);
+  return ["low_day", "vacation"].includes(shift.id) || shift.confirmedWork
+    || (shift.id === "public_holiday" && publicHolidayForProfile(state, profileId, date)?.batchId);
 }
 
 function renderWorkedDayAction(profile, date) {
@@ -3400,32 +3473,21 @@ function renderWorkedDayAction(profile, date) {
   const credit = state.lowDayCredits.find((item) => item.profileId === profile.id
     && (item.workedDate === date || item.replacementDate === date));
   if (credit) return `<button type="button" class="ghost wide" data-open-drawer="low-day-book" data-credit-id="${credit.id}">View Low Days credit</button>`;
-  if (!canConfirmWorkedDay(state, profile.id, date)) {
+  if (!canOverrideDayOff(profile, date)) {
     const status = scheduleFor(profile.id, date);
     const message = ["vacation", "sick", "low_day"].includes(status.id)
       ? `This date is recorded as ${displayStatusLabel(status)}.`
-      : date > cairoDate() ? "Work can be confirmed on or after the worked date." : "Choose a scheduled day off or a public holiday.";
+      : date > cairoDate() ? "Work can be recorded on or after this date." : "";
+    if (!message) return "";
     return `<div class="shift-low-day-context"><strong>Low Days</strong><p class="hint">${escapeHtml(message)}</p></div>`;
   }
-  return `<button type="button" class="ghost wide" data-open-drawer="low-day-work" data-profile-id="${profile.id}" data-date="${date}">Confirm worked day</button>`;
-}
-
-function lowDayFindDrawer() {
-  const people = visibleProfiles().filter((profile) => canManageLowDay(profile)
-    && (ui.peopleDepartmentId === "all" || profileBelongsToDepartment(profile, ui.peopleDepartmentId)));
-  if (!people.length) return '<p class="hint">Select a team with employees you manage.</p>';
-  return `<form class="drawer-form" id="low-day-find-form">
-    <label>Person<select name="profileId">${people.map((profile) => `<option value="${profile.id}">${escapeHtml(profile.name)}</option>`).join("")}</select></label>
-    <label>Worked date<input type="date" name="date" max="${cairoDate()}" required></label>
-    <p class="hint">Select the date the person worked on their scheduled day off or a public holiday.</p>
-    <button class="primary wide">Open Shift Details</button>
-  </form>`;
+  return `<button type="button" class="primary wide" data-open-drawer="low-day-work" data-profile-id="${profile.id}" data-date="${date}">Override day off</button>`;
 }
 
 function lowDayWorkDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   const date = ui.drawer.date;
-  if (!canManageLowDay(profile) || !canConfirmWorkedDay(state, profile.id, date)) return '<p class="hint">This date is unavailable for confirmation.</p>';
+  if (!canOverrideDayOff(profile, date)) return '<p class="hint">This date is unavailable for confirmation.</p>';
   const shift = scheduleFor(profile.id, date);
   const holiday = publicHolidayForProfile(state, profile.id, date);
   const selected = ui.drawer.workStatus || shift.id;
@@ -3433,13 +3495,14 @@ function lowDayWorkDrawer() {
   return `<form class="drawer-form" id="low-day-work-form">
     <div class="detail-line"><span>Employee</span><strong>${escapeHtml(profile.name)}</strong></div>
     <div class="detail-line"><span>Worked date</span><strong>${date}</strong></div>
-    <div class="detail-line"><span>Reason</span><strong>${holiday ? escapeHtml(holiday.name) : "Scheduled day off"}</strong></div>
+    <div class="detail-line"><span>Reason</span><strong>${escapeHtml(holiday?.name || displayStatusLabel(shift))}</strong></div>
     <div class="detail-line"><span>Take replacement by</span><strong>${addDays(date, 30)}</strong></div>
+    ${shift.id === "vacation" ? '<p class="hint">Any recorded Annual charge for this day will be returned to its year’s balance.</p>' : ""}
     <label>Shift worked<select name="statusId" required><option value="">Choose shift</option>
       ${choices.map((status) => `<option value="${status.id}" ${status.id === selected ? "selected" : ""}>${escapeHtml(status.label)}</option>`).join("")}
     </select></label>
     <label>Note<textarea name="note" maxlength="500">${escapeHtml(ui.drawer.workNote ?? (shift.kind === "working" ? shift.note : "") ?? "")}</textarea></label>
-    <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Confirm Work and Add Credit</button>
+    <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Save Worked Day</button>
   </form>`;
 }
 
@@ -3463,19 +3526,83 @@ function lowDayBookingDrawer() {
   </form>`;
 }
 
-function renderHolidaySettings() {
-  return `<section class="list-panel calendar-workflow-panel" aria-labelledby="holiday-settings-title">
-    <div class="team-section-head"><h2 id="holiday-settings-title">Public Holidays</h2>
-      <button type="button" class="primary" data-open-drawer="holiday">${icons.plus} Add Public Holiday</button>
+function holidayBatches() {
+  const batches = new Map();
+  for (const holiday of state.publicHolidays || []) {
+    if (!holiday.batchId) continue;
+    if (!batches.has(holiday.batchId)) batches.set(holiday.batchId, []);
+    batches.get(holiday.batchId).push(holiday);
+  }
+  return batches;
+}
+
+function renderHolidaySelectionBar() {
+  const { cells, batchId, startDate, endDate } = ui.holidaySelection;
+  return `<section class="holiday-selection-bar list-panel" aria-label="Public Holiday mode">
+    <div class="team-section-head">
+      <div><h2>${batchId ? "Edit Public Holiday" : "Public Holiday mode"}</h2>
+        <p class="hint">Select a date header for everyone shown, or select individual shifts.</p>
+      </div>
+      <button type="button" class="ghost" data-open-drawer="holidays">Saved Holidays</button>
     </div>
-    ${state.publicHolidays.length ? state.publicHolidays.map((holiday) => `<div class="calendar-workflow-row">
+    <div class="holiday-selection-controls">
+      <form id="holiday-date-range">
+        <label>From<input type="date" name="startDate" value="${startDate}" required></label>
+        <label>Through<input type="date" name="endDate" value="${endDate}" required></label>
+        <button class="ghost" type="submit" ${departmentProfiles().length ? "" : "disabled"}>Select Range</button>
+      </form>
+      <div class="holiday-selection-actions">
+        <output aria-live="polite">${cells.size} ${cells.size === 1 ? "shift" : "shifts"} selected</output>
+        <button type="button" class="ghost" id="cancel-holiday-selection">Cancel</button>
+        <button type="button" class="primary" data-open-drawer="holiday-selection" ${cells.size ? "" : "disabled"}>Review Holiday</button>
+      </div>
+    </div>
+  </section>`;
+}
+
+function renderHolidayList() {
+  if (!canManageSystemSettings()) return "";
+  const batches = [...holidayBatches()];
+  const legacy = state.publicHolidays.filter((holiday) => !holiday.batchId);
+  return `<div class="drawer-stack">
+    ${state.holidaySelectionEnabled ? "" : '<button type="button" class="primary" data-open-drawer="holiday">Add Public Holiday</button>'}
+    ${batches.map(([id, rows]) => `<div class="calendar-workflow-row">
+      <div><strong>${escapeHtml(rows[0].name)}</strong>
+        <span>${rows[0].date}${rows.length > 1 ? ` to ${rows.at(-1).date}` : ""} · ${rows.length} ${rows.length === 1 ? "date" : "dates"}</span>
+      </div>
+      <button type="button" class="ghost" data-edit-holiday-batch="${id}" aria-label="Edit ${escapeHtml(rows[0].name)}">Edit</button>
+      <button type="button" class="ghost" data-open-drawer="holiday-selection-remove" data-batch-id="${id}" aria-label="Remove ${escapeHtml(rows[0].name)}">Remove</button>
+    </div>`).join("")}
+    ${legacy.map((holiday) => `<div class="calendar-workflow-row">
       <div><strong>${escapeHtml(holiday.name)}</strong>
         <span>${holiday.date} · ${holiday.dayOff ? "Day off" : "Scheduled coverage"}</span>
         <span>${holiday.organizationWide ? "Entire organization" : escapeHtml(holiday.departmentIds.map((id) => byId(state.departments, id)?.name || "Removed team").join(", "))}</span>
       </div>
       <button type="button" class="ghost" data-open-drawer="holiday" data-holiday-id="${holiday.id}" aria-label="Edit ${escapeHtml(holiday.name)}">Edit</button>
-    </div>`).join("") : '<p class="hint">No public holidays added.</p>'}
-  </section>`;
+    </div>`).join("")}
+    ${batches.length || legacy.length ? "" : '<p class="hint">No public holidays added.</p>'}
+  </div>`;
+}
+
+function holidaySelectionDrawer() {
+  if (!canManageSystemSettings()) return "";
+  if (ui.drawer.type === "holiday-selection-remove") {
+    const rows = holidayBatches().get(ui.drawer.batchId);
+    if (!rows) return "";
+    return `<form class="drawer-form" id="remove-holiday-selection-form">
+      <p>Remove ${escapeHtml(rows[0].name)} from its ${rows.length} selected ${rows.length === 1 ? "date" : "dates"}?</p>
+      <button class="danger wide" ${isMutationPending() ? "disabled" : ""}>Remove Public Holiday</button>
+    </form>`;
+  }
+  const selection = ui.holidaySelection;
+  if (!selection?.cells.size) return "";
+  const dates = new Set([...selection.cells].map((cell) => cell.split("/")[0]));
+  return `<form class="drawer-form" id="save-holiday-selection-form">
+    <label>Holiday name<input name="name" required maxlength="100" value="${escapeHtml(selection.name)}"></label>
+    <div class="detail-line"><span>Selected shifts</span><strong>${selection.cells.size} across ${dates.size} ${dates.size === 1 ? "date" : "dates"}</strong></div>
+    <p class="hint">Existing leave and confirmed work keep their recorded status.</p>
+    <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Save Public Holiday</button>
+  </form>`;
 }
 
 function publicHolidayDrawer() {
@@ -3632,7 +3759,8 @@ function coverageGroup(label, entries) {
 function shiftDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   const schedule = scheduleFor(profile.id, ui.drawer.date);
-  const canEdit = canManageProfileDepartment(profile) && editableDate(ui.drawer.date) && schedule.id !== "low_day";
+  const canEdit = canManageProfileDepartment(profile) && editableDate(ui.drawer.date)
+    && !protectedDailyShift(profile.id, ui.drawer.date);
   const rotation = activeRotation(profile.id, ui.drawer.date);
   const rotationStatus = schedule.rotationStatus;
   const existingOverride = state.scheduleOverrides.find((entry) => entry.profileId === profile.id && entry.date === ui.drawer.date);
@@ -4634,12 +4762,14 @@ function bindEvents() {
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       ui.activeView = button.dataset.view;
+      if (ui.activeView !== "scheduler") ui.holidaySelection = null;
       ui.drawer = null;
       render();
     });
   });
 
   wireDrawerButtons();
+  bindHolidaySelection();
 
   document.querySelectorAll("[data-open-profile-page]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -4906,6 +5036,7 @@ function bindEvents() {
     ui.rotationClipboard = null;
     ui.rotationLeadDraftPattern = null;
     ui.rolePreview = null;
+    ui.holidaySelection = null;
     state.currentUserId = event.target.value;
     const firstDepartment = visibleDepartments()[0];
     ui.selectedDepartmentId = firstDepartment?.id || "";
@@ -4926,22 +5057,10 @@ function bindEvents() {
   document.querySelector("#shift-form")?.addEventListener("submit", saveShiftOverride);
   document.querySelector("#scheduler-low-days")?.addEventListener("click", () => {
     ui.activeView = "team";
+    ui.holidaySelection = null;
     ui.teamTab = "alerts";
     ui.peopleDepartmentId = ui.selectedDepartmentId || "all";
     ui.drawer = null;
-    render();
-  });
-  document.querySelector("#low-day-find-form")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const profile = byId(state.profiles, form.get("profileId"));
-    if (!canManageLowDay(profile)) return;
-    const date = form.get("date");
-    const team = profileDepartmentIds(profile).find(canManageDepartment);
-    if (team) ui.selectedDepartmentId = team;
-    ui.activeView = "scheduler";
-    ui.startDate = date;
-    ui.drawer = { type: editableDate(date) ? "shift" : "calendar-day", profileId: profile.id, date };
     render();
   });
   document.querySelector("#low-day-work-form")?.addEventListener("submit", confirmWorkedDay);
@@ -5336,6 +5455,7 @@ function bindAuthEvents() {
 
 async function signOut() {
   invalidateAnalytics();
+  ui.holidaySelection = null;
   await runMutation("sign-out", {
     pending: "Signing out...",
     success: "Signed out.",
@@ -5367,7 +5487,7 @@ async function confirmWorkedDay(event) {
   event.preventDefault();
   const profile = byId(state.profiles, ui.drawer.profileId);
   const date = ui.drawer.date;
-  if (!canManageLowDay(profile) || !canConfirmWorkedDay(state, profile.id, date)) return;
+  if (!canOverrideDayOff(profile, date)) return;
   const form = new FormData(event.currentTarget);
   const input = { profileId: profile.id, date, statusId: form.get("statusId"), note: String(form.get("note") || "").trim() };
   Object.assign(ui.drawer, { workStatus: input.statusId, workNote: input.note });
@@ -5377,9 +5497,126 @@ async function confirmWorkedDay(event) {
   }, async () => {
     const result = dataStore.mode === "demo" ? confirmDemoLowDay(state, input) : await dataStore.confirmLowDay(input);
     applyLowDayResult(result);
+    if (result.refund) {
+      const { request, balance } = result.refund;
+      state.vacationRequests = state.vacationRequests.map((item) => item.id === request.id ? request : item);
+      state.annualBalances = (state.annualBalances || []).filter((item) =>
+        item.profileId !== balance.profileId || item.year !== balance.year);
+      state.annualBalances.push(balance);
+      if (profile.annualBalanceYear === balance.year) profile.remainingVacationDays = balance.remaining;
+    }
     if (dataStore.mode === "demo") audit("low_day.earned", "profile", profile.id, `Worked ${date} · use by ${result.credit.dueDate}`);
     await saveState();
     ui.drawer = null;
+  });
+}
+
+function enterHolidaySelection(batchId) {
+  if (!canManageSystemSettings() || !state.holidaySelectionEnabled || isMutationPending()) return;
+  if (ui.schedulerEditMode) {
+    notify("Save or cancel daily Lead edits before entering Public Holiday mode.", "warning");
+    return;
+  }
+  const rows = batchId ? holidayBatches().get(batchId) : [];
+  if (!rows) return;
+  const startDate = rows[0]?.date || ui.startDate;
+  ui.holidaySelection = {
+    batchId, name: rows[0]?.name || "", startDate, endDate: rows.at(-1)?.date || startDate,
+    cells: new Set(rows.flatMap((holiday) => holiday.profileIds.map((id) => `${holiday.date}/${id}`)))
+  };
+  if (batchId) ui.startDate = startDate;
+  ui.schedulerEditMode = false;
+  ui.schedulerLeadDrafts = [];
+  ui.drawer = null;
+  render();
+  document.querySelector("#holiday-date-range input")?.focus({ preventScroll: true });
+}
+
+function renderHolidaySelectionChange(focusSelector) {
+  const left = document.querySelector(".scheduler-shell")?.scrollLeft || 0;
+  render();
+  const shell = document.querySelector(".scheduler-shell");
+  if (shell) shell.scrollLeft = left;
+  document.querySelector(focusSelector)?.focus({ preventScroll: true });
+}
+
+function bindHolidaySelection() {
+  document.querySelector("#enter-public-holiday")?.addEventListener("click", () => enterHolidaySelection());
+  document.querySelectorAll("[data-edit-holiday-batch]").forEach((button) =>
+    button.addEventListener("click", () => enterHolidaySelection(button.dataset.editHolidayBatch)));
+  document.querySelector("#cancel-holiday-selection")?.addEventListener("click", () => {
+    if (isMutationPending()) return;
+    ui.holidaySelection = null;
+    ui.drawer = null;
+    render();
+    document.querySelector("#enter-public-holiday")?.focus();
+  });
+  document.querySelector("#save-holiday-selection-form")?.addEventListener("submit", (event) => void saveHolidaySelection(event, false));
+  document.querySelector("#remove-holiday-selection-form")?.addEventListener("submit", (event) => void saveHolidaySelection(event, true));
+  const selection = ui.holidaySelection;
+  if (!selection) return;
+  const people = departmentProfiles();
+  const range = document.querySelector("#holiday-date-range");
+  range?.addEventListener("input", (event) => { selection[event.target.name] = event.target.value; });
+  range?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const { startDate, endDate } = selection;
+    const days = dateDiffLogic(startDate, endDate) + 1;
+    if (!startDate || !endDate || days < 1 || days * people.length > 10000) {
+      notify("Choose a valid range with at most 10,000 person-days.", "error");
+      return;
+    }
+    for (const date of datesBetween(startDate, endDate)) {
+      for (const profile of people) selection.cells.add(`${date}/${profile.id}`);
+    }
+    renderHolidaySelectionChange("#holiday-date-range button");
+  });
+  document.querySelectorAll("[data-holiday-date], [data-holiday-cell]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const { date, profileId } = button.dataset;
+      const keys = profileId ? [`${date}/${profileId}`] : people.map((profile) => `${date}/${profile.id}`);
+      const remove = keys.every((key) => selection.cells.has(key));
+      for (const key of keys) {
+        if (remove) selection.cells.delete(key);
+        else selection.cells.add(key);
+      }
+      renderHolidaySelectionChange(profileId
+        ? `[data-holiday-cell][data-date="${date}"][data-profile-id="${profileId}"]`
+        : `[data-holiday-date][data-date="${date}"]`);
+    }));
+}
+
+async function saveHolidaySelection(event, remove) {
+  event.preventDefault();
+  if (!canManageSystemSettings() || !state.holidaySelectionEnabled) return;
+  const selection = ui.holidaySelection;
+  const batchId = remove ? ui.drawer.batchId : selection?.batchId;
+  const name = remove ? holidayBatches().get(batchId)?.[0]?.name || ""
+    : String(new FormData(event.currentTarget).get("name") || "").trim();
+  const cells = remove ? [] : [...(selection?.cells || [])].map((key) => {
+    const [date, profileId] = key.split("/");
+    return { date, profileId };
+  });
+  if (!remove && (!name || !cells.length || cells.length > 10000)) {
+    notify("Enter a holiday name and select between 1 and 10,000 shifts.", "error");
+    return;
+  }
+  if (!remove) selection.name = name;
+  await runMutation("holiday-save", {
+    pending: "Updating public holidays…", success: remove ? "Public holiday removed." : "Public holiday saved.",
+    failure: "The public holiday could not be updated."
+  }, async () => {
+    const payload = { batchId, name, cells };
+    if (dataStore.mode === "demo") {
+      const result = saveDemoHolidaySelection(state, payload, remove);
+      state.publicHolidays = result.holidays;
+      audit(remove ? "holiday.deleted" : "holiday.saved", "public_holiday", result.batchId, name);
+    } else {
+      Object.assign(state, await dataStore.saveHolidaySelection(payload, remove));
+    }
+    if (!remove || selection?.batchId === batchId) ui.holidaySelection = null;
+    await saveState();
+    ui.drawer = remove ? { type: "holidays" } : null;
   });
 }
 
@@ -5503,8 +5740,8 @@ async function saveShiftOverride(event) {
   const rangeStart = startDate <= endDate ? startDate : endDate;
   const rangeEnd = startDate <= endDate ? endDate : startDate;
   const targetDates = datesBetween(rangeStart, rangeEnd).filter(editableDate);
-  if (targetDates.some((date) => scheduleFor(profile.id, date).id === "low_day")) {
-    notify("Manage booked replacement days in Team Alerts.", "error");
+  if (targetDates.some((date) => protectedDailyShift(profile.id, date))) {
+    notify("The range includes Annual, a public holiday, or a Low Days shift. Review that date individually.", "error");
     return;
   }
   const selectedStatusId = form.get("statusId");
@@ -5554,7 +5791,7 @@ async function clearShiftOverride() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   if (!profile || !canManageProfileDepartment(profile) || !editableDate(ui.drawer.date)) return;
   const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === ui.drawer.date);
-  if (!existing || existing.statusId === "low_day") return;
+  if (!existing || protectedDailyShift(profile.id, ui.drawer.date)) return;
   await runMutation("shift-clear", {
     pending: "Clearing daily change...",
     success: "Daily change cleared.",
