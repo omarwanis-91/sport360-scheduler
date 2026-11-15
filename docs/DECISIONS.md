@@ -564,3 +564,12 @@ Override day off records a working shift and earns one Low Days credit when the 
 Edit daily leads stages a date-based lead reassignment or restores the weekly lead. A shift or request that removes actual lead coverage offers a direct replacement picker with Skip for now. Reassignment preserves the former lead’s stored shift.
 
 A daily shift edit can explicitly replace the selected holiday for that person and date. Scope the exception to the saved holiday batch. Keep confirmed work and credit creation in Override day off and provide Admin access to remove a saved holiday from Scheduler.
+
+## D-072 - Public Holiday Entitlements and Low Days Expiry
+
+**Date:** 2026-11-15
+**Status:** Accepted
+
+Admin sets the number of holiday days per person in Review Holiday. Compare it with the dates allocated to each person in the reviewed teams. Issue one Low Days credit per unallocated day with a deadline measured from the last selected holiday date. The expiry period defaults to 30 calendar days and Admin can change it for new holiday batches and worked credits.
+
+Clear Override can reverse a worked shift and its unused credit together. Restore any previous shift and Annual deduction in the same transaction. Cancel an upcoming replacement booking before clearing the worked shift. Keep taken replacements in history.

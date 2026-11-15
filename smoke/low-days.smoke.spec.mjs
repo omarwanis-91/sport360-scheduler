@@ -77,9 +77,18 @@ test("a worked day earns one credit and a booking can be cancelled without losin
 
 test("Admin can select a range, dates and individual shifts and see uneven holiday alerts by team", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 950 });
+  await navigate(page, "Settings");
+  await page.getByLabel("Expiry in calendar days").fill("10");
+  await navigate(page, "Save expiry");
+  await navigate(page, "Scheduler");
   await navigate(page, "Enter Public Holiday");
   await page.getByLabel("From", { exact: true }).fill("2026-11-12");
-  await page.getByLabel("Through", { exact: true }).fill("2026-11-13");
+  const through = page.getByLabel("Through", { exact: true });
+  await expect(through).toHaveValue("2026-11-12");
+  await expect(through).toHaveAttribute("min", "2026-11-12");
+  await through.fill("2026-11-10");
+  await expect(through).toHaveValue("2026-11-12");
+  await through.fill("2026-11-13");
   await navigate(page, "Select Range");
   await expect(page.getByRole("region", { name: "Public Holiday mode" })).toContainText("6 shifts selected");
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
@@ -89,10 +98,21 @@ test("Admin can select a range, dates and individual shifts and see uneven holid
   await expect(shift(page, "2026-11-13")).toHaveAttribute("aria-pressed", "true");
   await navigate(page, "Review Holiday");
   await page.getByLabel("Holiday name").fill("Observed Holiday");
+  const days = page.getByLabel("Holiday days per person");
+  const allocations = page.locator("#holiday-allocation-preview");
+  await expect(days).toHaveValue("2");
+  await days.fill("3");
+  await expect(allocations).toContainText("2 allocated · 1 credit");
+  await days.fill("2");
+  await expect(allocations).toContainText("1 allocated · 1 credit");
+  await expect(allocations).toContainText("2 allocated · 0 credits");
+  await expect(page.getByRole("dialog")).toContainText("2026-11-23");
   await navigate(page, "Save Public Holiday");
   const header = page.locator('.date-head[data-date="2026-11-12"]');
   await expect(header).toContainText("Observed Holiday");
   await expect(shift(page, "2026-11-12")).toHaveClass(/public_holiday/);
+  await expect(shift(page, "2026-11-12").locator(".shift-label")).toHaveText("Observed Holiday");
+  await expect(shift(page, "2026-11-12")).toContainText("Public Holiday");
   await expect(shift(page, "2026-11-13", "emp-002")).not.toHaveClass(/public_holiday/);
   await page.locator("#department-select").selectOption("support");
   await expect(header).not.toContainText("Observed Holiday");
@@ -102,6 +122,8 @@ test("Admin can select a range, dates and individual shifts and see uneven holid
   await expect(holidayAlert).toContainText("Observed Holiday · Operations");
   await expect(holidayAlert).toContainText("Omar Wanis received 2 days");
   await expect(holidayAlert).toContainText(/received 1 day/);
+  await expect(page.locator(".replacement-card")).toHaveCount(2);
+  await expect(page.locator(".replacement-card").first()).toContainText("Nov 23 2026");
   await page.locator("#team-department-select").selectOption("support");
   await expect(holidayAlert).toHaveCount(0);
   await navigate(page, "Scheduler");
@@ -114,6 +136,7 @@ test("Admin can select a range, dates and individual shifts and see uneven holid
   await expect(shift(page, "2026-11-13", "emp-002")).toHaveClass(/public_holiday/);
   await navigate(page, "Low Days");
   await expect(holidayAlert).toHaveCount(0);
+  await expect(page.locator(".replacement-card")).toHaveCount(0);
 });
 
 test("a saved holiday can be overridden for one shift and removed directly from Scheduler", async ({ page }) => {
