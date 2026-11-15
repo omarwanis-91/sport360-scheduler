@@ -555,3 +555,12 @@ Role Preview has its own Settings tab. Admin selects the actual role and a depar
 Admin assigns named public holidays from the Scheduler using a whole displayed team on a date or date range, or individual person-date cells. Store each saved selection as a batch and keep legacy holiday scope and precedence. A selected holiday takes precedence over normal shifts. Existing leave, replacement bookings, and confirmed work retain their recorded status. Report differences in days off within each team under Alerts.
 
 Override day off records a working shift and earns one Low Days credit when the selected date is Weekend, a public holiday, Annual, or Sick. If the Annual override links to an approved charge, return one day to its original year and adjust the recorded deduction in the same transaction.
+
+## D-071 - Daily Lead Coverage and Public Holiday Shift Edits
+
+**Date:** 2026-11-15
+**Status:** Accepted
+
+Edit daily leads stages a date-based lead reassignment or restores the weekly lead. A shift or request that removes actual lead coverage offers a direct replacement picker with Skip for now. Reassignment preserves the former lead’s stored shift.
+
+A daily shift edit can explicitly replace the selected holiday for that person and date. Scope the exception to the saved holiday batch. Keep confirmed work and credit creation in Override day off and provide Admin access to remove a saved holiday from Scheduler.

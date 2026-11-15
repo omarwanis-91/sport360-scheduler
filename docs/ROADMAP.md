@@ -120,7 +120,8 @@ Feature development normally freezes after Phase 3 while this production hardeni
 - ✅ Team/profile structure is live on Vercel after migration 035 and all five audit 024 checks passed. PR #39 shipped nonassignable containers, automatic titles, and the centered editor. PR #40 grouped Video Unit grids and simplified Scheduler person rows.
 - ✅ Low Days, Team Alerts, and Public Holidays shipped in PR #41 after migration 036 and all five audit 025 checks passed.
 - ✅ Events, scoped Manager preview, and the Scheduler/Profile/Analytics UI fixes shipped in PR #42 after migration 037 and all five audit 026 checks passed.
-- ⏳ Review Scheduler holiday selection, uneven allocation alerts, and worked leave. Apply migration 038 and verify audit 027 before releasing the matching app update.
+- ✅ Scheduler holiday selection, uneven allocation alerts, and worked leave shipped in PR #43 after migration 038 and all five audit 027 checks passed.
+- ⏳ Review staged daily lead selection, replacement prompts, and individual public holiday shift edits. Apply migration 039 and verify audit 028 before release.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.

@@ -7934,7 +7934,7 @@ select:focus {
 body:has(.profile-editor-modal) { overflow:hidden; }
 .profile-editor-scrim { position:fixed; inset:0; z-index:49; background:#030304b8; backdrop-filter:blur(5px); }
 .drawer.creation-modal.profile-editor-modal { z-index:50; padding:0; width:min(900px,calc(100vw - 40px)); max-width:none; max-height:calc(100dvh - 40px); display:flex; flex-direction:column; overflow:hidden; box-shadow:0 38px 100px #000a,0 0 65px #a52d4c26,inset 0 1px #ffffff13; }
-.profile-editor-modal > .app-notice { position:static; flex:none; transform:none; width:auto; max-width:none; margin:12px 24px 0; padding:10px 12px; font-size:13px; }
+.profile-editor-modal > .app-notice-stack { position:static; flex:none; width:auto; max-width:none; margin:12px 24px 0; }
 .profile-editor-modal .drawer-head { flex:none; padding:20px 24px; }
 .profile-editor-modal .drawer-head h2 { font-size:23px; }
 .profile-editor-form.drawer-form { display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:0; gap:0; }
@@ -8574,13 +8574,71 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 }
 
 .scheduler-toolbar .month-title-control {
-  grid-template-columns: 30px minmax(115px, auto) 30px auto;
+  grid-template-columns: 30px minmax(115px, auto) 30px;
   gap: 5px;
 }
 
 .scheduler-toolbar .month-title-control strong {
   font-size: 12px;
 }
+
+.scheduler-toolbar .month-corner { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.scheduler-toolbar .month-corner select { width:auto; max-width:100%; min-width:0; flex:1 1 auto; }
+.scheduler-date-actions { margin-inline-start:auto; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.scheduler-toolbar :is(#cancel-scheduler-edit,#save-scheduler-edit,#month-start-range) {
+  display:inline-flex; align-items:center; justify-content:center; gap:5px;
+}
+.scheduler-toolbar :is(#cancel-scheduler-edit,#save-scheduler-edit,#month-start-range) svg,
+.day-lead-edit-label svg { width:14px; height:14px; flex:none; }
+.date-head .day-lead-edit-label,.schedule-grid.range-month .date-head .day-lead-edit-label {
+  display:flex; gap:4px; align-items:center; color:#f1a5b7; font-style:normal; font-size:10px;
+}
+.schedule-grid.is-editing .assign-lead-action {
+  opacity:1; pointer-events:auto; transform:none; animation:none;
+}
+.schedule-grid.is-editing .shift-cell .assign-lead-action { bottom:4px; right:4px; }
+.current-lead-chip { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #f586a04d; border-radius:8px; background:#361d27; color:#ffd0dc; }
+.current-lead-chip svg { width:18px; height:18px; }
+.current-lead-chip span { margin-inline-start:auto; }
+.worked-shift-picker { min-width:0; margin:0; padding:0; border:0; }
+.worked-shift-picker legend { color:var(--muted); font-size:12px; margin-bottom:7px; }
+.worked-shift-picker .status-choice-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.worked-shift-picker .status-choice span { min-height:36px; justify-content:center; }
+.worked-shift-picker .status-choice svg { width:19px; height:19px; }
+
+.app-notice-stack {
+  position:fixed; z-index:30; right:18px; bottom:18px; width:max-content;
+  max-width:min(420px,calc(100vw - 36px)); display:flex; flex-direction:column-reverse; align-items:stretch; gap:7px;
+  pointer-events:none;
+}
+.profile-editor-modal > .app-notice-stack { flex-direction:column; }
+.app-notice-stack :is(.app-notice,.notice-toast) { position:static; width:auto; max-width:none; }
+.app-notice-stack .icon-button { pointer-events:auto; }
+.notice-toast {
+  display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 10px 9px 13px;
+  border:1px solid #22c55e57; border-radius:var(--radius); color:#bbf7d0; background:#101d15;
+  box-shadow:var(--shadow); font-size:12px; animation:sport360NoticeIn 300ms var(--ease-out) both;
+}
+.notice-toast .icon-button { width:30px; height:30px; flex:none; }
+.notice-toast.is-dismissing { animation:success-notice-out 220ms ease both; pointer-events:none; }
+@keyframes success-notice-out { to { opacity:0; transform:translateY(8px); } }
+@media (prefers-reduced-motion: reduce) {
+  .notice-toast,.notice-toast.is-dismissing { animation:none; }
+  .notice-toast.is-dismissing { visibility:hidden; }
+}
+
+.low-day-alert-head { flex-wrap:wrap; }
+.low-day-alert-head h2,.replacement-card header,.replacement-card-dates > div { display:flex; align-items:center; gap:8px; }
+.low-day-alert-head h2 svg,.replacement-card-dates svg { width:16px; height:16px; color:#cbb4ee; }
+.replacement-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(290px,100%),1fr)); gap:10px; margin-top:10px; }
+.replacement-card { display:grid; gap:12px; border:1px solid var(--line); border-radius:10px; padding:12px; background:#18151e; }
+.replacement-card header strong { flex:1; }
+.replacement-card.due,.replacement-card.overdue { border-color:#a45a6f; }
+.replacement-card-dates { display:flex; flex-wrap:wrap; gap:12px; }
+.replacement-card-dates span { display:grid; gap:2px; }
+.replacement-card-dates small { color:var(--muted); }
+.replacement-card-dates time { font-size:12px; font-weight:650; }
+.replacement-card > button { justify-self:end; }
 
 .scheduler-toolbar .icon-button {
   display: inline-flex;
@@ -8895,15 +8953,24 @@ body:has(.profile-editor-modal) { overflow:hidden; }
   filter: brightness(0.68) saturate(0.7) blur(0.22px);
 }
 
-.shift-cell.vacation :is(.shift-icon, .shift-label, small, .cell-alert),
-.schedule-grid .shift-cell.vacation :is(.shift-icon, .shift-label, small, .cell-alert) {
-  opacity: 0.56;
+.shift-cell.public_holiday,.month-day.public_holiday,.my-shifts .request-row.public_holiday,.leave-impact-shift.public_holiday {
+  --status-rgb: 229 188 116;
+  --status-accent: #edc986;
 }
-
-.month-day:is(.vacation, .approved-vacation),
-.my-shifts .request-row.vacation,
-.leave-impact-shift.vacation {
-  opacity: 0.64;
+.schedule-grid .shift-cell:is(.vacation,.sick,.public_holiday) :is(.shift-icon,.shift-label,small,.cell-alert) {
+  opacity:0.84;
+  filter:none;
+}
+.month-day:is(.vacation,.approved-vacation,.sick,.public_holiday),
+.my-shifts .request-row:is(.vacation,.sick,.public_holiday),
+.leave-impact-shift:is(.vacation,.sick,.public_holiday) {
+  opacity:1;
+  filter:none;
+  border-color:rgb(var(--status-rgb,126 220 152) / .42);
+  box-shadow:inset 2px 0 var(--status-accent,#7edc98),inset 5px 0 12px -7px var(--status-accent,#7edc98);
+}
+.month-day:is(.vacation,.sick,.public_holiday) svg,.my-shifts .request-row.public_holiday svg {
+  color:var(--status-accent);
 }
 
 .legend-dot.leave { background: #7edc98; }
