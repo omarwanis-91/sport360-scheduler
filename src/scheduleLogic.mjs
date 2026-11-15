@@ -216,13 +216,14 @@ export function scheduleFor(state, profileId, dateIso) {
   const rotationStatus = rotation ? byId(state.statuses, rotation.pattern.length === 7
     ? rotation.pattern[weekdayIndex(dateIso)]
     : rotation.pattern[Math.max(0, dateDiff(rotation.effectiveStart, dateIso)) % rotation.pattern.length]) : null;
-  const confirmedWork = state.lowDayCredits?.some((credit) => credit.profileId === profileId && credit.workedDate === dateIso);
+  const confirmedWork = state.lowDayCredits?.some((credit) =>
+    credit.reason !== "holiday_shortfall" && credit.profileId === profileId && credit.workedDate === dateIso);
   const holiday = publicHolidayForProfile(state, profileId, dateIso);
   const protectedOverride = ["vacation", "sick", "low_day"].includes(override?.statusId);
 
   if (holiday?.dayOff && (!override || (holiday.batchId && !protectedOverride && !confirmedWork && override.holidayOverrideBatchId !== holiday.batchId))) {
-    return { id: "public_holiday", label: "Public Holiday", kind: "off", color: "#d4ac74",
-      source: "Public holiday", note: holiday.name, rotation, rotationStatus };
+    return { id: "public_holiday", label: "Public Holiday", holidayName: holiday.name, kind: "off", color: "#7edc98",
+      source: "Public Holiday", note: holiday.name, rotation, rotationStatus };
   }
 
   if (override) {

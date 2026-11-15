@@ -160,6 +160,15 @@ test("shift details fit the drawer and show only the selected person's Annual ac
   expect(saved.lowDayCredits.filter((credit) => credit.workedDate === annualDate)).toHaveLength(1);
   expect(saved.profiles.find((profile) => profile.id === "emp-001").remainingVacationDays).toBe(23);
   expect(saved.vacationRequests.find((request) => request.id === annualRequestId).deductedDays).toBe(0);
+  await cell.click();
+  await button(page, "Clear Override").click();
+  await expect(page.getByRole("dialog", { name: "Clear Worked Shift" })).toContainText("unused Low Days credit");
+  await button(page, "Clear Override").click();
+  await expect(cell).toHaveClass(/vacation/);
+  const restored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), stateKey);
+  expect(restored.lowDayCredits.filter((credit) => credit.workedDate === annualDate)).toHaveLength(0);
+  expect(restored.profiles.find((profile) => profile.id === "emp-001").remainingVacationDays).toBe(22);
+  expect(restored.vacationRequests.find((request) => request.id === annualRequestId).deductedDays).toBe(1);
 });
 
 test("My Profile puts the bright working calendar on the right and Scheduler opens the worked day directly", async ({ page }) => {
@@ -195,7 +204,12 @@ test("team events appear on Scheduler and Annual approval, with no rotation or s
   await button(page, "New Event").click();
   await page.getByLabel("Event name").fill("Live championship");
   await page.getByLabel("Starts", { exact: true }).fill(eventDate);
-  await page.getByLabel("Ends", { exact: true }).fill("2026-11-13");
+  const ends = page.getByLabel("Ends", { exact: true });
+  await expect(ends).toHaveValue(eventDate);
+  await expect(ends).toHaveAttribute("min", eventDate);
+  await ends.fill("2026-11-10");
+  await expect(ends).toHaveValue(eventDate);
+  await ends.fill("2026-11-13");
   await button(page, "Save Event").click();
   await page.locator("#close-drawer").click();
   const header = page.locator(`.date-head[data-date="${eventDate}"]`);
@@ -219,6 +233,11 @@ test("team events appear on Scheduler and Annual approval, with no rotation or s
   await button(page, "Scheduler").click();
   await button(page, "Events").click();
   await button(page, "Edit Live championship").click();
+  await page.getByLabel("Starts", { exact: true }).fill("2026-11-14");
+  await expect(ends).toHaveValue("2026-11-14");
+  await button(page, "Save Event").click();
+  await button(page, "Edit Live championship").click();
+  await expect(ends).toHaveValue("2026-11-14");
   await button(page, "Remove Event").click();
   await button(page, "Remove Event").click();
   await page.locator("#close-drawer").click();

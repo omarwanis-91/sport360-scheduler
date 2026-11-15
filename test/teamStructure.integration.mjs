@@ -324,5 +324,63 @@ await saveHolidaySelection(null, [], batch, true);
 const newHoliday = await saveHolidaySelection('Different holiday', [[pe, oneDate]]);
 equal(newHoliday.holidays.some((h) => h.batchId === batch), false);
 equal(await eligible(pe, oneDate), 0);
-await db.close();
 console.log(`${checks - beforeHolidayOverride} Public Holiday shift override PostgreSQL checks passed.`);
+
+const beforeEntitlements = checks;
+await db.exec('reset role');
+await db.exec(file('../supabase/migrations/040_holiday_entitlement_and_low_day_expiry.sql'));
+equal((await rows(file('../supabase/audit/029_holiday_entitlement_and_low_day_expiry_audit.sql')))
+  .map(({ passed }) => passed), [true, true, true, true, true]);
+const setExpiry = (days) => rows('select public.save_low_day_expiry($1)', [days]);
+const saveEntitled = async (name, cells, days, profiles, batch = null, remove = false) =>
+  (await rows('select public.save_entitled_scheduler_holiday($1,$2,$3::jsonb,$4,$5,$6::uuid[]) value',
+    [batch, name, JSON.stringify(cells.map(([profile_id, day]) => ({ profile_id, day }))), remove, days, profiles]))[0].value;
+const clearWorked = async (profile, day) =>
+  (await rows('select public.clear_low_day_work($1,$2) value', [profile, day]))[0].value;
+const [first, last, booking, deadline12, latestWork] = await Promise.all([12, 13, 14, 25, -1].map(at));
+await login(lead);
+await deny(() => setExpiry(12), /Only Admin/);
+await deny(() => clearWorked(pe, annualDay), /cannot clear/);
+await login(admin);
+equal((await calendar()).lowDayExpiryDays, 30);
+await setExpiry(12);
+equal((await calendar()).credits.find((credit) => credit.id === earned.id).due_date, deadline);
+const days = [[pe, first], [phm, first], [phm, last]];
+const savedEntitlement = await saveEntitled('Two-day holiday', days, 2, [pe, outsider]);
+const entitlement = savedEntitlement.holidayEntitlements.find((entry) => entry.days === 2);
+const entitlementBatch = entitlement.batchId;
+equal(entitlement.profileIds.includes(phm), true);
+const holidayCredits = (result) => result.credits.filter((credit) => credit.holiday_batch_id === entitlementBatch);
+equal(holidayCredits(savedEntitlement).length, 3);
+const shortfall = holidayCredits(savedEntitlement).find((credit) => credit.profile_id === pe);
+equal(shortfall.due_date, deadline12);
+equal(shortfall.worked_status_id, null);
+equal(await eligible(pe, last), 1);
+await setExpiry(20);
+equal(holidayCredits(await saveEntitled('Renamed holiday', days, 2, [pe, phm, outsider], entitlementBatch))
+  .find((credit) => credit.profile_id === pe).due_date, deadline12);
+await login(lead);
+equal(holidayCredits(await calendar()).some((credit) => credit.profile_id === outsider), false);
+await login(admin);
+equal((await book(shortfall.id, booking)).override.note, 'Holiday credit: Renamed holiday');
+await deny(() => saveEntitled(null, [], null, null, entitlementBatch, true), /booked replacement/);
+await deny(() => saveEntitled('Renamed holiday', days, 1, [pe, phm, outsider], entitlementBatch), /remove a booked replacement/);
+await book(shortfall.id, null);
+equal(holidayCredits(await saveEntitled(null, [], null, null, entitlementBatch, true)).length, 0);
+
+const beforeRestore = (await profile()).remaining_vacation_days;
+const legacyAnnual = await clearWorked(pe, annualDay);
+equal(legacyAnnual.override.status_id, 'vacation');
+equal(legacyAnnual.refund.balance.remaining_days, beforeRestore - 1);
+const newRequestId = (await rows("insert into public.vacation_requests(profile_id,start_date,end_date,status) values($1,$2,$2,'pending') returning id",
+  [pe, latestWork]))[0].id;
+await rows("select public.decide_vacation_request($1,'approved')", [newRequestId]);
+const newCredit = (await confirm(pe, latestWork, 'morning')).credit;
+equal(newCredit.due_date, await at(19));
+await book(newCredit.id, booking);
+await deny(() => clearWorked(pe, latestWork), /Cancel the booked replacement/);
+await book(newCredit.id, null);
+equal((await clearWorked(pe, latestWork)).override.status_id, 'vacation');
+equal((await calendar()).credits.some((credit) => credit.id === newCredit.id), false);
+await db.close();
+console.log(`${checks - beforeEntitlements} Holiday entitlement and Low Days PostgreSQL checks passed.`);

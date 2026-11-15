@@ -8788,9 +8788,12 @@ body:has(.profile-editor-modal) { overflow:hidden; }
   white-space: nowrap;
 }
 
-.low-day-state.due,
-.holiday-date-label {
+.low-day-state.due {
   color: #efc58c;
+}
+
+.holiday-date-label {
+  color: #91dbab;
 }
 
 .low-day-state.overdue,
@@ -8889,6 +8892,15 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 }
 .holiday-alerts { padding:0 0 14px; margin-bottom:12px; border-bottom:1px solid var(--line-soft); }
 .holiday-alerts b { color:#efd3a8; }
+.holiday-allocation-list {
+  display:grid; gap:5px; list-style:none; margin:0; padding:0; max-height:220px; overflow:auto;
+}
+.holiday-allocation-list li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; padding:8px; border:1px solid var(--line); border-radius:7px; }
+.holiday-allocation-list span { color:var(--muted); }
+.holiday-allocation-list b { color:#7edc98; }
+.low-day-expiry-form { display:flex; flex-wrap:wrap; align-items:end; gap:8px; }
+.low-day-expiry-form input { width:100%; }
+.shift-cell.public_holiday .shift-label { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 @media (max-width:600px) {
   .scheduler-shell.is-selecting-holiday {
     --scheduler-people-width:clamp(100px,32vw,146px);
@@ -8954,8 +8966,8 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 }
 
 .shift-cell.public_holiday,.month-day.public_holiday,.my-shifts .request-row.public_holiday,.leave-impact-shift.public_holiday {
-  --status-rgb: 229 188 116;
-  --status-accent: #edc986;
+  --status-rgb: 126 220 152;
+  --status-accent: #7edc98;
 }
 .schedule-grid .shift-cell:is(.vacation,.sick,.public_holiday) :is(.shift-icon,.shift-label,small,.cell-alert) {
   opacity:0.84;

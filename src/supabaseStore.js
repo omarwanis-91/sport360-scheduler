@@ -37,6 +37,9 @@ function createLocalStore() {
       state.lowDaysEnabled = true;
       state.holidaySelectionEnabled = true;
       state.holidayShiftOverridesEnabled = true;
+      state.holidayEntitlementsEnabled = true;
+      state.lowDayExpiryDays ||= 30;
+      state.holidayEntitlements ||= [];
       state.scheduleEvents ||= [];
       state.eventsEnabled = true;
       localStorage.setItem(storageKey, JSON.stringify(state));
@@ -325,12 +328,19 @@ function createRemoteStore(client) {
       });
       return fromDbLowDayCalendar(calendar, true);
     },
-    async saveHolidaySelection({ batchId, name, cells }, remove) {
-      const calendar = await client.rpc("save_scheduler_holiday", {
+    async saveHolidaySelection({ batchId, name, cells, days, profileIds }, remove) {
+      const calendar = await client.rpc(days == null ? "save_scheduler_holiday" : "save_entitled_scheduler_holiday", {
         p_batch: batchId || null, p_name: name || null, p_delete: remove,
-        p_cells: cells.map(({ profileId, date }) => ({ profile_id: profileId, day: date }))
+        p_cells: cells.map(({ profileId, date }) => ({ profile_id: profileId, day: date })),
+        ...(days == null ? {} : { p_days: days, p_profile_ids: profileIds })
       });
       return fromDbLowDayCalendar(calendar, true);
+    },
+    async saveLowDayExpiry(days) {
+      return await client.rpc("save_low_day_expiry", { p_days: days });
+    },
+    async clearWorkedDay({ profileId, workedDate }) {
+      return fromDbLowDayResult(await client.rpc("clear_low_day_work", { p_profile: profileId, p_date: workedDate }));
     },
     async loadLowDayCalendar(admin) {
       return fromDbLowDayCalendar(await client.rpc("get_low_day_calendar"), admin);
@@ -1023,7 +1033,8 @@ function fromDbOverride(row) {
 
 function fromDbLowDayCredit(row) {
   return { id: row.id, profileId: row.profile_id, workedDate: row.worked_date, dueDate: row.due_date,
-    workedStatusId: row.worked_status_id, reason: row.reason, replacementDate: row.replacement_date };
+    workedStatusId: row.worked_status_id, reason: row.reason, replacementDate: row.replacement_date,
+    holidayBatchId: row.holiday_batch_id, holidayName: row.holiday_name };
 }
 
 function fromDbLowDayCalendar(calendar, admin) {
@@ -1031,6 +1042,8 @@ function fromDbLowDayCalendar(calendar, admin) {
     admin && !holiday.batchId ? holiday : { ...holiday, profileIds });
   return { publicHolidays, holidaySelectionEnabled: calendar.holidaySelectionEnabled === true,
     holidayShiftOverridesEnabled: calendar.holidayShiftOverridesEnabled === true,
+    holidayEntitlementsEnabled: calendar.holidayEntitlementsEnabled === true,
+    lowDayExpiryDays: calendar.lowDayExpiryDays ?? 30, holidayEntitlements: calendar.holidayEntitlements || [],
     lowDayCredits: (calendar.credits || []).map(fromDbLowDayCredit) };
 }
 
@@ -1049,7 +1062,7 @@ async function readSchedulerTools(client) {
 
 function fromDbLowDayResult(result) {
   const balance = result.refund?.balance;
-  return { credit: fromDbLowDayCredit(result.credit), previousDate: result.previousDate,
+  return { credit: result.credit ? fromDbLowDayCredit(result.credit) : null, previousDate: result.previousDate,
     refund: balance ? { request: fromDbVacationRequest(result.refund.request),
       balance: { profileId: balance.profile_id, year: balance.balance_year, allowance: balance.allowance_days,
         remaining: balance.remaining_days, source: balance.source } } : null,
