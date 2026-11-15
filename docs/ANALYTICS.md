@@ -30,7 +30,7 @@ The dashboard is planned scheduling analysis, not attendance, hours, payroll, or
 
 Choose Team, Month, Year, and Month/Quarter/Year using dropdowns. The monthly leave chart always labels its full calendar year. Hover or focus a month for exact Annual/Sick values; select it to change the period. Hover or tap a daily chart point for its nearby values popup. Keyboard users can focus a point, use arrows/Home/End between dates, and press Escape to dismiss. A tap keeps the popup open until another selection, a tap outside the chart, or scrolling. The daily table remains an accessible alternative.
 
-The dashboard uses larger reporting text, a full-width people table, and a larger gradient donut with aligned counts and small comparison tracks. Diffuse glows scale with the displayed values; zero work/leave values do not gain decorative data glow. These effects do not alter the numbers, categories, authorization, or saved schedule data. Reduced motion is supported.
+The dashboard uses larger reporting text, a full-width people table, and a gradient donut with aligned counts and small comparison tracks. Small highlights fade toward lower values and disappear below the upper half of the chart’s value range. On bars they concentrate at the tip, and on lines they sit at the plotted peak values. Reduced motion is supported.
 
 Sort the People breakdown using column headers. Refresh reloads the authorized snapshot; CSV exports the filtered people totals. There are no writes from Analytics.
 

@@ -35,6 +35,7 @@ function createLocalStore() {
       state.publicHolidays ||= [];
       state.lowDayCredits ||= [];
       state.lowDaysEnabled = true;
+      state.holidaySelectionEnabled = true;
       state.scheduleEvents ||= [];
       state.eventsEnabled = true;
       localStorage.setItem(storageKey, JSON.stringify(state));
@@ -320,6 +321,13 @@ function createRemoteStore(client) {
       const calendar = await client.rpc("save_public_holiday", {
         p_id: holiday.id || null, p_date: holiday.date || null, p_name: holiday.name || null,
         p_department_ids: holiday.departmentIds || [], p_day_off: holiday.dayOff ?? null, p_delete: remove
+      });
+      return fromDbLowDayCalendar(calendar, true);
+    },
+    async saveHolidaySelection({ batchId, name, cells }, remove) {
+      const calendar = await client.rpc("save_scheduler_holiday", {
+        p_batch: batchId || null, p_name: name || null, p_delete: remove,
+        p_cells: cells.map(({ profileId, date }) => ({ profile_id: profileId, day: date }))
       });
       return fromDbLowDayCalendar(calendar, true);
     },
@@ -1018,8 +1026,9 @@ function fromDbLowDayCredit(row) {
 
 function fromDbLowDayCalendar(calendar, admin) {
   const publicHolidays = (calendar.holidays || []).map(({ profileIds, ...holiday }) =>
-    admin ? holiday : { ...holiday, profileIds });
-  return { publicHolidays, lowDayCredits: (calendar.credits || []).map(fromDbLowDayCredit) };
+    admin && !holiday.batchId ? holiday : { ...holiday, profileIds });
+  return { publicHolidays, holidaySelectionEnabled: calendar.holidaySelectionEnabled === true,
+    lowDayCredits: (calendar.credits || []).map(fromDbLowDayCredit) };
 }
 
 function fromDbSchedulerTools(result) {
@@ -1036,7 +1045,11 @@ async function readSchedulerTools(client) {
 }
 
 function fromDbLowDayResult(result) {
+  const balance = result.refund?.balance;
   return { credit: fromDbLowDayCredit(result.credit), previousDate: result.previousDate,
+    refund: balance ? { request: fromDbVacationRequest(result.refund.request),
+      balance: { profileId: balance.profile_id, year: balance.balance_year, allowance: balance.allowance_days,
+        remaining: balance.remaining_days, source: balance.source } } : null,
     override: result.override?.id ? fromDbOverride(result.override) : null,
     restoredOverride: result.restoredOverride?.id ? fromDbOverride(result.restoredOverride) : null };
 }

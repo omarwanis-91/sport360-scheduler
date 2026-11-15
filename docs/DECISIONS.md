@@ -546,3 +546,12 @@ Show due-soon credits within seven days and overdue credits in Team Alerts for A
 Events have a name, inclusive date range, and scope covering selected teams or the entire organization. They appear on Scheduler date headers and in Annual review for affected teams. Event changes are audited and leave rotations, scheduled shifts, and balances intact.
 
 Role Preview has its own Settings tab. Admin selects the actual role and a department before choosing a linked profile. Managers with Lead access select an Employee from the teams they share. Preview stays read-only and keeps the original Supabase session.
+
+## D-070 - Scheduler Holiday Selections and Worked Leave
+
+**Date:** 2026-11-12
+**Status:** Accepted
+
+Admin assigns named public holidays from the Scheduler using a whole displayed team on a date or date range, or individual person-date cells. Store each saved selection as a batch and keep legacy holiday scope and precedence. A selected holiday takes precedence over normal shifts. Existing leave, replacement bookings, and confirmed work retain their recorded status. Report differences in days off within each team under Alerts.
+
+Override day off records a working shift and earns one Low Days credit when the selected date is Weekend, a public holiday, Annual, or Sick. If the Annual override links to an approved charge, return one day to its original year and adjust the recorded deduction in the same transaction.

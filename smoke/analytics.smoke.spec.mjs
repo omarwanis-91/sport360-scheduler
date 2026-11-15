@@ -48,7 +48,7 @@ test('team, month, quarter and year controls recalculate; monthly chart navigate
   await page.locator('#analytics-month').selectOption('01');await page.locator('#analytics-year').selectOption('2027');
   await expect(page.locator('.analytics-dashboard')).toBeVisible();await expect(page.locator('.analytics-monthly h2')).toContainText('2027');
 });
-test('readable reports use full-width people totals, dropdown dates and value-weighted diffuse glows',async({page})=>{
+test('readable reports use full-width people totals, dropdown dates and tight peak highlights',async({page})=>{
   await page.setViewportSize({width:1920,height:1080});await open(page);
   await expect(page.getByRole('combobox',{name:'Month',exact:true})).toHaveValue('11');
   await expect(page.getByRole('combobox',{name:'Year',exact:true})).toHaveValue('2026');
@@ -56,11 +56,14 @@ test('readable reports use full-width people totals, dropdown dates and value-we
   const values=await page.evaluate(()=>{
     const grid=document.querySelector('.analytics-grid'),people=document.querySelector('.analytics-people');
     return {body:Number.parseFloat(getComputedStyle(people.querySelector('tbody td')).fontSize),heading:Number.parseFloat(getComputedStyle(people.querySelector('h2')).fontSize),width:people.getBoundingClientRect().width/grid.getBoundingClientRect().width,
-      workGlow:Number(document.querySelector('[data-mix-glow="morning"]').getAttribute('opacity')),groundGlow:Number(document.querySelector('[data-mix-glow="ground"]').getAttribute('opacity')),
-      noWork:[...document.querySelectorAll('.analytics-work-halo path')].some(p=>Number(p.getAttribute('opacity'))===0)};
+      workGlow:Number(document.querySelector('[data-mix-glow="morning"]').getAttribute('opacity')),groundGlow:document.querySelector('[data-mix-glow="ground"]'),
+      flares:[...document.querySelectorAll('.analytics-work-halo circle')].map(p=>Number(p.getAttribute('r'))),
+      dailyPoints:document.querySelectorAll('.analytics-work-dot').length};
   });
   expect(values.body).toBeGreaterThanOrEqual(16);expect(values.heading).toBeGreaterThanOrEqual(18);expect(values.width).toBeGreaterThan(.95);
-  expect(values.workGlow).toBeGreaterThan(values.groundGlow);expect(values.noWork).toBe(true);
+  expect(values.workGlow).toBeGreaterThan(0);expect(values.groundGlow).toBeNull();
+  expect(values.flares.length).toBeGreaterThan(0);expect(values.flares.length).toBeLessThan(values.dailyPoints);
+  expect(Math.max(...values.flares)).toBeLessThanOrEqual(12);
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.getByRole('button',{name:'Scheduler',exact:true}).click();await open(page);
   expect(await page.locator('.analytics-panel').first().evaluate(e=>getComputedStyle(e).animationName)).toBe('none');

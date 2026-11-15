@@ -254,5 +254,50 @@ await login(null, 'anon');
 await deny(schedulerTools, /permission denied/);
 await db.exec('reset role');
 equal(await original(), operationalBefore);
-await db.close();
 console.log(`${checks - beforeEventChecks} Scheduler events and manager preview PostgreSQL checks passed.`);
+
+const beforeHolidaySelection = checks;
+await db.exec(file('../supabase/migrations/038_scheduler_holiday_selections.sql'));
+equal((await rows(file('../supabase/audit/027_scheduler_holiday_selections_audit.sql'))).map((result) => result.passed),
+  [true, true, true, true, true]);
+const saveHolidaySelection = async (name, cells, batch = null, remove = false) =>
+  (await rows('select public.save_scheduler_holiday($1,$2,$3::jsonb,$4) value',
+    [batch, name, JSON.stringify(cells.map(([profile_id, day]) => ({ profile_id, day }))), remove]))[0].value;
+const [annualDay, sickDay, firstHoliday, secondHoliday] = await Promise.all([-6, -5, -4, -3].map(at));
+await rows("insert into public.schedule_overrides(profile_id,shift_date,status_id,note) values($1,$2,'sick','Sick'),($1,$3,'night','Saved shift')",
+  [pe, sickDay, firstHoliday]);
+await login(lead);
+await deny(() => saveHolidaySelection('Cannot save', [[pe, firstHoliday]]), /Only Admin/);
+await login(admin);
+const batchCalendar = await saveHolidaySelection('Eid', [[pe, firstHoliday], [pe, secondHoliday], [phm, firstHoliday]]);
+equal(batchCalendar.holidaySelectionEnabled, true);
+const holidayBatch = batchCalendar.holidays.find((h) => h.name === 'Eid').batchId;
+equal(batchCalendar.holidays.filter((h) => h.batchId === holidayBatch).map((h) => h.profileIds.length), [2, 1]);
+await saveHolidaySelection('Another team', [[outsider, firstHoliday]]);
+await deny(() => saveHolidaySelection('Overlapping holiday', [[pe, firstHoliday]]), /already has a public holiday/);
+equal(await eligible(pe, firstHoliday), 0);
+equal(await eligible(phm, secondHoliday), 1);
+await login(lead);
+equal((await calendar()).holidays.some((h) => h.name === 'Another team'), false);
+
+const requestId = (await inspect("insert into public.vacation_requests(profile_id,start_date,end_date,status) values($1,$2,$2,'pending') returning id", [pe, annualDay]))[0].id;
+await rows("select public.decide_vacation_request($1,'approved')", [requestId]);
+const charged = (await profile()).remaining_vacation_days;
+const workedAnnual = await confirm(pe, annualDay, 'morning');
+equal(workedAnnual.refund.request.deducted_days, 0);
+equal(workedAnnual.refund.balance.remaining_days, charged + 1);
+equal((await profile()).remaining_vacation_days, charged + 1);
+await deny(() => confirm(pe, annualDay), /already exists/);
+equal((await confirm(pe, sickDay)).refund, null);
+equal((await confirm(pe, firstHoliday)).credit.reason, 'public_holiday');
+const updatedAnalytics = (await rows("select public.get_schedule_analytics(extract(year from $1::date)::int,$2) value", [firstHoliday, edit]))[0].value;
+equal(updatedAnalytics.publicHolidays.find((h) => h.batchId === holidayBatch && h.date === firstHoliday).profileIds.includes(pe), false);
+await login(admin);
+await saveHolidaySelection('Eid adjusted', [[pe, secondHoliday]], holidayBatch);
+equal((await calendar()).holidays.filter((h) => h.batchId === holidayBatch).map((h) => h.name), ['Eid adjusted']);
+await saveHolidaySelection(null, [], holidayBatch, true);
+equal((await calendar()).holidays.some((h) => h.batchId === holidayBatch), false);
+await login(artist);
+await deny(() => confirm(pe, secondHoliday), /only confirm work/);
+await db.close();
+console.log(`${checks - beforeHolidaySelection} Scheduler holiday selection PostgreSQL checks passed.`);

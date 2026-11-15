@@ -5,6 +5,7 @@ const stateKey = "sport360-scheduler-state";
 const annualDate = "2026-11-11";
 const workedDate = "2026-11-10";
 const eventDate = "2026-11-12";
+const annualRequestId = "a0c24c7e-bf25-4a60-93f9-b3147fb29a11";
 
 test.use({ reducedMotion: "reduce" });
 
@@ -15,12 +16,13 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-11-11T12:00:00Z"));
   const state = structuredClone(seedState);
   state.scheduleOverrides = [
-    { id: "annual", profileId: "emp-001", date: annualDate, statusId: "vacation", note: "Long-note-".repeat(35) },
+    { id: "annual", profileId: "emp-001", date: annualDate, statusId: "vacation", note: `Vacation request ${annualRequestId}` },
     { id: "worked", profileId: "emp-001", date: workedDate, statusId: "weekend", note: "Scheduled day off" },
     { id: "saturday", profileId: "emp-001", date: "2026-11-14", statusId: "morning" }
   ];
   state.vacationRequests = [
-    { id: "own-annual", profileId: "emp-001", startDate: annualDate, endDate: annualDate, status: "approved", reason: "Own request" },
+    { id: annualRequestId, profileId: "emp-001", startDate: annualDate, endDate: annualDate, status: "approved",
+      reason: "Own request", deductedDays: 1, deductedDaysByYear: { 2026: 1 } },
     { id: "other-annual", profileId: "emp-002", startDate: annualDate, endDate: eventDate, status: "pending", reason: "Another person's request" }
   ];
   state.auditLog = state.vacationRequests.map((request) => ({
@@ -49,13 +51,21 @@ test("shift details fit the drawer and show only the selected person's Annual ac
   const drawer = page.locator(".drawer");
   await expect(drawer).toContainText("Own request");
   await expect(drawer).not.toContainText("Another person's request");
-  await expect(drawer).toContainText(/recorded as Annual/i);
+  await expect(page.locator('#shift-form textarea[name="note"]')).toHaveValue("Annual request");
   await expect(drawer).toHaveCSS("overflow-x", "hidden");
   await expect.poll(() => drawer.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await button(page, "Override day off").click();
+  await page.getByLabel("Shift worked").selectOption("ground");
+  await button(page, "Save Worked Day").click();
+  await expect(cell).toHaveClass(/ground/);
+  const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), stateKey);
+  expect(saved.lowDayCredits.filter((credit) => credit.workedDate === annualDate)).toHaveLength(1);
+  expect(saved.profiles.find((profile) => profile.id === "emp-001").remainingVacationDays).toBe(23);
+  expect(saved.vacationRequests.find((request) => request.id === annualRequestId).deductedDays).toBe(0);
 });
 
-test("My Profile puts the bright working calendar on the right and Low Days links to credit confirmation", async ({ page }) => {
+test("My Profile puts the bright working calendar on the right and Scheduler opens the worked day directly", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 950 });
   await button(page, "My Profile").click();
   await expect(page.locator(".my-profile-side")).toBeVisible();
@@ -67,15 +77,15 @@ test("My Profile puts the bright working calendar on the right and Low Days link
   const workingSaturday = page.locator('.month-day[data-date="2026-11-14"]');
   await expect(workingSaturday).toHaveClass(/working/);
   await expect(workingSaturday).toHaveCSS("opacity", "1");
+  const heading = page.locator(".my-shifts > .eyebrow");
+  await expect(heading).toHaveCSS("padding-left", "12px");
+  await expect(heading).toHaveCSS("padding-top", "10px");
   await button(page, "Scheduler").click();
-  await button(page, "Low Days").click();
-  await button(page, "Find worked day").click();
-  await page.getByRole("combobox", { name: "Person", exact: true }).selectOption("emp-001");
-  await page.getByLabel("Worked date").fill(workedDate);
-  await button(page, "Open Shift Details").click();
-  await button(page, "Confirm worked day").click();
+  await page.getByLabel("Schedule start date", { exact: true }).fill(workedDate);
+  await page.locator(`.schedule-grid .shift-cell[data-profile-id="emp-001"][data-date="${workedDate}"]`).click();
+  await button(page, "Override day off").click();
   await expect(page.locator(".drawer")).toContainText("2026-12-10");
-  await expect(button(page, "Confirm Work and Add Credit")).toBeVisible();
+  await expect(button(page, "Save Worked Day")).toBeVisible();
 });
 
 test("team events appear on Scheduler and Annual approval, with no rotation or shift changes", async ({ page }) => {
@@ -92,9 +102,16 @@ test("team events appear on Scheduler and Annual approval, with no rotation or s
   await button(page, "Save Event").click();
   await page.locator("#close-drawer").click();
   const header = page.locator(`.date-head[data-date="${eventDate}"]`);
-  await expect(header).toContainText("Live championship");
+  const eventCell = page.locator(`.schedule-events-cell[data-date="${eventDate}"]`);
+  await expect(eventCell).toContainText("Live championship");
+  const eventBox = await eventCell.boundingBox();
+  const dateBox = await header.boundingBox();
+  const shiftBox = await page.locator(`.schedule-grid .shift-cell[data-date="${eventDate}"]`).first().boundingBox();
+  expect(eventBox.y).toBeGreaterThan(dateBox.y + dateBox.height);
+  expect(eventBox.y + eventBox.height).toBeLessThan(shiftBox.y);
+  expect(eventBox.height).toBeLessThan(shiftBox.height);
   await page.locator("#department-select").selectOption("support");
-  await expect(header).not.toContainText("Live championship");
+  await expect(eventCell).toHaveCount(0);
   await page.locator("#department-select").selectOption("ops");
   await button(page, "Rotations").click();
   await expect(page.getByText("Live championship")).toHaveCount(0);
@@ -108,7 +125,7 @@ test("team events appear on Scheduler and Annual approval, with no rotation or s
   await button(page, "Remove Event").click();
   await button(page, "Remove Event").click();
   await page.locator("#close-drawer").click();
-  await expect(header).not.toContainText("Live championship");
+  await expect(eventCell).toHaveCount(0);
   expect(await savedShifts()).toEqual(before);
 });
 
