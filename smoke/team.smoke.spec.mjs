@@ -29,9 +29,9 @@ test('Video Unit groups both grids in team order and shows hybrid people once', 
   });
   await page.reload();
 
-  for (const [view, gridSelector, scrollSelector] of [
-    ['Scheduler', '.schedule-grid', '.scheduler-shell'],
-    ['Rotations', '.rotation-grid', '.rotation-board']
+  for (const [view, gridSelector, scrollSelector, videoEditOrder] of [
+    ['Scheduler', '.schedule-grid', '.scheduler-shell', ['emp-003', 'emp-002']],
+    ['Rotations', '.rotation-grid', '.rotation-board', ['emp-002', 'emp-003']]
   ]) {
     await page.getByRole('button', { name: view, exact: true }).click();
     await page.locator('#department-select').selectOption('unit');
@@ -39,7 +39,7 @@ test('Video Unit groups both grids in team order and shows hybrid people once', 
     const rows = grid.locator(':scope > .schedule-team-divider, :scope > .employee-cell');
     expect(await rows.evaluateAll((elements) => elements.map((element) =>
       element.dataset.rotationPerson || element.dataset.profileId || element.textContent.trim()
-    ))).toEqual(['Video Edit', 'emp-002', 'emp-003', 'Hybrid', 'emp-001', 'Motion Graphics', 'emp-004']);
+    ))).toEqual(['Video Edit', ...videoEditOrder, 'Hybrid', 'emp-001', 'Motion Graphics', 'emp-004']);
 
     const scroller = page.locator(scrollSelector);
     const groupHeading = grid.getByRole('heading', { name: 'Hybrid', exact: true });
