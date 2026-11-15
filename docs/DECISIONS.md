@@ -573,3 +573,10 @@ A daily shift edit can explicitly replace the selected holiday for that person a
 Admin sets the number of holiday days per person in Review Holiday. Compare it with the dates allocated to each person in the reviewed teams. Issue one Low Days credit per unallocated day with a deadline measured from the last selected holiday date. The expiry period defaults to 30 calendar days and Admin can change it for new holiday batches and worked credits.
 
 Clear Override can reverse a worked shift and its unused credit together. Restore any previous shift and Annual deduction in the same transaction. Cancel an upcoming replacement booking before clearing the worked shift. Keep taken replacements in history.
+
+## D-073 - Public Holiday Selection Eligibility
+
+**Date:** 2026-11-16
+**Status:** Accepted
+
+Block new public holiday allocations on Weekend, Annual, and Sick shifts using the saved daily override or rotation. Date and range selection skip blocked cells. Review Holiday continues to calculate credits from each person's allocation against the intended number of days. Existing batches can be edited to remove prior overlaps.

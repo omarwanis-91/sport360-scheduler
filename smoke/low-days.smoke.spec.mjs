@@ -139,6 +139,60 @@ test("Admin can select a range, dates and individual shifts and see uneven holid
   await expect(page.locator(".replacement-card")).toHaveCount(0);
 });
 
+test("public holiday selections skip Weekend, Annual, and Sick shifts", async ({ page }) => {
+  await page.evaluate(() => {
+    const key = "sport360-scheduler-state";
+    const state = JSON.parse(localStorage.getItem(key));
+    state.scheduleOverrides.push(
+      { id: "annual", profileId: "emp-001", date: "2026-11-13", statusId: "vacation" },
+      { id: "sick-fri", profileId: "emp-003", date: "2026-11-13", statusId: "sick" },
+      { id: "sick-sat", profileId: "emp-002", date: "2026-11-14", statusId: "sick" }
+    );
+    localStorage.setItem(key, JSON.stringify(state));
+  });
+  await page.reload();
+  await navigate(page, "Enter Public Holiday");
+  const holidayMode = page.getByRole("region", { name: "Public Holiday mode" });
+  const friday = page.locator('.date-head[data-date="2026-11-13"]');
+  const saturday = page.locator('.date-head[data-date="2026-11-14"]');
+  const annual = shift(page, "2026-11-13");
+  const weekend = shift(page, "2026-11-14");
+  const sick = shift(page, "2026-11-13", "emp-003");
+  const eligible = shift(page, "2026-11-13", "emp-002");
+  for (const cell of [annual, weekend, sick]) {
+    await expect(cell).toBeDisabled();
+    await expect(cell).toHaveAttribute("aria-pressed", "false");
+  }
+  await expect(saturday).toBeDisabled();
+  await eligible.click();
+  await expect(eligible).toHaveAttribute("aria-pressed", "true");
+  await expect(friday).toHaveAttribute("aria-pressed", "true");
+  await friday.press("Space");
+  await expect(holidayMode).toContainText("0 shifts selected");
+  await friday.press("Space");
+  await expect(holidayMode).toContainText("1 shift selected");
+  await friday.press("Space");
+
+  await page.getByLabel("From", { exact: true }).fill("2026-11-14");
+  await navigate(page, "Select Range");
+  await expect(page.locator(".app-notice")).toContainText("No eligible shifts in this range.");
+  await expect(holidayMode).toContainText("0 shifts selected");
+  await page.getByLabel("From", { exact: true }).fill("2026-11-13");
+  await navigate(page, "Select Range");
+  await expect(holidayMode).toContainText("1 shift selected");
+  await navigate(page, "Review Holiday");
+  await page.getByLabel("Holiday name").fill("Working shift holiday");
+  await navigate(page, "Save Public Holiday");
+  await expect(eligible).toHaveClass(/public_holiday/);
+  await expect(annual).toHaveClass(/vacation/);
+  await expect(weekend).toHaveClass(/weekend/);
+  await expect(sick).toHaveClass(/sick/);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("sport360-scheduler-state")).publicHolidays);
+  expect(saved.filter(({ name }) => name === "Working shift holiday")).toMatchObject([
+    { date: "2026-11-13", profileIds: ["emp-002"] }
+  ]);
+});
+
 test("a saved holiday can be overridden for one shift and removed directly from Scheduler", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.evaluate(() => {

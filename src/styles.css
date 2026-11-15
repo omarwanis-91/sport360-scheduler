@@ -8881,6 +8881,11 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 .holiday-selection-controls { justify-content:space-between; }
 .holiday-selection-actions { align-items:center; }
 .holiday-selection-actions output { color:#efd3a8; padding-right:4px; }
+.scheduler-shell.is-selecting-holiday .schedule-grid :is([data-holiday-date], [data-holiday-cell]):disabled {
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
 .schedule-grid :is([data-holiday-date],[data-holiday-cell])[aria-pressed="true"] {
   border-color:#e3bd82;
   box-shadow:inset 0 0 0 1px #e3bd82;

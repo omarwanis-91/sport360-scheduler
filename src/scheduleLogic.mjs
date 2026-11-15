@@ -210,7 +210,7 @@ export function publicHolidayForProfile(state, profileId, dateIso) {
   return matches.find((holiday) => holiday.dayOff) || matches[0] || null;
 }
 
-export function scheduleFor(state, profileId, dateIso) {
+export function scheduleFor(state, profileId, dateIso, { includePublicHolidays = true } = {}) {
   const override = state.scheduleOverrides.find((entry) => entry.profileId === profileId && entry.date === dateIso);
   const rotation = activeRotation(state.rotationVersions, profileId, dateIso);
   const rotationStatus = rotation ? byId(state.statuses, rotation.pattern.length === 7
@@ -218,7 +218,7 @@ export function scheduleFor(state, profileId, dateIso) {
     : rotation.pattern[Math.max(0, dateDiff(rotation.effectiveStart, dateIso)) % rotation.pattern.length]) : null;
   const confirmedWork = state.lowDayCredits?.some((credit) =>
     credit.reason !== "holiday_shortfall" && credit.profileId === profileId && credit.workedDate === dateIso);
-  const holiday = publicHolidayForProfile(state, profileId, dateIso);
+  const holiday = includePublicHolidays ? publicHolidayForProfile(state, profileId, dateIso) : null;
   const protectedOverride = ["vacation", "sick", "low_day"].includes(override?.statusId);
 
   if (holiday?.dayOff && (!override || (holiday.batchId && !protectedOverride && !confirmedWork && override.holidayOverrideBatchId !== holiday.batchId))) {
@@ -245,6 +245,11 @@ export function scheduleFor(state, profileId, dateIso) {
   if (!rotation) return { id: "empty", label: "Unassigned", color: "#3f3f46", kind: "off", source: "No rotation" };
 
   return { ...rotationStatus, source: "Rotation", rotation, rotationStatus, confirmedWork };
+}
+
+export function holidaySelectionBlocked(state, profileId, date) {
+  const shift = scheduleFor(state, profileId, date, { includePublicHolidays: false });
+  return ["weekend", "vacation", "sick"].includes(shift.id);
 }
 
 export function isAnnualEligibleSchedule(schedule) {
