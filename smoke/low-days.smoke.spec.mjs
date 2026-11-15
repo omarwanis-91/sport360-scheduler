@@ -35,7 +35,7 @@ test("a worked day earns one credit and a booking can be cancelled without losin
   await shift(page, "2026-10-18").click();
   await navigate(page, "Override day off");
   await expect(page.locator(".drawer")).toContainText("2026-11-17");
-  await page.getByLabel("Shift worked").selectOption("morning");
+  await page.getByRole("radio", { name: "Morning", exact: true }).press("Space");
   await navigate(page, "Save Worked Day");
   await expect(page.locator(".app-notice")).toContainText("Take the replacement by 2026-11-17");
   await expect(shift(page, "2026-10-18")).toHaveClass(/morning/);
@@ -114,6 +114,50 @@ test("Admin can select a range, dates and individual shifts and see uneven holid
   await expect(shift(page, "2026-11-13", "emp-002")).toHaveClass(/public_holiday/);
   await navigate(page, "Low Days");
   await expect(holidayAlert).toHaveCount(0);
+});
+
+test("a saved holiday can be overridden for one shift and removed directly from Scheduler", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => {
+    const key = "sport360-scheduler-state";
+    const state = JSON.parse(localStorage.getItem(key));
+    state.publicHolidays = [
+      { id: "holiday", batchId: "holiday-batch", name: "Team holiday", date: "2026-11-12", dayOff: true,
+        organizationWide: false, departmentIds: [], profileIds: ["emp-001", "emp-003"] }
+    ];
+    state.lowDayCredits = [
+      { id: "omar", profileId: "emp-001", workedDate: "2026-11-10", dueDate: "2026-12-10", reason: "day_off" },
+      { id: "karim", profileId: "emp-003", workedDate: "2026-11-08", dueDate: "2026-12-08", reason: "day_off" }
+    ];
+    localStorage.setItem(key, JSON.stringify(state));
+  });
+  await page.reload();
+  const holidayShift = shift(page, "2026-11-12");
+  await expect(holidayShift).toHaveClass(/public_holiday/);
+  await expect(holidayShift.locator(".shift-label")).toHaveCSS("opacity", "0.84");
+  await navigate(page, "My Profile");
+  await expect(page.locator('.month-day.public_holiday[data-date="2026-11-12"]')).toHaveCSS("opacity", "1");
+  await navigate(page, "Scheduler");
+  await holidayShift.click();
+  await page.locator(".status-choice.night > span").click();
+  await navigate(page, "Save Daily Change");
+  await expect(holidayShift).toHaveClass(/night/);
+  await expect(shift(page, "2026-11-12", "emp-003")).toHaveClass(/public_holiday/);
+  await page.reload();
+  await expect(holidayShift).toHaveClass(/night/);
+  await navigate(page, "Low Days");
+  const filter = page.getByRole("combobox", { name: "Filter replacement days by person" });
+  await expect(page.locator(".replacement-card")).toHaveCount(2);
+  await filter.selectOption("emp-003");
+  await expect(page.locator(".replacement-card")).toHaveCount(1);
+  await expect(page.locator(".replacement-card")).toContainText("Karim Adel");
+  await navigate(page, "Scheduler");
+  await navigate(page, "Public Holidays");
+  await navigate(page, "Remove Team holiday");
+  await navigate(page, "Remove Public Holiday");
+  await expect(page.getByRole("dialog", { name: "Public Holidays" })).toContainText("No public holidays added.");
+  await expect(shift(page, "2026-11-12", "emp-003")).not.toHaveClass(/public_holiday/);
+  await expect(holidayShift).toHaveClass(/night/);
 });
 
 test("employees see their own Low Days and cannot manage holiday selections", async ({ page }) => {

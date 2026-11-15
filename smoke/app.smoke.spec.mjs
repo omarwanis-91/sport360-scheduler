@@ -709,9 +709,10 @@ test("parent department daily lead overrides can return to weekly rotation", asy
   const dailyLeadSelect = page.getByRole("combobox", { name: "Daily lead override", exact: true });
   await expect(dailyLeadSelect).toHaveValue("emp-002");
   await dailyLeadSelect.selectOption("");
-  await page.getByRole("button", { name: "Save Lead", exact: true }).click();
+  await page.getByRole("button", { name: "Stage Lead", exact: true }).click();
+  await page.locator("#save-scheduler-edit").click();
 
-  await expect(page.getByText("Daily lead returned to weekly rotation.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Saved 1 lead change.", { exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate((date) => {
     const storedState = JSON.parse(localStorage.getItem("sport360-scheduler-state"));
     return storedState.departmentLeads.some((lead) => lead.departmentId === "ops" && lead.date === date);

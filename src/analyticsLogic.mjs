@@ -31,7 +31,9 @@ export function scopedAnalyticsState(state, { year, departmentId=null, directOnl
   const publicHolidays = (state.publicHolidays || []).filter(holiday => holiday.date.slice(0, 4) === String(year))
     .map(holiday => ({ date: holiday.date, dayOff: holiday.dayOff, batchId: holiday.batchId,
       profileIds: profiles.filter(person => holidayAppliesToProfile(state, holiday, person.id)
-        && (!holiday.batchId || !state.lowDayCredits?.some(credit => credit.profileId === person.id && credit.workedDate === holiday.date)))
+        && (!holiday.batchId || (!state.lowDayCredits?.some(credit => credit.profileId === person.id && credit.workedDate === holiday.date)
+          && !state.scheduleOverrides.some(override => override.profileId === person.id && override.date === holiday.date
+            && override.holidayOverrideBatchId === holiday.batchId))))
         .map(person => person.id) }))
     .filter(holiday => holiday.profileIds.length);
   return { year, departments, profiles, statuses:state.statuses.map(({id,label,kind})=>({id,label,kind})),

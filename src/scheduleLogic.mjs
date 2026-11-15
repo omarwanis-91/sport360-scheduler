@@ -220,7 +220,7 @@ export function scheduleFor(state, profileId, dateIso) {
   const holiday = publicHolidayForProfile(state, profileId, dateIso);
   const protectedOverride = ["vacation", "sick", "low_day"].includes(override?.statusId);
 
-  if (holiday?.dayOff && (!override || (holiday.batchId && !protectedOverride && !confirmedWork))) {
+  if (holiday?.dayOff && (!override || (holiday.batchId && !protectedOverride && !confirmedWork && override.holidayOverrideBatchId !== holiday.batchId))) {
     return { id: "public_holiday", label: "Public Holiday", kind: "off", color: "#d4ac74",
       source: "Public holiday", note: holiday.name, rotation, rotationStatus };
   }

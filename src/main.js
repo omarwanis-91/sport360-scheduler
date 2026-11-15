@@ -119,6 +119,8 @@ const ui = {
   rotationDrafts: [],
   rotationDraftsOwner: null,
   schedulerEditMode: false,
+  schedulerSort: "name-asc",
+  lowDayPerson: "",
   holidaySelection: null,
   schedulerLeadDrafts: [],
   pendingPhotoFile: null,
@@ -141,10 +143,32 @@ const ui = {
   mutation: { key: "", status: "idle", message: "" }
 };
 
+const successNotices = [];
+let nextNoticeId = 0;
+
 function notify(message, kind = "info") {
+  if (kind === "success" && !(dataStore?.mode === "supabase" && (!dataStore.session || ui.authMode !== "sign-in"))) {
+    const id = ++nextNoticeId;
+    successNotices.unshift({ id, message });
+    successNotices.splice(4);
+    setTimeout(() => dismissSuccessNotice(id), 10000);
+    ui.notice = "";
+    render();
+    return;
+  }
   ui.notice = message;
   ui.noticeKind = kind;
   render();
+}
+
+function dismissSuccessNotice(id) {
+  const index = successNotices.findIndex((notice) => notice.id === id);
+  if (index < 0) return;
+  successNotices.splice(index, 1);
+  const item = document.querySelector(`[data-success-notice="${id}"]`);
+  if (!item) return;
+  item.classList.add("is-dismissing");
+  setTimeout(() => item.remove(), 220);
 }
 
 function isMutationPending() {
@@ -655,15 +679,18 @@ function rotationLeadPatternDraft(departmentId) {
   return ui.rotationLeadDraftPattern;
 }
 
-function schedulerLeadDraftForDate(dateIso) {
-  return ui.schedulerLeadDrafts.find((item) => item.departmentId === ui.selectedDepartmentId && item.date === dateIso);
+function schedulerLeadDraftForDate(departmentId, dateIso) {
+  return ui.schedulerLeadDrafts.find((item) => item.departmentId === departmentId && item.date === dateIso);
 }
 
 function departmentLeadForDate(departmentId, dateIso) {
   const staged = ui.schedulerEditMode
-    ? ui.schedulerLeadDrafts.find((item) => item.departmentId === departmentId && item.date === dateIso)
+    ? schedulerLeadDraftForDate(departmentId, dateIso)
     : null;
   if (staged) {
+    if (!staged.profileId) return departmentLeadForDateLogic({
+      ...state, departmentLeads: state.departmentLeads.filter((row) => row.departmentId !== departmentId || row.date !== dateIso)
+    }, departmentId, dateIso);
     const profile = byId(state.profiles, staged.profileId);
     return {
       profile,
@@ -710,21 +737,13 @@ function leadAvailabilityForScopeDate(departmentId, dateIso) {
     );
 }
 
-function unavailableLeadAssignmentsForProfile(profileId, dates) {
-  const departmentIds = profileDepartmentIds(byId(state.profiles, profileId));
-  return departmentIds.flatMap((departmentId) => dates.map((date) => {
-    const lead = departmentLeadForDate(departmentId, date);
-    if (lead.profile?.id !== profileId) return null;
-    const schedule = scheduleFor(profileId, date);
-    return isScheduleLeadAvailable(schedule) ? null : { departmentId, date, schedule };
-  }).filter(Boolean));
-}
-
 function assignedLeadDatesForProfile(profileId, dates) {
-  const departmentIds = profileDepartmentIds(byId(state.profiles, profileId));
-  return departmentIds.flatMap((departmentId) => dates.map((date) => {
+  const profile = byId(state.profiles, profileId);
+  const departments = visibleDepartments().filter((team) =>
+    canManageDepartment(team.id) && profileBelongsToDepartment(profile, team.id));
+  return departments.flatMap(({ id: departmentId }) => dates.map((date) => {
     const lead = departmentLeadForDate(departmentId, date);
-    return lead.profile?.id === profileId ? { departmentId, date } : null;
+    return lead.profile?.id === profileId && isScheduleLeadAvailable(scheduleFor(profileId, date)) ? { departmentId, date } : null;
   }).filter(Boolean));
 }
 
@@ -745,16 +764,17 @@ function missingLeadInfo(departmentId, dateIso) {
   };
 }
 
-function openLeadPromptForAssignment(assignment, message) {
-  if (!assignment) return false;
-  ui.selectedDepartmentId = assignment.departmentId;
-  ui.activeView = "scheduler";
-  ui.drawer = { type: "lead", date: assignment.date, departmentId: assignment.departmentId };
-  if (message) {
-    ui.notice = message;
-    ui.noticeKind = "warning";
-  }
-  return true;
+function openLeadReplacement(assignments, returnDrawer = null) {
+  const unique = new Map(assignments.map((entry) => [`${entry.departmentId}/${entry.date}`, entry]));
+  const [next, ...remaining] = [...unique.values()].filter(({ departmentId, date }) =>
+    canManageDepartment(departmentId) && editableDate(date) && leadAvailabilityForDepartmentDate(departmentId, date).missing);
+  ui.drawer = next ? { type: "lead", ...next, replacement: true, remaining, returnDrawer } : returnDrawer;
+}
+
+function stageDailyLead(departmentId, date, profileId) {
+  const existing = dailyLeadOverrideForDate(departmentId, date);
+  ui.schedulerLeadDrafts = ui.schedulerLeadDrafts.filter((row) => row.departmentId !== departmentId || row.date !== date);
+  if (profileId !== (existing?.profileId || "")) ui.schedulerLeadDrafts.push({ departmentId, date, profileId });
 }
 
 function departmentLeadsForDate(departmentId, dateIso) {
@@ -1103,13 +1123,18 @@ function showFatalError(error) {
 }
 
 function renderAppNotice() {
-  if (!ui.notice || (dataStore?.mode === "supabase" && !dataStore.session)) return "";
-  return `
-    <div class="app-notice ${ui.noticeKind || "info"}" role="status">
-      <span>${ui.notice}</span>
+  if (dataStore?.mode === "supabase" && !dataStore.session) return "";
+  if (!ui.notice && !successNotices.length) return "";
+  return `<div class="app-notice-stack">
+    ${ui.notice ? `<div class="app-notice ${ui.noticeKind || "info"}" role="status">
+      <span>${escapeHtml(ui.notice)}</span>
       <button type="button" class="icon-button" id="dismiss-notice" aria-label="Dismiss notice" title="Dismiss notice">${icons.close}</button>
-    </div>
-  `;
+    </div>` : ""}
+    ${successNotices.map(({ id, message }, index) => `<div class="notice-toast success ${!ui.notice && index === 0 ? "app-notice" : ""}" data-success-notice="${id}" role="status">
+      <span>${escapeHtml(message)}</span>
+      <button type="button" class="icon-button" data-dismiss-success="${id}" aria-label="Dismiss success notice">${icons.close}</button>
+    </div>`).join("")}
+  </div>`;
 }
 
 function renderAuth() {
@@ -1729,15 +1754,21 @@ function renderDepartmentScheduleRows(department, profiles, renderRow) {
 
 function renderScheduler() {
   const dates = datesInRange();
-  const profiles = departmentProfiles();
+  const [sortBy, direction] = ui.schedulerSort.split("-");
+  const positions = ["manager", "lead", "artist"];
+  const profiles = departmentProfiles().sort((a, b) => {
+    const positionOrder = positions.indexOf(normalizeHierarchyLevel(a.seniorityLevel)) - positions.indexOf(normalizeHierarchyLevel(b.seniorityLevel));
+    const ascending = sortBy === "position" && positionOrder ? positionOrder : a.name.localeCompare(b.name);
+    return direction === "desc" ? -ascending : ascending;
+  });
   const department = byId(state.departments, ui.selectedDepartmentId);
   if (!department) {
     return renderTopbar("No Departments", "Create at least one department in Supabase before building schedules.", "");
   }
   const actions = `<div class="top-actions scheduler-top-actions">
-    ${canManageSystemSettings() && state.lowDaysEnabled && !ui.holidaySelection ? state.holidaySelectionEnabled
-      ? '<button class="ghost" id="enter-public-holiday">Enter Public Holiday</button>'
-      : '<button class="ghost" data-open-drawer="holidays">Public Holidays</button>' : ""}
+    ${canManageSystemSettings() && state.lowDaysEnabled && !ui.holidaySelection
+      ? '<button class="ghost" data-open-drawer="holidays">Public Holidays</button>'
+        + (state.holidaySelectionEnabled ? '<button class="ghost" id="enter-public-holiday">Enter Public Holiday</button>' : "") : ""}
     ${state.lowDaysEnabled && (isAdmin() || isLead()) ? '<button class="ghost" id="scheduler-low-days">Low Days</button>' : ""}
     ${state.eventsEnabled ? '<button class="ghost" data-open-drawer="events">Events</button>' : ""}
   </div>`;
@@ -1751,25 +1782,31 @@ function renderScheduler() {
           <select id="department-select" title="Department">
             ${departmentOptions(ui.selectedDepartmentId, { teamNames: true })}
           </select>
+          <select id="scheduler-sort" aria-label="Sort people">
+            ${[["name-asc", "Name A–Z"], ["name-desc", "Name Z–A"], ["position-asc", "Position ↑"], ["position-desc", "Position ↓"]]
+              .map(([value, label]) => `<option value="${value}" ${ui.schedulerSort === value ? "selected" : ""}>${label}</option>`).join("")}
+          </select>
         </div>
         <div class="scheduler-month-bar">
           <div class="month-title-control">
             <button class="ghost icon-button" id="month-prev-range" aria-label="Previous range" title="Previous range">${icons.chevron}</button>
             <strong>${schedulerMonthLabel(dates)}</strong>
             <button class="ghost icon-button" id="month-next-range" aria-label="Next range" title="Next range">${icons.chevron}</button>
-            <button class="ghost month-today-button" id="today-range">Today</button>
           </div>
-          <label class="bar-date-control"><input id="schedule-start-date" aria-label="Schedule start date" type="date" value="${ui.startDate}"></label>
-          <button class="ghost icon-button" id="month-start-range" aria-label="Month Start" title="Month Start">${icons.scheduler}</button>
           <div class="schedule-zoom" role="group" aria-label="Schedule zoom">
             <button class="ghost icon-button" id="zoom-out-range" aria-label="Zoom out" title="Zoom out" ${ui.rangeDays === 30 ? "disabled" : ""}>${icons.minus}</button>
             <output aria-label="Schedule zoom level" title="${ui.rangeDays}-day range">${ui.rangeDays === 7 ? "200" : ui.rangeDays === 14 ? "100" : "50"}%</output>
             <button class="ghost icon-button" id="zoom-in-range" aria-label="Zoom in" title="Zoom in" ${ui.rangeDays === 7 ? "disabled" : ""}>${icons.plus}</button>
           </div>
           ${!ui.holidaySelection && canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
-            <button class="primary" id="save-scheduler-edit">${icons.lead} Save</button>
+            <button class="primary" id="save-scheduler-edit" ${ui.schedulerLeadDrafts.length ? "" : "disabled"}>${icons.lead} Save</button>
             <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
           ` : `<button class="primary" id="toggle-scheduler-edit">${icons.lead} Edit daily leads</button>` : ""}
+          <div class="scheduler-date-actions">
+            <button class="ghost month-today-button" id="today-range">Today</button>
+            <label class="bar-date-control"><input id="schedule-start-date" aria-label="Schedule start date" type="date" value="${ui.startDate}"></label>
+            <button class="ghost" id="month-start-range">${icons.scheduler} Month Start</button>
+          </div>
         </div>
     </section>
     <section class="scheduler-shell ${ui.holidaySelection ? "is-selecting-holiday" : ""}">
@@ -1788,13 +1825,13 @@ function renderScheduler() {
 }
 
 function renderSchedulerEditCommitBar() {
-  const stagedChanges = ui.schedulerLeadDrafts.filter((item) => item.departmentId === ui.selectedDepartmentId).length;
+  const stagedChanges = ui.schedulerLeadDrafts.length;
   return `
     <section class="edit-commit-bar scheduler-edit-commit">
       <div>
         <span class="eyebrow">Daily Lead assignments</span>
         <strong>Changes are staged until saved</strong>
-        <p>Stage day-lead assignments here. Click any shift for a separate one-time shift edit.</p>
+        <p>Select a date to choose its lead, or select a star on an available shift. Save to apply.</p>
       </div>
       <div class="edit-commit-actions">
         <span>${stagedChanges} lead ${stagedChanges === 1 ? "change" : "changes"}</span>
@@ -1828,7 +1865,8 @@ function renderDateHead(date, profiles) {
   const leadInfo = missingLeadInfo(ui.selectedDepartmentId, date);
   const selectedOverride = dailyLeadOverrideForDate(ui.selectedDepartmentId, date);
   const leadDepartmentId = selectedOverride ? ui.selectedDepartmentId : leadInfo.items[0]?.department?.id || ui.selectedDepartmentId;
-  const drawerType = ui.schedulerEditMode && (selectedOverride || leadInfo.missing) ? "lead" : "coverage";
+  const canEditLead = ui.schedulerEditMode && canManageDepartment(leadDepartmentId) && editableDate(date) && !isRolePreviewActive();
+  const drawerType = canEditLead ? "lead" : "coverage";
   const leadLabel = leads.length > 1
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
@@ -1839,18 +1877,23 @@ function renderDateHead(date, profiles) {
     ? `data-holiday-date aria-pressed="${selected}" ${profiles.length ? "" : "disabled"}`
     : `data-open-drawer="${drawerType}" data-department-id="${leadDepartmentId}"`;
   return `
-    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" ${action} data-date="${date}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${ui.holidaySelection ? "Toggle this date for all people shown" : leadLabel}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}">
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" ${action} data-date="${date}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${ui.holidaySelection ? "Toggle this date for all people shown" : leadLabel}${canEditLead ? ". Edit daily lead" : ""}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
-      ${holiday ? `<em class="holiday-date-label" title="${escapeHtml(holiday.name)}">${escapeHtml(holiday.name)}</em>` : ""}
+      ${canEditLead && !ui.holidaySelection ? `<em class="day-lead-edit-label">${icons.lead} ${leadInfo.missing ? "Pick lead" : "Edit lead"}</em>` : ""}
+      ${holiday && !canEditLead ? `<em class="holiday-date-label" title="${escapeHtml(holiday.name)}">${escapeHtml(holiday.name)}</em>` : ""}
     </button>
   `;
 }
 
 function holidayForDepartment(departmentId, date) {
+  return holidaysForDepartment(departmentId, date)[0] || null;
+}
+
+function holidaysForDepartment(departmentId, date) {
   const scope = departmentScopeIds(departmentId);
   const profiles = visibleProfiles().filter((profile) => profileBelongsToDepartment(profile, departmentId));
-  return (state.publicHolidays || []).find((holiday) => holiday.date === date && (
+  return (state.publicHolidays || []).filter((holiday) => holiday.date === date && (
     holiday.organizationWide || holiday.departmentIds.some((id) => scope.includes(id))
     || profiles.some((profile) => holidayAppliesToProfile(state, holiday, profile.id))));
 }
@@ -1888,7 +1931,8 @@ function renderShiftCell(profile, date) {
   const pendingVacation = pendingAnnualForWorkingDate(profile.id, date, status);
   const lead = leadForProfileDate(profile, ui.selectedDepartmentId, date);
   const isDayLead = lead?.profile?.id === profile.id;
-  const canAssignLead = ui.schedulerEditMode && canManageDepartment(ui.selectedDepartmentId) && isScheduleLeadAvailable(status) && !isDayLead;
+  const canAssignLead = ui.schedulerEditMode && canManageDepartment(ui.selectedDepartmentId) && editableDate(date)
+    && !isRolePreviewActive() && isScheduleLeadAvailable(status) && !isDayLead;
   const visualId = isDayLead ? "lead" : status.id;
   const icon = isDayLead ? icons.lead : statusIcons[status.id] || icons.scheduler;
   const label = isDayLead ? "Lead" : displayStatusLabel(status);
@@ -1907,7 +1951,7 @@ function renderShiftCell(profile, date) {
       <span class="shift-label">${label}</span>
       <small>${source}</small>
       ${pendingVacation ? `<span class="cell-alert">Pending annual</span>` : ""}
-      ${canAssignLead ? `<span class="assign-lead-action" data-assign-schedule-lead="${profile.id}" data-date="${date}">${icons.lead}<em>Lead</em></span>` : ""}
+      ${canAssignLead ? `<span class="assign-lead-action" title="Assign daily lead" data-assign-schedule-lead="${profile.id}" data-date="${date}">${icons.lead}<em>Lead</em></span>` : ""}
     </button>
   `;
 }
@@ -3112,9 +3156,7 @@ function exitRolePreview() {
   ui.schedulerEditMode = false;
   ui.schedulerLeadDrafts = [];
   ui.drawer = null;
-  ui.notice = "Role Preview closed.";
-  ui.noticeKind = "success";
-  render();
+  notify("Role Preview closed.", "success");
 }
 
 function renderActivity() {
@@ -3397,17 +3439,14 @@ function teamLowDayCredits(profiles) {
 
 const lowDayLabels = { open: "Available", due: "Due soon", overdue: "Overdue", booked: "Booked", taken: "Taken" };
 
-function renderLowDayRow(credit, showPerson = false) {
-  const profile = byId(state.profiles, credit.profileId);
+function renderLowDayRow(credit) {
   const status = lowDayStatus(credit);
   return `<div class="calendar-workflow-row">
     <div>
-      ${showPerson ? `<strong>${escapeHtml(profile?.name || "Employee")}</strong>` : ""}
       <span>Worked ${credit.workedDate} · Use by ${credit.dueDate}</span>
       ${credit.replacementDate ? `<span>Replacement on ${credit.replacementDate}</span>` : ""}
     </div>
     <span class="low-day-state ${status}">${lowDayLabels[status]}</span>
-    ${showPerson && canManageLowDay(profile) ? `<button type="button" class="ghost" data-open-drawer="low-day-book" data-credit-id="${credit.id}" aria-label="Manage replacement day for ${escapeHtml(profile.name)} worked ${credit.workedDate}">${status === "open" || status === "due" ? "Book" : "Review"}</button>` : ""}
   </div>`;
 }
 
@@ -3441,6 +3480,10 @@ function unevenHolidayAllocations(departments, profiles) {
 }
 
 function renderTeamAlerts(credits, holidayAlerts, motion) {
+  const people = [...new Set(credits.map((credit) => credit.profileId))].map((id) => byId(state.profiles, id))
+    .filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  const selected = people.some(({ id }) => id === ui.lowDayPerson) ? ui.lowDayPerson : "";
+  const filtered = selected ? credits.filter(({ profileId }) => profileId === selected) : credits;
   return `<section class="team-directory-panel${motion}" id="team-alerts-panel" role="tabpanel" aria-labelledby="team-alerts-tab">
     ${holidayAlerts.length ? `<section class="holiday-alerts" aria-label="Uneven public holidays">
       <h2>Uneven public holidays</h2>
@@ -3450,11 +3493,33 @@ function renderTeamAlerts(credits, holidayAlerts, motion) {
             `<span>${escapeHtml(names.join(", "))} received <b>${count} ${count === 1 ? "day" : "days"}</b></span>`).join("")}
         </div></div>`).join("")}
     </section>` : ""}
-    <div class="team-section-head"><h2>Replacement days</h2>
+    <div class="team-section-head low-day-alert-head"><h2>${icons.scheduler} Replacement days</h2>
+      ${people.length ? `<select id="replacement-person-filter" aria-label="Filter replacement days by person">
+        <option value="">All people</option>
+        ${people.map(({ id, name }) => `<option value="${id}" ${selected === id ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+      </select>` : ""}
       ${!isRolePreviewActive() ? '<button class="ghost" data-view="scheduler">Open Scheduler</button>' : ""}
     </div>
-    ${credits.length ? credits.map((credit) => renderLowDayRow(credit, true)).join("") : '<p class="hint">No open or upcoming replacement days for this team.</p>'}
+    ${filtered.length ? `<div class="replacement-card-grid">${filtered.map(renderReplacementCard).join("")}</div>`
+      : '<p class="hint">No open or upcoming replacement days for this team.</p>'}
   </section>`;
+}
+
+function renderReplacementCard(credit) {
+  const profile = byId(state.profiles, credit.profileId);
+  const status = lowDayStatus(credit);
+  const date = (label, value, icon) => `<div>${icon}<span><small>${label}</small><time datetime="${value}">${formatDate(value)} ${value.slice(0, 4)}</time></span></div>`;
+  return `<article class="replacement-card ${status}">
+    <header><div class="avatar">${avatar(profile)}</div><strong>${escapeHtml(profile?.name || "Employee")}</strong>
+      <span class="low-day-state ${status}">${lowDayLabels[status]}</span></header>
+    <div class="replacement-card-dates">
+      ${date("Worked", credit.workedDate, icons.activity)}
+      ${date("Use by", credit.dueDate, icons.scheduler)}
+      ${credit.replacementDate ? date("Booked for", credit.replacementDate, icons.weekend) : ""}
+    </div>
+    ${canManageLowDay(profile) ? `<button type="button" class="ghost" data-open-drawer="low-day-book" data-credit-id="${credit.id}"
+      aria-label="Manage replacement day for ${escapeHtml(profile.name)} worked ${credit.workedDate}">${["open", "due"].includes(status) ? "Book" : "Review"}</button>` : ""}
+  </article>`;
 }
 
 function canOverrideDayOff(profile, date) {
@@ -3465,7 +3530,8 @@ function canOverrideDayOff(profile, date) {
 function protectedDailyShift(profileId, date) {
   const shift = scheduleFor(profileId, date);
   return ["low_day", "vacation"].includes(shift.id) || shift.confirmedWork
-    || (shift.id === "public_holiday" && publicHolidayForProfile(state, profileId, date)?.batchId);
+    || (!state.holidayShiftOverridesEnabled && shift.id === "public_holiday"
+      && publicHolidayForProfile(state, profileId, date)?.batchId);
 }
 
 function renderWorkedDayAction(profile, date) {
@@ -3498,9 +3564,15 @@ function lowDayWorkDrawer() {
     <div class="detail-line"><span>Reason</span><strong>${escapeHtml(holiday?.name || displayStatusLabel(shift))}</strong></div>
     <div class="detail-line"><span>Take replacement by</span><strong>${addDays(date, 30)}</strong></div>
     ${shift.id === "vacation" ? '<p class="hint">Any recorded Annual charge for this day will be returned to its year’s balance.</p>' : ""}
-    <label>Shift worked<select name="statusId" required><option value="">Choose shift</option>
-      ${choices.map((status) => `<option value="${status.id}" ${status.id === selected ? "selected" : ""}>${escapeHtml(status.label)}</option>`).join("")}
-    </select></label>
+    <fieldset class="worked-shift-picker"><legend>Shift worked</legend>
+      <div class="status-choice-grid">
+        ${choices.map((status) => `<label class="status-choice ${status.id}" title="${escapeHtml(status.label)}">
+          <input type="radio" name="statusId" value="${status.id}" aria-label="${escapeHtml(status.label)}"
+            required ${status.id === selected ? "checked" : ""}>
+          <span>${statusIcons[status.id]}</span>
+        </label>`).join("")}
+      </div>
+    </fieldset>
     <label>Note<textarea name="note" maxlength="500">${escapeHtml(ui.drawer.workNote ?? (shift.kind === "working" ? shift.note : "") ?? "")}</textarea></label>
     <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Save Worked Day</button>
   </form>`;
@@ -3565,13 +3637,14 @@ function renderHolidayList() {
   const batches = [...holidayBatches()];
   const legacy = state.publicHolidays.filter((holiday) => !holiday.batchId);
   return `<div class="drawer-stack">
-    ${state.holidaySelectionEnabled ? "" : '<button type="button" class="primary" data-open-drawer="holiday">Add Public Holiday</button>'}
+    ${state.holidaySelectionEnabled ? (ui.holidaySelection ? "" : '<button type="button" class="primary" id="new-holiday-selection">New holiday</button>')
+      : '<button type="button" class="primary" data-open-drawer="holiday">Add Public Holiday</button>'}
     ${batches.map(([id, rows]) => `<div class="calendar-workflow-row">
       <div><strong>${escapeHtml(rows[0].name)}</strong>
         <span>${rows[0].date}${rows.length > 1 ? ` to ${rows.at(-1).date}` : ""} · ${rows.length} ${rows.length === 1 ? "date" : "dates"}</span>
       </div>
       <button type="button" class="ghost" data-edit-holiday-batch="${id}" aria-label="Edit ${escapeHtml(rows[0].name)}">Edit</button>
-      <button type="button" class="ghost" data-open-drawer="holiday-selection-remove" data-batch-id="${id}" aria-label="Remove ${escapeHtml(rows[0].name)}">Remove</button>
+      <button type="button" class="danger" data-open-drawer="holiday-selection-remove" data-batch-id="${id}" aria-label="Remove ${escapeHtml(rows[0].name)}">Remove</button>
     </div>`).join("")}
     ${legacy.map((holiday) => `<div class="calendar-workflow-row">
       <div><strong>${escapeHtml(holiday.name)}</strong>
@@ -3579,6 +3652,7 @@ function renderHolidayList() {
         <span>${holiday.organizationWide ? "Entire organization" : escapeHtml(holiday.departmentIds.map((id) => byId(state.departments, id)?.name || "Removed team").join(", "))}</span>
       </div>
       <button type="button" class="ghost" data-open-drawer="holiday" data-holiday-id="${holiday.id}" aria-label="Edit ${escapeHtml(holiday.name)}">Edit</button>
+      <button type="button" class="danger" data-open-drawer="holiday-remove" data-holiday-id="${holiday.id}" aria-label="Remove ${escapeHtml(holiday.name)}">Remove</button>
     </div>`).join("")}
     ${batches.length || legacy.length ? "" : '<p class="hint">No public holidays added.</p>'}
   </div>`;
@@ -3723,10 +3797,17 @@ function coverageDrawer() {
   const groups = coverageGroupsForDate(profiles, ui.drawer.date);
   const target = coverageTargetForDepartment(department);
   const events = scopedEvents(departmentScopeIds(department.id), ui.drawer.date, ui.drawer.date);
+  const holidays = holidaysForDepartment(department.id, ui.drawer.date);
   return `
     <div class="drawer-stack">
       <p class="hint">${formatDay(ui.drawer.date)}, ${formatDate(ui.drawer.date)} coverage for ${department.name}.</p>
       ${events.length ? `<section aria-label="Events on this date">${renderEventRows(events, true)}</section>` : ""}
+      ${holidays.length ? `<section aria-label="Public holidays on this date">${holidays.map((holiday) => `<div class="calendar-workflow-row">
+        <div><strong>${escapeHtml(holiday.name)}</strong></div>
+        ${canManageSystemSettings() ? `<button type="button" class="danger"
+          ${holiday.batchId ? `data-open-drawer="holiday-selection-remove" data-batch-id="${holiday.batchId}"`
+            : `data-open-drawer="holiday-remove" data-holiday-id="${holiday.id}"`}>Remove holiday</button>` : ""}
+      </div>`).join("")}</section>` : ""}
       <div class="coverage-summary-card ${groups.available.length < target ? "low" : ""}">
         <span>Available</span>
         <strong>${groups.available.length} / ${target}</strong>
@@ -3759,6 +3840,7 @@ function coverageGroup(label, entries) {
 function shiftDrawer() {
   const profile = byId(state.profiles, ui.drawer.profileId);
   const schedule = scheduleFor(profile.id, ui.drawer.date);
+  const lead = leadForProfileDate(profile, ui.selectedDepartmentId, ui.drawer.date);
   const canEdit = canManageProfileDepartment(profile) && editableDate(ui.drawer.date)
     && !protectedDailyShift(profile.id, ui.drawer.date);
   const rotation = activeRotation(profile.id, ui.drawer.date);
@@ -3788,11 +3870,12 @@ function shiftDrawer() {
           <span>${pendingVacation.startDate} to ${pendingVacation.endDate}</span>
         </button>
       ` : ""}
+      ${lead ? `<div class="current-lead-chip">${icons.lead}<strong>Lead</strong><span>${escapeHtml(lead.department.name)}</span></div>` : ""}
       <div class="detail-line"><span>Rotation default</span><strong>${displayStatusLabel(rotationStatus) || "No rotation"}</strong></div>
       <div class="detail-line"><span>Override</span><strong>${existingOverride ? displayStatusLabel(schedule) : "None"}</strong></div>
       ${renderWorkedDayAction(profile, ui.drawer.date)}
       <div class="shift-status-picker">
-        ${renderDailyStatusGroups("statusId", schedule.id, canEdit)}
+        ${renderDailyStatusGroups("statusId", lead ? "" : schedule.id, canEdit)}
       </div>
       <div class="form-grid two">
         <label>Apply from<input name="startDate" type="date" value="${ui.drawer.date}" ${canEdit ? "" : "disabled"}></label>
@@ -4297,7 +4380,11 @@ function leadDrawer() {
   const lead = dailyLeadOverrideForDate(departmentId, ui.drawer.date);
   const resolvedLead = departmentLeadForDate(departmentId, ui.drawer.date);
   const candidates = availableLeadCandidates(departmentId, ui.drawer.date);
-  const canEdit = ui.schedulerEditMode && canManageDepartment(departmentId) && editableDate(ui.drawer.date);
+  const replacement = ui.drawer.replacement;
+  const staged = schedulerLeadDraftForDate(departmentId, ui.drawer.date);
+  const selectedId = replacement ? "" : (staged || lead)?.profileId || "";
+  const canEdit = (ui.schedulerEditMode || replacement) && canManageDepartment(departmentId)
+    && editableDate(ui.drawer.date) && !isRolePreviewActive();
   const department = byId(state.departments, departmentId);
   const leadHealth = leadAvailabilityForDepartmentDate(departmentId, ui.drawer.date);
   const activeLeadText = leadHealth.available
@@ -4316,12 +4403,13 @@ function leadDrawer() {
       <p class="lead-only-copy">${activeLeadText}</p>
 
       <form id="lead-form" class="day-lead-form">
-        <label>Daily lead override<select name="profileId" ${canEdit ? "" : "disabled"}>
-          <option value="">Use weekly rotation${resolvedLead.rotation && resolvedLead.profile ? ` (${resolvedLead.profile.name})` : ""}</option>
-          ${candidates.map((profile) => `<option value="${profile.id}" ${lead?.profileId === profile.id ? "selected" : ""}>${profile.name}</option>`).join("")}
+        <label>${replacement ? "Replacement lead" : "Daily lead override"}<select name="profileId" ${canEdit ? "" : "disabled"} ${replacement ? "required" : ""}>
+          <option value="">${replacement ? "Choose a replacement lead" : `Use weekly rotation${resolvedLead.rotation && resolvedLead.profile ? ` (${escapeHtml(resolvedLead.profile.name)})` : ""}`}</option>
+          ${candidates.map((profile) => `<option value="${profile.id}" ${selectedId === profile.id ? "selected" : ""}>${escapeHtml(profile.name)}</option>`).join("")}
         </select></label>
         <p class="hint">${candidates.length ? "Only people available on this day are listed." : "No available replacement leaders for this department on this day."}</p>
-        <button class="primary wide" ${canEdit ? "" : "disabled"}>Save Lead</button>
+        <button class="primary wide" ${canEdit && (!replacement || candidates.length) ? "" : "disabled"}>${replacement ? "Save Lead" : "Stage Lead"}</button>
+        ${replacement ? '<button class="ghost wide" id="skip-lead-replacement" type="button">Skip for now</button>' : ""}
       </form>
     </div>
   `;
@@ -4607,7 +4695,6 @@ function wireDrawerButtons(root = document) {
     button.onclick = () => {
       if (button.hasAttribute("data-hierarchy-drag") && performance.now() < ui.hierarchySuppressClickUntil) return;
       if (button.dataset.openDrawer === "profile") { ui.pendingPhotoFile = null; ui.pendingPhotoDataUrl = ""; }
-      if (button.dataset.openDrawer === "lead" && button.dataset.departmentId) ui.selectedDepartmentId = button.dataset.departmentId;
       ui.drawer = { type: button.dataset.openDrawer, ...button.dataset };
       if (["rotation-detail", "rotation-delete"].includes(button.dataset.openDrawer)) ui.notice = "";
       render();
@@ -4684,7 +4771,8 @@ function closeDrawerWithMotion() {
     if (ui.drawer !== closingDrawer) return;
     ui.pendingPhotoFile = null;
     ui.pendingPhotoDataUrl = "";
-    ui.drawer = null;
+    if (closingDrawer?.replacement) openLeadReplacement(closingDrawer.remaining, closingDrawer.returnDrawer);
+    else ui.drawer = null;
     render();
     if (closingDrawer?.type === "profile") {
       const candidate=document.querySelector(`[data-open-drawer="profile"][data-profile-id="${closingDrawer.profileId}"]`)
@@ -4781,6 +4869,16 @@ function bindEvents() {
   });
 
   document.querySelector("#close-drawer")?.addEventListener("click", closeDrawerWithMotion);
+  document.querySelector("#skip-lead-replacement")?.addEventListener("click", closeDrawerWithMotion);
+  document.querySelector("#replacement-person-filter")?.addEventListener("change", (event) => {
+    ui.lowDayPerson = event.target.value;
+    render();
+    document.querySelector("#replacement-person-filter")?.focus();
+  });
+  document.querySelector("#scheduler-sort")?.addEventListener("change", (event) => {
+    ui.schedulerSort = event.target.value;
+    renderWithScheduleScroll("#scheduler-sort");
+  });
 
   document.querySelector("#department-select")?.addEventListener("change", (event) => {
     ui.selectedDepartmentId = event.target.value;
@@ -4832,6 +4930,7 @@ function bindEvents() {
   document.querySelector("#cancel-scheduler-edit")?.addEventListener("click", () => {
     ui.schedulerEditMode = false;
     ui.schedulerLeadDrafts = [];
+    if (ui.drawer?.type === "lead" && !ui.drawer.replacement) ui.drawer = null;
     render();
   });
 
@@ -4843,11 +4942,8 @@ function bindEvents() {
       event.stopPropagation();
       const date = button.dataset.date;
       const profileId = button.dataset.assignScheduleLead;
-      ui.schedulerLeadDrafts = [
-        ...ui.schedulerLeadDrafts.filter((item) => !(item.departmentId === ui.selectedDepartmentId && item.date === date)),
-        { departmentId: ui.selectedDepartmentId, date, profileId }
-      ];
-      render();
+      stageDailyLead(ui.selectedDepartmentId, date, profileId);
+      renderWithScheduleScroll(`.date-head[data-date="${date}"]`);
     });
   });
 
@@ -5037,6 +5133,7 @@ function bindEvents() {
     ui.rotationLeadDraftPattern = null;
     ui.rolePreview = null;
     ui.holidaySelection = null;
+    successNotices.length = 0;
     state.currentUserId = event.target.value;
     const firstDepartment = visibleDepartments()[0];
     ui.selectedDepartmentId = firstDepartment?.id || "";
@@ -5054,6 +5151,8 @@ function bindEvents() {
     ui.notice = "";
     document.querySelector(".app-notice")?.remove();
   });
+  document.querySelectorAll("[data-dismiss-success]").forEach((button) =>
+    button.addEventListener("click", () => dismissSuccessNotice(Number(button.dataset.dismissSuccess))));
   document.querySelector("#shift-form")?.addEventListener("submit", saveShiftOverride);
   document.querySelector("#scheduler-low-days")?.addEventListener("click", () => {
     ui.activeView = "team";
@@ -5456,6 +5555,7 @@ function bindAuthEvents() {
 async function signOut() {
   invalidateAnalytics();
   ui.holidaySelection = null;
+  successNotices.length = 0;
   await runMutation("sign-out", {
     pending: "Signing out...",
     success: "Signed out.",
@@ -5490,6 +5590,7 @@ async function confirmWorkedDay(event) {
   if (!canOverrideDayOff(profile, date)) return;
   const form = new FormData(event.currentTarget);
   const input = { profileId: profile.id, date, statusId: form.get("statusId"), note: String(form.get("note") || "").trim() };
+  const leadAssignments = input.statusId === "ground" ? assignedLeadDatesForProfile(profile.id, [date]) : [];
   Object.assign(ui.drawer, { workStatus: input.statusId, workNote: input.note });
   await runMutation("low-day-confirm", {
     pending: "Confirming the worked shift…", success: `Work confirmed. Take the replacement by ${addDays(date, 30)}.`,
@@ -5507,7 +5608,7 @@ async function confirmWorkedDay(event) {
     }
     if (dataStore.mode === "demo") audit("low_day.earned", "profile", profile.id, `Worked ${date} · use by ${result.credit.dueDate}`);
     await saveState();
-    ui.drawer = null;
+    openLeadReplacement(leadAssignments);
   });
 }
 
@@ -5532,7 +5633,7 @@ function enterHolidaySelection(batchId) {
   document.querySelector("#holiday-date-range input")?.focus({ preventScroll: true });
 }
 
-function renderHolidaySelectionChange(focusSelector) {
+function renderWithScheduleScroll(focusSelector) {
   const left = document.querySelector(".scheduler-shell")?.scrollLeft || 0;
   render();
   const shell = document.querySelector(".scheduler-shell");
@@ -5542,6 +5643,7 @@ function renderHolidaySelectionChange(focusSelector) {
 
 function bindHolidaySelection() {
   document.querySelector("#enter-public-holiday")?.addEventListener("click", () => enterHolidaySelection());
+  document.querySelector("#new-holiday-selection")?.addEventListener("click", () => enterHolidaySelection());
   document.querySelectorAll("[data-edit-holiday-batch]").forEach((button) =>
     button.addEventListener("click", () => enterHolidaySelection(button.dataset.editHolidayBatch)));
   document.querySelector("#cancel-holiday-selection")?.addEventListener("click", () => {
@@ -5569,7 +5671,7 @@ function bindHolidaySelection() {
     for (const date of datesBetween(startDate, endDate)) {
       for (const profile of people) selection.cells.add(`${date}/${profile.id}`);
     }
-    renderHolidaySelectionChange("#holiday-date-range button");
+    renderWithScheduleScroll("#holiday-date-range button");
   });
   document.querySelectorAll("[data-holiday-date], [data-holiday-cell]").forEach((button) =>
     button.addEventListener("click", () => {
@@ -5580,7 +5682,7 @@ function bindHolidaySelection() {
         if (remove) selection.cells.delete(key);
         else selection.cells.add(key);
       }
-      renderHolidaySelectionChange(profileId
+      renderWithScheduleScroll(profileId
         ? `[data-holiday-cell][data-date="${date}"][data-profile-id="${profileId}"]`
         : `[data-holiday-date][data-date="${date}"]`);
     }));
@@ -5602,6 +5704,7 @@ async function saveHolidaySelection(event, remove) {
     return;
   }
   if (!remove) selection.name = name;
+  const leadAssignments = cells.flatMap(({ profileId, date }) => assignedLeadDatesForProfile(profileId, [date]));
   await runMutation("holiday-save", {
     pending: "Updating public holidays…", success: remove ? "Public holiday removed." : "Public holiday saved.",
     failure: "The public holiday could not be updated."
@@ -5616,7 +5719,7 @@ async function saveHolidaySelection(event, remove) {
     }
     if (!remove || selection?.batchId === batchId) ui.holidaySelection = null;
     await saveState();
-    ui.drawer = remove ? { type: "holidays" } : null;
+    openLeadReplacement(leadAssignments, remove ? { type: "holidays" } : null);
   });
 }
 
@@ -5649,6 +5752,7 @@ function bindLowDayCoverage() {
 async function saveLowDayBooking(date) {
   const credit = byId(state.lowDayCredits, ui.drawer.creditId);
   if (!credit || !canManageLowDay(byId(state.profiles, credit.profileId))) return;
+  const leadAssignments = date ? assignedLeadDatesForProfile(credit.profileId, [date]) : [];
   ui.drawer.bookingDate = date;
   await runMutation("low-day-book", {
     pending: "Updating the replacement day…",
@@ -5659,7 +5763,7 @@ async function saveLowDayBooking(date) {
     applyLowDayResult(result);
     if (dataStore.mode === "demo") audit(date ? "low_day.booked" : "low_day.booking_cancelled", "profile", credit.profileId, date || credit.replacementDate);
     await saveState();
-    ui.drawer = null;
+    openLeadReplacement(leadAssignments);
   });
 }
 
@@ -5762,6 +5866,8 @@ async function saveShiftOverride(event) {
         profileId: ui.drawer.profileId,
         date,
         statusId: selectedStatusId,
+        ...(state.holidayShiftOverridesEnabled
+          ? { holidayOverrideBatchId: publicHolidayForProfile(state, profile.id, date)?.batchId || null } : {}),
         note: form.get("note").trim()
       }
     };
@@ -5772,17 +5878,13 @@ async function saveShiftOverride(event) {
     failure: "The daily change could not be saved."
   }, async () => {
     for (const item of payloads) {
+      await dataStore.upsertScheduleOverride(item.payload);
       if (item.existing) Object.assign(item.existing, item.payload);
       else state.scheduleOverrides.push(item.payload);
       audit("schedule.override", "schedule_override", item.payload.id, `${item.payload.date} set to ${item.payload.statusId}`);
-      await dataStore.upsertScheduleOverride(item.payload);
     }
     await saveState();
-    ui.drawer = null;
-    if (leadAssignmentsToReplace.length) {
-      ui.notice = "Leader is unavailable on one or more edited days. Use the Lead missing alert to assign a replacement.";
-      ui.noticeKind = "warning";
-    }
+    openLeadReplacement(leadAssignmentsToReplace);
     render();
   });
 }
@@ -5792,16 +5894,17 @@ async function clearShiftOverride() {
   if (!profile || !canManageProfileDepartment(profile) || !editableDate(ui.drawer.date)) return;
   const existing = state.scheduleOverrides.find((entry) => entry.profileId === ui.drawer.profileId && entry.date === ui.drawer.date);
   if (!existing || protectedDailyShift(profile.id, ui.drawer.date)) return;
+  const leadAssignments = assignedLeadDatesForProfile(profile.id, [existing.date]);
   await runMutation("shift-clear", {
     pending: "Clearing daily change...",
     success: "Daily change cleared.",
     failure: "The daily change could not be cleared."
   }, async () => {
+    await dataStore.deleteScheduleOverride(existing);
     state.scheduleOverrides = state.scheduleOverrides.filter((entry) => entry.id !== existing.id);
     audit("schedule.override_cleared", "schedule_override", existing.id, `${existing.date} returned to rotation`);
-    await dataStore.deleteScheduleOverride(existing);
     await saveState();
-    ui.drawer = null;
+    openLeadReplacement(leadAssignments);
     render();
   });
 }
@@ -6190,7 +6293,7 @@ async function saveVacationRequest(event) {
 
 async function decideRequest(requestId, decision) {
   const request = byId(state.vacationRequests, requestId);
-  const profile = byId(state.profiles, request.profileId);
+  const profile = byId(state.profiles, request?.profileId);
   if (!request || !profile || request.status !== "pending" || !canManageProfileDepartment(profile)) return;
   const eligibleDates = annualEligibleDates(profile.id, request.startDate, request.endDate);
   const days = eligibleDates.length;
@@ -6199,7 +6302,7 @@ async function decideRequest(requestId, decision) {
     return;
   }
   const leadAssignmentsToReplace = decision === "approved"
-    ? assignedLeadDatesForProfile(profile.id, eligibleDates).filter((assignment) => isScheduleLeadAvailable(scheduleFor(profile.id, assignment.date)))
+    ? assignedLeadDatesForProfile(profile.id, eligibleDates)
     : [];
   await runMutation("vacation-decision", {
     pending: decision === "approved" ? "Approving request..." : "Rejecting request...",
@@ -6209,10 +6312,8 @@ async function decideRequest(requestId, decision) {
     if (dataStore?.mode === "supabase") {
       await dataStore.updateVacationDecision({ ...request, status: decision }, profile, []);
       audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
-      await reloadState();
-      if (!openLeadPromptForAssignment(leadAssignmentsToReplace[0], "Annual approved. Choose another leader for the affected day.")) {
-        ui.drawer = null;
-      }
+      await reloadState({ preserveDepartment: true });
+      openLeadReplacement(leadAssignmentsToReplace);
       render();
       return;
     }
@@ -6237,55 +6338,57 @@ async function decideRequest(requestId, decision) {
     audit(`vacation.${decision}`, "vacation_request", request.id, `${days} work days`);
     await dataStore.updateVacationDecision(request, profile, changedOverrides);
     await saveState();
-    if (!openLeadPromptForAssignment(leadAssignmentsToReplace[0], "Annual approved. Choose another leader for the affected day.")) {
-      ui.drawer = null;
-    }
+    openLeadReplacement(leadAssignmentsToReplace);
     render();
   });
 }
 
+async function persistDailyLead({ departmentId, date, profileId }) {
+  if (!canManageDepartment(departmentId) || !editableDate(date)) throw new Error("This date or department is locked.");
+  if (profileId && !availableLeadCandidates(departmentId, date).some((profile) => profile.id === profileId)) {
+    throw new Error("Choose a team member who is available on that date.");
+  }
+  const existing = dailyLeadOverrideForDate(departmentId, date);
+  if (!profileId && !existing) return;
+  if (!profileId) {
+    await dataStore.deleteDailyLead(existing);
+    state.departmentLeads = state.departmentLeads.filter((item) => item.id !== existing.id);
+    audit("department.lead_cleared", "department_lead", existing.id, `${date} returned to weekly lead rotation`);
+    return;
+  }
+  const payload = { id: existing?.id || makeId("lead"), departmentId, date, profileId };
+  await dataStore.upsertDailyLead(payload);
+  if (existing) Object.assign(existing, payload);
+  else state.departmentLeads.push(payload);
+  audit("department.lead_set", "department_lead", payload.id, `${date} lead`);
+}
+
 async function saveLead(event) {
   event.preventDefault();
-  if (!ui.schedulerEditMode) {
-    notify("Turn on Edit daily leads before changing daily leads.", "error");
-    return;
-  }
+  const { date, replacement, remaining, returnDrawer } = ui.drawer;
   const departmentId = activeDrawerDepartmentId();
-  if (!canManageDepartment(departmentId) || !editableDate(ui.drawer.date)) return;
-  const form = new FormData(event.currentTarget);
-  const existing = dailyLeadOverrideForDate(departmentId, ui.drawer.date);
-  const profileId = form.get("profileId");
-  const selectedProfile = byId(state.profiles, profileId);
-  if (profileId && (!selectedProfile || !profileBelongsToDepartment(selectedProfile, departmentId))) {
-    notify("Choose a person from this department.", "error");
+  if ((!ui.schedulerEditMode && !replacement) || !canManageDepartment(departmentId) || !editableDate(date)
+    || isRolePreviewActive() || isMutationPending()) return;
+  const profileId = new FormData(event.currentTarget).get("profileId");
+  if (profileId && !availableLeadCandidates(departmentId, date).some((profile) => profile.id === profileId)) {
+    notify("Choose a team member who is available on that date.", "error");
     return;
   }
-  if (profileId && !isScheduleLeadAvailable(scheduleFor(profileId, ui.drawer.date))) {
-    notify("Choose a leader who is available on this day.", "error");
-    return;
-  }
-  const payload = { id: existing?.id || makeId("lead"), departmentId, date: ui.drawer.date, profileId };
-  await runMutation("daily-lead", {
-    pending: "Saving daily lead...",
-    success: profileId ? "Daily lead override saved." : "Daily lead returned to weekly rotation.",
-    failure: "The daily lead could not be saved."
-  }, async () => {
-    if (!profileId) {
-      if (existing) {
-        state.departmentLeads = state.departmentLeads.filter((item) => item.id !== existing.id);
-        await dataStore.deleteDailyLead(existing);
-        audit("department.lead_cleared", "department_lead", existing.id, `${existing.date} returned to weekly lead rotation`);
-      }
-    } else {
-      if (existing) Object.assign(existing, payload);
-      else state.departmentLeads.push(payload);
-      audit("department.lead_set", "department_lead", payload.id, `${payload.date} lead`);
-      await dataStore.upsertDailyLead(payload);
-    }
-    await saveState();
-    ui.selectedDepartmentId = departmentId;
+  if (!replacement) {
+    stageDailyLead(departmentId, date, profileId);
     ui.drawer = null;
-    render();
+    renderWithScheduleScroll(`.date-head[data-date="${date}"]`);
+    return;
+  }
+  if (!profileId) return;
+  await runMutation("daily-lead", {
+    pending: "Saving replacement lead…",
+    success: "Replacement lead saved.",
+    failure: "The replacement lead could not be saved."
+  }, async () => {
+    await persistDailyLead({ departmentId, date, profileId });
+    await saveState();
+    openLeadReplacement(remaining, returnDrawer);
   });
 }
 
@@ -6393,20 +6496,8 @@ async function saveSchedulerLeadDrafts() {
     failure: "The scheduler edits could not be saved."
   }, async () => {
     for (const draft of drafts) {
-      if (!editableDate(draft.date) && !isAdmin()) continue;
-      const profile = byId(state.profiles, draft.profileId);
-      if (!profile || !profileBelongsToDepartment(profile, draft.departmentId) || !isScheduleLeadAvailable(scheduleFor(profile.id, draft.date))) continue;
-      const existing = state.departmentLeads.find((item) => item.departmentId === draft.departmentId && item.date === draft.date);
-      const payload = {
-        id: existing?.id || makeId("lead"),
-        departmentId: draft.departmentId,
-        date: draft.date,
-        profileId: draft.profileId
-      };
-      if (existing) Object.assign(existing, payload);
-      else state.departmentLeads.push(payload);
-      await dataStore.upsertDailyLead(payload);
-      audit("department.lead_set", "department_lead", payload.id, `${payload.date} staged scheduler lead`);
+      await persistDailyLead(draft);
+      ui.schedulerLeadDrafts = ui.schedulerLeadDrafts.filter((item) => item !== draft);
     }
     await saveState();
     ui.schedulerEditMode = false;

@@ -116,14 +116,14 @@ For a person and date:
 1. Find a matching daily override.
 2. Find the newest rotation version effective on that date.
 3. Resolve the correct weekday slot.
-4. Apply selected public holidays to the selected people and dates. Existing Annual, Sick, booked replacement days, and confirmed work take precedence. Legacy team holidays keep their previous precedence below daily overrides.
+4. Apply selected public holidays to the selected people and dates. Annual, Sick, booked replacement days, confirmed work, and daily edits explicitly saved against that holiday take precedence. Legacy team holidays keep their previous precedence below daily overrides.
 5. Use the rotation result on regular dates and holidays with scheduled coverage. If no rotation exists, show Unassigned.
 
 Migration 036 adds dated holidays and Low Days credits. Migration 038 adds Scheduler → Enter Public Holiday, where Admin can select a date header or an inclusive date range for everyone shown, and toggle individual shifts. Save the named selection as one batch. Saved Holidays supports editing or removing the batch and managing legacy team entries. Selected holidays snapshot the people chosen at save time, so later membership changes do not reassign their dates. Team → Alerts groups actual holiday days off by person and shows unequal totals within each visible managed team.
 
 Admin and scoped Leads select an eligible Scheduler cell and choose Override day off to record Morning, Mid-day, Night, or On Ground. The date must have started in Cairo. The RPC writes the shift and issues one credit per person and date in the same transaction. If the person worked on charged Annual, the RPC returns one day to its original yearly balance and updates the request deduction. The credit is due 30 calendar days after the worked date. Team → Alerts shows upcoming bookings and due or overdue credits, and lets authorized viewers choose a regular working day by the deadline. Moving or cancelling a booking restores the prior shift. Employees see their own history and deadlines in My Profile → Low Days.
 
-The calendar and credit tables are private. The read RPC resolves holiday applicability against full memberships, including hidden hybrid memberships, and returns credit history only to its owner or an authorized manager. The Analytics snapshot carries scoped holiday applicability and counts both new exceptions as known off days. Annual request validation and approval share the holiday-aware workday calculation and exclude confirmed worked dates. Replacement-day actions never charge the Annual ledger.
+The calendar and credit tables are private. The read RPC resolves holiday applicability against full memberships, including hidden hybrid memberships, and returns credit history only to its owner or an authorized manager. Migration 039 records the holiday batch on a one-off shift edit, so the Scheduler, Annual eligibility and Analytics agree when someone is scheduled to work during a holiday. Removing a holiday keeps explicit daily shifts. Confirmed worked days still earn replacement credits through Override day off. Replacement-day actions never charge the Annual ledger.
 
 Scheduler → Low Days opens Team → Alerts. Migration 037 adds a private events table, scoped reads, and audited event writes. Admin can create organization-wide or team events. Leads can change events scoped entirely to teams they manage. The Events row below Scheduler date headers and Annual review use the same date-range overlay.
 
@@ -146,7 +146,7 @@ Employee profiles also carry `seniority_level`, now simplified to `manager`, `le
 
 Weekly lead assignment is edited directly inside the rotation grid through a red star on each eligible person's weekday shift. Once assigned, Lead replaces the underlying Morning, Mid-day, or Night label in Scheduler, Rotations, profile calendars, upcoming-shift lists, and request-impact previews. The underlying rotation remains authoritative for calculations, coverage, leave deductions, and history; Lead is a primary presentation of the existing effective-dated lead assignment rather than a fifth stored rotation-template status.
 
-Parent-department lead assignments use the full descendant department scope. A daily override or weekly lead rotation stored on a parent can therefore resolve to a profile assigned to one of its sub-departments. In Scheduler edit mode, an existing parent daily override reopens the parent lead editor so it can be returned to the weekly rotation without direct database cleanup.
+Parent-department lead assignments use the full descendant department scope. A daily override or weekly lead rotation stored on a parent can therefore resolve to a profile assigned to one of its sub-departments. In Edit daily leads, date headers open a picker to stage a replacement or restore weekly rotation before a separate Save. A change that makes a scheduled lead unavailable opens a skippable replacement picker right after saving the shift or request.
 
 ## Authorization Model
 

@@ -43,6 +43,103 @@ function button(page, name) {
   return page.getByRole("button", { name, exact: true });
 }
 
+function shift(page, profileId, date = eventDate) {
+  return page.locator(`.schedule-grid .shift-cell[data-profile-id="${profileId}"][data-date="${date}"]`);
+}
+
+test("scheduler sorts rows, stages date-based daily leads, and keeps the previous lead's shift", async ({ page }) => {
+  const rows = page.locator(".schedule-grid .employee-cell strong");
+  const sort = page.getByRole("combobox", { name: "Sort people" });
+  await expect(rows).toHaveText(["Karim Adel", "Mona Saleh", "Omar Wanis"]);
+  await sort.selectOption("name-desc");
+  await expect(rows).toHaveText(["Omar Wanis", "Mona Saleh", "Karim Adel"]);
+  await sort.selectOption("position-asc");
+  await expect(rows).toHaveText(["Mona Saleh", "Omar Wanis", "Karim Adel"]);
+  await sort.selectOption("position-desc");
+  await expect(rows).toHaveText(["Karim Adel", "Omar Wanis", "Mona Saleh"]);
+  const dateActions = page.locator(".scheduler-date-actions");
+  expect(await dateActions.locator("button, input").evaluateAll((items) => items.map((item) => item.id)))
+    .toEqual(["today-range", "schedule-start-date", "month-start-range"]);
+  await shift(page, "emp-002").click();
+  await expect(page.locator(".current-lead-chip")).toContainText("Lead");
+  await expect(page.locator('#shift-form input[name="statusId"]:checked')).toHaveCount(0);
+  await page.locator("#close-drawer").click();
+  await button(page, "Edit daily leads").click();
+  const header = page.locator(`.date-head[data-date="${eventDate}"]`);
+  await expect(header).toContainText("Edit lead");
+  await header.click();
+  await page.getByRole("combobox", { name: "Daily lead override" }).selectOption("emp-001");
+  await button(page, "Stage Lead").click();
+  await expect(shift(page, "emp-001")).toHaveClass(/is-day-lead/);
+  await expect(shift(page, "emp-002").locator(".shift-label")).toHaveText("Mid-day");
+  await button(page, "Cancel").click();
+  await expect(shift(page, "emp-002")).toHaveClass(/is-day-lead/);
+  await button(page, "Edit daily leads").click();
+  await header.click();
+  await page.getByRole("combobox", { name: "Daily lead override" }).selectOption("emp-001");
+  await button(page, "Stage Lead").click();
+  await page.locator("#save-scheduler-edit").click();
+  await expect(shift(page, "emp-001")).toHaveClass(/is-day-lead/);
+  await page.reload();
+  await expect(shift(page, "emp-001")).toHaveClass(/is-day-lead/);
+});
+
+test("a daily exception offers a skippable lead picker, and approval can save a replacement directly", async ({ page }) => {
+  await page.evaluate(({ key, date }) => {
+    const state = JSON.parse(localStorage.getItem(key));
+    state.scheduleOverrides.push({ id: "karim", profileId: "emp-003", date, statusId: "morning" });
+    localStorage.setItem(key, JSON.stringify(state));
+  }, { key: stateKey, date: annualDate });
+  await page.reload();
+  await shift(page, "emp-002").click();
+  await page.locator('.status-choice.ground > span').click();
+  await button(page, "Save Daily Change").click();
+  const prompt = page.getByRole("dialog", { name: "Lead Assignment" });
+  await expect(prompt).toContainText("Needs lead");
+  await expect(page.getByRole("combobox", { name: "Replacement lead" })).toBeEnabled();
+  await button(page, "Skip for now").click();
+  await expect(prompt).toHaveCount(0);
+  const header = page.locator(`.date-head[data-date="${eventDate}"]`);
+  await expect(header).toHaveAccessibleName(/Lead missing/);
+  await button(page, "Edit daily leads").click();
+  await header.click();
+  await page.getByRole("combobox", { name: "Daily lead override" }).selectOption("emp-001");
+  await button(page, "Stage Lead").click();
+  await page.locator("#save-scheduler-edit").click();
+
+  await button(page, "Requests").click();
+  await page.locator('[data-request-id="other-annual"]').click();
+  await button(page, "Approve & Deduct").click();
+  await expect(prompt).toContainText("Nov 11");
+  await expect(button(page, "Skip for now")).toBeVisible();
+  await page.getByRole("combobox", { name: "Replacement lead" }).selectOption("emp-003");
+  await button(page, "Save Lead").click();
+  await expect(prompt).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Annual Requests" })).toBeVisible();
+  await button(page, "Scheduler").click();
+  await expect(shift(page, "emp-003", annualDate)).toHaveClass(/is-day-lead/);
+});
+
+test("success notices stack and each expires ten seconds after it appears", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-11T12:00:00Z") });
+  await shift(page, "emp-001").click();
+  await page.locator(".status-choice.morning > span").click();
+  await button(page, "Save Daily Change").click();
+  const notices = page.locator(".notice-toast.success");
+  await expect(notices).toHaveCount(1);
+  await page.clock.fastForward(5000);
+  await shift(page, "emp-001").click();
+  await button(page, "Clear Override").click();
+  await expect(notices).toHaveCount(2);
+  const [latest, previous] = await notices.evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
+  expect(latest).toBeGreaterThan(previous);
+  await page.clock.fastForward(5500);
+  await expect(notices).toHaveCount(1);
+  await expect(notices).toContainText("Daily change cleared.");
+  await page.clock.fastForward(5200);
+  await expect(notices).toHaveCount(0);
+});
+
 test("shift details fit the drawer and show only the selected person's Annual activity", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 850 });
   const cell = page.locator(`.schedule-grid .shift-cell[data-profile-id="emp-001"][data-date="${annualDate}"]`);
@@ -56,7 +153,7 @@ test("shift details fit the drawer and show only the selected person's Annual ac
   await expect.poll(() => drawer.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await button(page, "Override day off").click();
-  await page.getByLabel("Shift worked").selectOption("ground");
+  await page.getByRole("radio", { name: "On Ground", exact: true }).press("Space");
   await button(page, "Save Worked Day").click();
   await expect(cell).toHaveClass(/ground/);
   const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), stateKey);

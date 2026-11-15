@@ -36,6 +36,7 @@ function createLocalStore() {
       state.lowDayCredits ||= [];
       state.lowDaysEnabled = true;
       state.holidaySelectionEnabled = true;
+      state.holidayShiftOverridesEnabled = true;
       state.scheduleEvents ||= [];
       state.eventsEnabled = true;
       localStorage.setItem(storageKey, JSON.stringify(state));
@@ -1016,7 +1017,8 @@ function toDbRotation(rotation) {
 }
 
 function fromDbOverride(row) {
-  return { id: row.id, profileId: row.profile_id, date: row.shift_date, statusId: row.status_id, note: row.note || "" };
+  return { id: row.id, profileId: row.profile_id, date: row.shift_date, statusId: row.status_id, note: row.note || "",
+    holidayOverrideBatchId: row.holiday_override_batch_id || null };
 }
 
 function fromDbLowDayCredit(row) {
@@ -1028,6 +1030,7 @@ function fromDbLowDayCalendar(calendar, admin) {
   const publicHolidays = (calendar.holidays || []).map(({ profileIds, ...holiday }) =>
     admin && !holiday.batchId ? holiday : { ...holiday, profileIds });
   return { publicHolidays, holidaySelectionEnabled: calendar.holidaySelectionEnabled === true,
+    holidayShiftOverridesEnabled: calendar.holidayShiftOverridesEnabled === true,
     lowDayCredits: (calendar.credits || []).map(fromDbLowDayCredit) };
 }
 
@@ -1055,7 +1058,9 @@ function fromDbLowDayResult(result) {
 }
 
 function toDbOverride(override) {
-  return { id: override.id, profile_id: override.profileId, shift_date: override.date, status_id: override.statusId, note: override.note || null };
+  return { id: override.id, profile_id: override.profileId, shift_date: override.date, status_id: override.statusId,
+    note: override.note || null, ...(Object.hasOwn(override, "holidayOverrideBatchId")
+      ? { holiday_override_batch_id: override.holidayOverrideBatchId } : {}) };
 }
 
 function fromDbLead(row) {
