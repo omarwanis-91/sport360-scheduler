@@ -11,6 +11,7 @@ import {
   annualEligibleDates as annualEligibleDatesLogic,
   byId,
   holidayAppliesToProfile,
+  holidaySelectionBlocked,
   dateDiff as dateDiffLogic,
   datesBetween as datesBetweenLogic,
   departmentLeadForDate as departmentLeadForDateLogic,
@@ -1872,13 +1873,13 @@ function renderDateHead(date, profiles) {
     ? `${leads.length} leads`
     : leads[0]?.profile ? `Lead: ${leads[0].profile.name.split(" ")[0]}` : leadInfo.label || "No lead";
   const holiday = holidayForDepartment(ui.selectedDepartmentId, date);
-  const selected = ui.holidaySelection && profiles.length > 0
-    && profiles.every((profile) => ui.holidaySelection.cells.has(`${date}/${profile.id}`));
+  const keys = ui.holidaySelection ? holidayKeysForDate(date, profiles) : [];
+  const selected = keys.length > 0 && keys.every((key) => ui.holidaySelection.cells.has(key));
   const action = ui.holidaySelection
-    ? `data-holiday-date aria-pressed="${selected}" ${profiles.length ? "" : "disabled"}`
+    ? `data-holiday-date aria-pressed="${selected}" ${keys.length ? "" : "disabled"}`
     : `data-open-drawer="${drawerType}" data-department-id="${leadDepartmentId}"`;
   return `
-    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" ${action} data-date="${date}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${ui.holidaySelection ? "Toggle this date for all people shown" : leadLabel}${canEditLead ? ". Edit daily lead" : ""}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}">
+    <button class="date-head ${isToday ? "today" : ""} ${leadInfo.missing ? "lead-missing" : ""} ${isWeekStart(date) ? "week-start" : ""}" ${action} data-date="${date}" aria-label="${formatDay(date)} ${formatDate(date)}${isToday ? ". Today" : ""}. ${ui.holidaySelection ? (keys.length ? "Toggle eligible shifts for public holiday" : "No eligible shifts for public holiday") : leadLabel}${canEditLead ? ". Edit daily lead" : ""}${holiday ? `. Public holiday, ${escapeHtml(holiday.name)}` : ""}">
       <span>${formatDay(date)}${isToday ? `<small>Today</small>` : ""}</span>
       <strong>${formatDate(date)}</strong>
       ${canEditLead && !ui.holidaySelection ? `<em class="day-lead-edit-label">${icons.lead} ${leadInfo.missing ? "Pick lead" : "Edit lead"}</em>` : ""}
@@ -1943,9 +1944,13 @@ function renderShiftCell(profile, date) {
   const drawerType = canManageProfileDepartment(profile) && editableDate(date) && !isRolePreviewActive()
     ? "shift"
     : "calendar-day";
-  const action = ui.holidaySelection
-    ? `data-holiday-cell aria-pressed="${ui.holidaySelection.cells.has(`${date}/${profile.id}`)}" aria-label="${escapeHtml(profile.name)}, ${formatDate(date)}, toggle public holiday"`
-    : `data-open-drawer="${drawerType}"`;
+  let action = `data-open-drawer="${drawerType}"`;
+  if (ui.holidaySelection) {
+    const key = `${date}/${profile.id}`;
+    const allowed = holidayCellSelectable(profile.id, date);
+    action = `data-holiday-cell aria-pressed="${ui.holidaySelection.cells.has(key)}" ${allowed ? "" : "disabled"}
+      aria-label="${escapeHtml(profile.name)}, ${formatDate(date)}, ${escapeHtml(label)}, ${allowed ? "toggle public holiday" : "unavailable for public holiday"}"`;
+  }
   return `
     <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" ${action} data-profile-id="${profile.id}" data-date="${date}" title="${escapeHtml(profile.name)}, ${formatDate(date)}, ${escapeHtml(label)}">
       <span class="shift-icon">${icon}</span>
@@ -3626,7 +3631,7 @@ function renderHolidaySelectionBar() {
   return `<section class="holiday-selection-bar list-panel" aria-label="Public Holiday mode">
     <div class="team-section-head">
       <div><h2>${batchId ? "Edit Public Holiday" : "Public Holiday mode"}</h2>
-        <p class="hint">Select a date header for everyone shown, or select individual shifts.</p>
+        <p class="hint">Select a date, range, or shift. Weekend, Annual, and Sick shifts are skipped.</p>
       </div>
       <button type="button" class="ghost" data-open-drawer="holidays">Saved Holidays</button>
     </div>
@@ -3693,7 +3698,6 @@ function holidaySelectionDrawer() {
       <p class="hint">Each person receives one Low Days credit per unallocated day. Use the credits by
         ${addDays([...dates].sort().at(-1), selection.expiryDays || state.lowDayExpiryDays)}.</p>
       <div id="holiday-allocation-preview" aria-live="polite">${renderHolidayAllocation(selection, days)}</div>` : ""}
-    <p class="hint">Existing leave and confirmed work keep their recorded status.</p>
     <button class="primary wide" ${isMutationPending() ? "disabled" : ""}>Save Public Holiday</button>
   </form>`;
 }
@@ -5691,11 +5695,12 @@ function enterHolidaySelection(batchId) {
     ? visibleProfiles().filter((profile) => selectedPeople.has(profile.id)
       || profileTeamIds(state, profile).some((id) => selectedTeams.has(id)))
     : departmentProfiles();
+  const savedCells = new Set(rows.flatMap((holiday) => holiday.profileIds.map((id) => `${holiday.date}/${id}`)));
   ui.holidaySelection = {
     batchId, name: rows[0]?.name || "", startDate, endDate: rows.at(-1)?.date || startDate,
     days: entitlement?.days, expiryDays: entitlement?.expiryDays,
     profileIds: new Set(entitlement?.profileIds || (batchId ? profiles.map((profile) => profile.id) : [])),
-    cells: new Set(rows.flatMap((holiday) => holiday.profileIds.map((id) => `${holiday.date}/${id}`)))
+    savedCells, cells: new Set(savedCells)
   };
   if (batchId) ui.startDate = startDate;
   ui.schedulerEditMode = false;
@@ -5710,7 +5715,8 @@ function renderWithScheduleScroll(focusSelector) {
   render();
   const shell = document.querySelector(".scheduler-shell");
   if (shell) shell.scrollLeft = left;
-  document.querySelector(focusSelector)?.focus({ preventScroll: true });
+  const target = document.querySelector(focusSelector);
+  (target && !target.disabled ? target : document.querySelector("#holiday-date-range button"))?.focus({ preventScroll: true });
 }
 
 function bindDateRange(form, startName, endName, onChange) {
@@ -5727,6 +5733,16 @@ function bindDateRange(form, startName, endName, onChange) {
     input.addEventListener("change", sync);
   }
   sync();
+}
+
+function holidayCellSelectable(profileId, date) {
+  const key = `${date}/${profileId}`;
+  const { savedCells, cells } = ui.holidaySelection;
+  return (savedCells.has(key) && cells.has(key)) || !holidaySelectionBlocked(state, profileId, date);
+}
+
+function holidayKeysForDate(date, people) {
+  return people.filter(({ id }) => holidayCellSelectable(id, date)).map(({ id }) => `${date}/${id}`);
 }
 
 function bindHolidaySelection() {
@@ -5763,16 +5779,20 @@ function bindHolidaySelection() {
       notify("Choose a valid range with at most 10,000 person-days.", "error");
       return;
     }
-    for (const date of datesBetween(startDate, endDate)) {
-      for (const profile of people) selection.cells.add(`${date}/${profile.id}`);
+    const keys = datesBetween(startDate, endDate).flatMap((date) => holidayKeysForDate(date, people));
+    if (!keys.length) {
+      notify("No eligible shifts in this range.", "warning");
+      return;
     }
+    keys.forEach((key) => selection.cells.add(key));
     people.forEach(({ id }) => selection.profileIds.add(id));
     renderWithScheduleScroll("#holiday-date-range button");
   });
   document.querySelectorAll("[data-holiday-date], [data-holiday-cell]").forEach((button) =>
     button.addEventListener("click", () => {
       const { date, profileId } = button.dataset;
-      const keys = profileId ? [`${date}/${profileId}`] : people.map((profile) => `${date}/${profile.id}`);
+      const keys = holidayKeysForDate(date, profileId ? [{ id: profileId }] : people);
+      if (!keys.length) return;
       const remove = keys.every((key) => selection.cells.has(key));
       if (!remove) people.forEach(({ id }) => selection.profileIds.add(id));
       for (const key of keys) {

@@ -127,6 +127,8 @@ The calendar and credit tables are private. The read RPC resolves holiday applic
 
 Migration 040 adds Admin-only holiday entitlements and a Low Days expiry setting. Review Holiday compares the intended days per person with their selected dates and stores one credit for each unallocated day. The batch records the people covered by the review and its expiry period. Holiday credits use the last selected holiday date as their reference. Credits from work use the worked date. Both deadlines use the expiry period when first issued, which defaults to 30 calendar days. Clearing a worked shift with an unused credit removes the credit and restores the prior shift and any reversed Annual deduction in one transaction.
 
+Migration 041 validates new holiday selections against the daily override or effective rotation before saving. Holiday mode disables individual Weekend, Annual, and Sick cells and skips them when selecting a date or range. Previously saved allocations can be removed while editing a batch.
+
 Scheduler → Low Days opens Team → Alerts. Migration 037 adds a private events table, scoped reads, and audited event writes. Admin can create organization-wide or team events. Leads can change events scoped entirely to teams they manage. The Events row below Scheduler date headers and Annual review use the same date-range overlay.
 
 ## Main Domain Data

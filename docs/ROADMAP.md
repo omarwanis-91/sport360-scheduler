@@ -122,7 +122,8 @@ Feature development normally freezes after Phase 3 while this production hardeni
 - ✅ Events, scoped Manager preview, and the Scheduler/Profile/Analytics UI fixes shipped in PR #42 after migration 037 and all five audit 026 checks passed.
 - ✅ Scheduler holiday selection, uneven allocation alerts, and worked leave shipped in PR #43 after migration 038 and all five audit 027 checks passed.
 - ✅ Daily lead selection, replacement prompts, and individual public holiday shift edits shipped in PR #44 after migration 039 and all five audit 028 checks passed.
-- ⏳ Apply migration 040 and verify audit 029 before releasing holiday entitlements, configurable Low Days expiry, and clearing worked shift overrides.
+- ✅ Holiday entitlements, configurable Low Days expiry, and clearing worked shift overrides shipped in PR #45 after migration 040 and all five audit 029 checks passed.
+- ⏳ Apply migration 041 and verify audit 030 before releasing the Weekend, Annual, and Sick public holiday selection guard.
 - ⏳ Deploy the role-scoped UI and verify Admin, Lead, and Employee boundaries in production.
 - ⏳ Complete the first real employee submission and Admin link-or-create round trip in production.
 - ⏳ Verify production auth redirects, backup/export procedure, migration log, audit retention, health checks, and rollback instructions.

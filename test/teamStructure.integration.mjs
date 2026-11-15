@@ -382,5 +382,31 @@ await deny(() => clearWorked(pe, latestWork), /Cancel the booked replacement/);
 await book(newCredit.id, null);
 equal((await clearWorked(pe, latestWork)).override.status_id, 'vacation');
 equal((await calendar()).credits.some((credit) => credit.id === newCredit.id), false);
-await db.close();
 console.log(`${checks - beforeEntitlements} Holiday entitlement and Low Days PostgreSQL checks passed.`);
+
+const beforeHolidayEligibility = checks;
+const [rotationWeekend, sickOverride, annualOverride, workingOverride] = await Promise.all([40, 41, 42, 43].map(at));
+const oldBatch = (await saveHolidaySelection('Existing holiday', [[pe, rotationWeekend], [phm, rotationWeekend]]))
+  .holidays.find(({ name }) => name === 'Existing holiday').batchId;
+await db.exec('reset role');
+await db.exec(file('../supabase/migrations/041_public_holiday_eligibility.sql'));
+equal((await rows(file('../supabase/audit/030_public_holiday_eligibility_audit.sql')))
+  .map(({ passed }) => passed), [true, true, true, true, true]);
+await login(admin);
+await rows("insert into public.rotation_versions(profile_id,effective_start,pattern) values($1,$2,array_fill('weekend'::text,array[7]))",
+  [pe, rotationWeekend]);
+await rows("insert into public.schedule_overrides(profile_id,shift_date,status_id) values($1,$2,'sick'),($1,$3,'vacation'),($1,$4,'night')",
+  [pe, sickOverride, annualOverride, workingOverride]);
+const ineligible = /selected shift is Weekend, Annual, or Sick/;
+await deny(() => saveHolidaySelection('Weekend', [[pe, rotationWeekend]]), ineligible);
+await deny(() => saveEntitled('Sick', [[pe, sickOverride]], 1, [pe]), ineligible);
+await deny(() => saveEntitled('Annual', [[pe, annualOverride], [pe, workingOverride]], 1, [pe]), ineligible);
+equal((await calendar()).holidays.some(({ date }) => date === workingOverride), false);
+equal((await saveHolidaySelection('Existing holiday renamed', [[pe, rotationWeekend], [phm, rotationWeekend]], oldBatch))
+  .holidays.find(({ batchId }) => batchId === oldBatch).profileIds.includes(pe), true);
+await saveHolidaySelection('Existing holiday renamed', [[phm, rotationWeekend]], oldBatch);
+await deny(() => saveHolidaySelection('Existing holiday renamed', [[pe, rotationWeekend], [phm, rotationWeekend]], oldBatch), ineligible);
+equal((await saveEntitled('Working override', [[pe, workingOverride]], 1, [pe]))
+  .holidays.find(({ date }) => date === workingOverride).profileIds, [pe]);
+console.log(`${checks - beforeHolidayEligibility} Public Holiday eligibility PostgreSQL checks passed.`);
+await db.close();

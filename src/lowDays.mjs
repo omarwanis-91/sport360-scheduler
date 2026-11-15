@@ -1,4 +1,4 @@
-import { addDays, datesBetween, holidayAppliesToProfile, publicHolidayForProfile, scheduleFor } from "./scheduleLogic.mjs";
+import { addDays, datesBetween, holidayAppliesToProfile, holidaySelectionBlocked, publicHolidayForProfile, scheduleFor } from "./scheduleLogic.mjs";
 
 const cairoCalendar = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit"
@@ -141,7 +141,12 @@ export function saveDemoHolidaySelection(state, { batchId, name, cells, days, pr
     return { holidays: existing, batchId, entitlements, credits };
   }
   const selectedByDate = new Map();
+  const savedCells = new Set(state.publicHolidays.filter((holiday) => batchId && holiday.batchId === batchId)
+    .flatMap((holiday) => holiday.profileIds.map((id) => `${holiday.date}/${id}`)));
   for (const { profileId, date } of cells) {
+    if (!savedCells.has(`${date}/${profileId}`) && holidaySelectionBlocked(state, profileId, date)) {
+      throw new Error("A selected shift is Weekend, Annual, or Sick. Review the updated schedule.");
+    }
     if (existing.some((holiday) => holiday.date === date && holiday.dayOff && holidayAppliesToProfile(state, holiday, profileId))) {
       throw new Error("A selected shift already has a public holiday. Review the existing holiday first.");
     }
