@@ -183,13 +183,15 @@ function departmentScopeIds(state, departmentId) {
   return scope;
 }
 
-export function departmentLeadForDate(state, departmentId, dateIso) {
+export function departmentLeadForDate(state, departmentId, dateIso, { useDailyOverride = true } = {}) {
   const departmentScope = departmentScopeIds(state, departmentId);
   const validProfile = (profileId) => {
     const profile = byId(state.profiles, profileId);
     return profileDepartmentIds(profile).some((id) => departmentScope.has(id)) ? profile : null;
   };
-  const override = state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === dateIso);
+  const override = useDailyOverride
+    ? state.departmentLeads.find((item) => item.departmentId === departmentId && item.date === dateIso)
+    : null;
   const overrideProfile = validProfile(override?.profileId);
   if (override && overrideProfile) return { profile: overrideProfile, source: "Daily override", override };
 

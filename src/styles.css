@@ -8969,6 +8969,9 @@ body:has(.profile-editor-modal) { overflow:hidden; }
   --status-rgb: 126 220 152;
   --status-accent: #7edc98;
 }
+.schedule-grid .shift-cell:is(.vacation,.sick,.public_holiday) {
+  opacity: 0.95;
+}
 .schedule-grid .shift-cell:is(.vacation,.sick,.public_holiday) :is(.shift-icon,.shift-label,small,.cell-alert) {
   opacity:0.84;
   filter:none;
@@ -8976,7 +8979,7 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 .month-day:is(.vacation,.approved-vacation,.sick,.public_holiday),
 .my-shifts .request-row:is(.vacation,.sick,.public_holiday),
 .leave-impact-shift:is(.vacation,.sick,.public_holiday) {
-  opacity:1;
+  opacity:0.95;
   filter:none;
   border-color:rgb(var(--status-rgb,126 220 152) / .42);
   box-shadow:inset 2px 0 var(--status-accent,#7edc98),inset 5px 0 12px -7px var(--status-accent,#7edc98);

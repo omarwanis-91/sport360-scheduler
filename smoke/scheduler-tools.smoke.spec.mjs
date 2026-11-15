@@ -120,6 +120,44 @@ test("a daily exception offers a skippable lead picker, and approval can save a 
   await expect(shift(page, "emp-003", annualDate)).toHaveClass(/is-day-lead/);
 });
 
+test("a December replacement is date-specific and November can return to the weekly lead", async ({ page }) => {
+  const novemberDate = "2026-11-18";
+  const decemberDate = "2026-12-09";
+  await page.evaluate(({ key, novemberDate, decemberDate }) => {
+    const state = JSON.parse(localStorage.getItem(key));
+    state.departmentLeads.push({ id: "november-lead", departmentId: "ops", date: novemberDate, profileId: "emp-001" });
+    const request = state.vacationRequests.find(({ id }) => id === "other-annual");
+    request.startDate = decemberDate;
+    request.endDate = decemberDate;
+    localStorage.setItem(key, JSON.stringify(state));
+  }, { key: stateKey, novemberDate, decemberDate });
+  await page.reload();
+  await button(page, "Requests").click();
+  await page.locator('[data-request-id="other-annual"]').click();
+  await button(page, "Approve & Deduct").click();
+  const prompt = page.getByRole("dialog", { name: "Lead Assignment" });
+  await expect(prompt).toContainText(decemberDate);
+  await page.getByRole("combobox", { name: "Replacement lead" }).selectOption("emp-001");
+  await button(page, "Save Lead").click();
+
+  await button(page, "Scheduler").click();
+  await page.getByLabel("Schedule start date", { exact: true }).fill(novemberDate);
+  await expect(shift(page, "emp-001", novemberDate)).toHaveClass(/is-day-lead/);
+  await button(page, "Edit daily leads").click();
+  await page.locator(`.date-head[data-date="${novemberDate}"]`).click();
+  await expect(prompt).toContainText("Saved daily override · Omar Wanis");
+  const override = page.getByRole("combobox", { name: "Daily lead override" });
+  await expect(override).toHaveValue("emp-001");
+  await expect(override.locator('option[value=""]')).toHaveText("Use weekly rotation (Mona Saleh)");
+  await override.selectOption("");
+  await button(page, "Stage Lead").click();
+  await page.locator("#save-scheduler-edit").click();
+  await expect(shift(page, "emp-002", novemberDate)).toHaveClass(/is-day-lead/);
+  await page.getByLabel("Schedule start date", { exact: true }).fill(decemberDate);
+  await expect(shift(page, "emp-001", decemberDate)).toHaveClass(/is-day-lead/);
+  await expect(shift(page, "emp-002", decemberDate)).toHaveClass(/vacation/);
+});
+
 test("success notices stack and each expires ten seconds after it appears", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-11-11T12:00:00Z") });
   await shift(page, "emp-001").click();

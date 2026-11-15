@@ -148,7 +148,7 @@ Employee profiles also carry `seniority_level`, now simplified to `manager`, `le
 
 Weekly lead assignment is edited directly inside the rotation grid through a red star on each eligible person's weekday shift. Once assigned, Lead replaces the underlying Morning, Mid-day, or Night label in Scheduler, Rotations, profile calendars, upcoming-shift lists, and request-impact previews. The underlying rotation remains authoritative for calculations, coverage, leave deductions, and history; Lead is a primary presentation of the existing effective-dated lead assignment rather than a fifth stored rotation-template status.
 
-Parent-department lead assignments use the full descendant department scope. A daily override or weekly lead rotation stored on a parent can therefore resolve to a profile assigned to one of its sub-departments. In Edit daily leads, date headers open a picker to stage a replacement or restore weekly rotation before a separate Save. A change that makes a scheduled lead unavailable opens a skippable replacement picker right after saving the shift or request.
+Parent-department lead assignments use the full descendant department scope. A daily override or weekly lead rotation stored on a parent can therefore resolve to a profile assigned to one of its sub-departments. In Edit daily leads, date headers open a picker that names the saved daily override and the weekly lead that would be restored. Changes are staged until Save. A change that makes a scheduled lead unavailable opens a skippable replacement picker right after saving the shift or request.
 
 ## Authorization Model
 

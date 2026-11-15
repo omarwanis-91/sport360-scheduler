@@ -157,9 +157,10 @@ test("a saved holiday can be overridden for one shift and removed directly from 
   await page.reload();
   const holidayShift = shift(page, "2026-11-12");
   await expect(holidayShift).toHaveClass(/public_holiday/);
+  await expect(holidayShift).toHaveCSS("opacity", "0.95");
   await expect(holidayShift.locator(".shift-label")).toHaveCSS("opacity", "0.84");
   await navigate(page, "My Profile");
-  await expect(page.locator('.month-day.public_holiday[data-date="2026-11-12"]')).toHaveCSS("opacity", "1");
+  await expect(page.locator('.month-day.public_holiday[data-date="2026-11-12"]')).toHaveCSS("opacity", "0.95");
   await navigate(page, "Scheduler");
   await holidayShift.click();
   await page.locator(".status-choice.night > span").click();
