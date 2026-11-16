@@ -8585,11 +8585,16 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 .scheduler-toolbar .month-corner { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .scheduler-toolbar .month-corner select { width:auto; max-width:100%; min-width:0; flex:1 1 auto; }
 .scheduler-date-actions { margin-inline-start:auto; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-.scheduler-toolbar :is(#cancel-scheduler-edit,#save-scheduler-edit,#month-start-range) {
+.scheduler-toolbar :is(#cancel-scheduler-edit,#save-scheduler-edit,#month-start-range,#toggle-day-off-type) {
   display:inline-flex; align-items:center; justify-content:center; gap:5px;
 }
-.scheduler-toolbar :is(#cancel-scheduler-edit,#save-scheduler-edit,#month-start-range) svg,
+.scheduler-toolbar :is(#cancel-scheduler-edit,#save-scheduler-edit,#month-start-range,#toggle-day-off-type) svg,
 .day-lead-edit-label svg { width:14px; height:14px; flex:none; }
+#toggle-day-off-type[aria-pressed="true"] {
+  color: #ffd0dc;
+  border-color: #a64a60;
+  background: #361d27;
+}
 .date-head .day-lead-edit-label,.schedule-grid.range-month .date-head .day-lead-edit-label {
   display:flex; gap:4px; align-items:center; color:#f1a5b7; font-style:normal; font-size:10px;
 }
@@ -8941,6 +8946,10 @@ body:has(.profile-editor-modal) { overflow:hidden; }
   opacity: 0.46;
   filter: brightness(0.7) saturate(0.72) blur(0.18px);
   transition: opacity 0.22s ease, filter 0.22s ease;
+}
+
+.scheduler-shell.hide-day-off-types .shift-cell.state-off:not(.empty) > * {
+  display: none;
 }
 
 .shift-cell:is(.state-off, .weekend, .vacation, .sick)::before,

@@ -47,6 +47,7 @@ const icons = {
   moon: '<svg viewBox="0 0 24 24"><path d="M21 13.2A8.5 8.5 0 1 1 10.8 3a6.5 6.5 0 0 0 10.2 10.2Z"/></svg>',
   midday: '<svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M4.5 12h3M16.5 12h3"/><circle cx="12" cy="12" r="4"/><path d="M5 19 19 5"/></svg>',
   weekend: '<svg viewBox="0 0 24 24"><path d="M7 8h10v10H7z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9 7 9 7a14 14 0 0 1-2.6 3.6M6.2 6.2C4.2 8 3 12 3 12s3.5 7 9 7a9 9 0 0 0 4-.9"/></svg>',
   vacation: '<svg viewBox="0 0 24 24"><path d="M3 20h18M5 20c3-6 9-9 14-10"/><path d="M7 12c2-5 5-8 8-9 1 3 0 7-3 10"/></svg>',
   sick: '<svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z"/></svg>',
   ground: '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.4 7-11a7 7 0 1 0-14 0c0 6.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2"/></svg>',
@@ -120,6 +121,7 @@ const ui = {
   rotationDraftsOwner: null,
   schedulerEditMode: false,
   schedulerSort: "name-asc",
+  hideDayOffTypes: false,
   lowDayPerson: "",
   holidaySelection: null,
   schedulerLeadDrafts: [],
@@ -1797,6 +1799,7 @@ function renderScheduler() {
             <output aria-label="Schedule zoom level" title="${ui.rangeDays}-day range">${ui.rangeDays === 7 ? "200" : ui.rangeDays === 14 ? "100" : "50"}%</output>
             <button class="ghost icon-button" id="zoom-in-range" aria-label="Zoom in" title="Zoom in" ${ui.rangeDays === 7 ? "disabled" : ""}>${icons.plus}</button>
           </div>
+          <button type="button" class="ghost" id="toggle-day-off-type" aria-pressed="${ui.hideDayOffTypes}">${icons.eyeOff} Toggle Day Off Type</button>
           ${!ui.holidaySelection && canManageDepartment(ui.selectedDepartmentId) ? ui.schedulerEditMode ? `
             <button class="primary" id="save-scheduler-edit" ${ui.schedulerLeadDrafts.length ? "" : "disabled"}>${icons.lead} Save</button>
             <button class="ghost" id="cancel-scheduler-edit">${icons.close} Cancel</button>
@@ -1808,7 +1811,7 @@ function renderScheduler() {
           </div>
         </div>
     </section>
-    <section class="scheduler-shell ${ui.holidaySelection ? "is-selecting-holiday" : ""}">
+    <section class="scheduler-shell ${ui.holidaySelection ? "is-selecting-holiday" : ""} ${ui.hideDayOffTypes ? "hide-day-off-types" : ""}">
       <div class="schedule-grid ${schedulerRangeClass()} ${ui.schedulerEditMode ? "is-editing" : ""}" style="--days: ${dates.length}">
         ${renderSchedulerWeekBands(dates)}
         <div class="employee-head">
@@ -1941,11 +1944,12 @@ function renderShiftCell(profile, date) {
   const drawerType = canManageProfileDepartment(profile) && editableDate(date) && !isRolePreviewActive()
     ? "shift"
     : "calendar-day";
+  const description = `${escapeHtml(profile.name)}, ${formatDate(date)}, ${escapeHtml(label)}`;
   const action = ui.holidaySelection
-    ? `data-holiday-cell aria-pressed="${ui.holidaySelection.cells.has(`${date}/${profile.id}`)}" aria-label="${escapeHtml(profile.name)}, ${formatDate(date)}, toggle public holiday"`
-    : `data-open-drawer="${drawerType}"`;
+    ? `data-holiday-cell aria-pressed="${ui.holidaySelection.cells.has(`${date}/${profile.id}`)}" aria-label="${description}, toggle public holiday"`
+    : `data-open-drawer="${drawerType}"${availabilityState === "state-off" ? ` aria-label="${description}"` : ""}`;
   return `
-    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" ${action} data-profile-id="${profile.id}" data-date="${date}" title="${escapeHtml(profile.name)}, ${formatDate(date)}, ${escapeHtml(label)}">
+    <button class="shift-cell ${availabilityState} source-${sourceClass} ${pendingVacation ? "has-pending-vacation" : ""} ${isDayLead ? "is-day-lead" : ""} ${canAssignLead ? "can-assign-lead" : ""} ${isWeekStart(date) ? "week-start" : ""} ${visualId}" ${action} data-profile-id="${profile.id}" data-date="${date}" title="${description}">
       <span class="shift-icon">${icon}</span>
       <span class="shift-label">${escapeHtml(label)}</span>
       <small>${source}</small>
@@ -4932,6 +4936,11 @@ function bindEvents() {
   document.querySelector("#scheduler-sort")?.addEventListener("change", (event) => {
     ui.schedulerSort = event.target.value;
     renderWithScheduleScroll("#scheduler-sort");
+  });
+  document.querySelector("#toggle-day-off-type")?.addEventListener("click", (event) => {
+    ui.hideDayOffTypes = !ui.hideDayOffTypes;
+    event.currentTarget.setAttribute("aria-pressed", String(ui.hideDayOffTypes));
+    document.querySelector(".scheduler-shell").classList.toggle("hide-day-off-types", ui.hideDayOffTypes);
   });
 
   document.querySelector("#department-select")?.addEventListener("change", (event) => {
