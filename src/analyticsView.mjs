@@ -1,7 +1,7 @@
-import { shiftSeries } from './analyticsLogic.mjs';
+import { analyticsPeople, shiftMixSeries, shiftSeries } from './analyticsLogic.mjs';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>v==null?'—':Number.isInteger(v)?v.toLocaleString('en-GB'):v.toFixed(1);
-const dateLabel=d=>new Date(`${d}T12:00:00`).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+const dateLabel=(d,withYear)=>new Date(`${d}T12:00:00`).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:withYear?'2-digit':undefined});
 const head=(title,sub,extra='')=>`<header class="analytics-panel-head"><div><h2>${title}</h2><p>${sub}</p></div>${extra}</header>`;
 const empty=text=>`<div class="analytics-empty">${text}</div>`;
 const flareStrength = (ratio) => Math.max(0, (Math.min(1, ratio) - 0.5) * 2) ** 2;
@@ -44,7 +44,7 @@ function staffing(model) {
       <g class="analytics-leave-halo">${glow(d=>d.vacation+d.sick)}</g>
       ${work.map(p=>`<path class="analytics-work-line" d="${p.line}"/>`).join('')}
       ${leave.map(p=>`<path class="analytics-leave-line" d="${p.line}"/>`).join('')}
-      ${indexes.map(i=>`<text x="${x(i)}" y="${h-8}" text-anchor="${i===0?'start':i===model.daily.length-1?'end':'middle'}">${dateLabel(model.daily[i].date)}</text>`).join('')}
+      ${indexes.map(i=>`<text x="${x(i)}" y="${h-8}" text-anchor="${i===0?'start':i===model.daily.length-1?'end':'middle'}">${dateLabel(model.daily[i].date,model.range.start.slice(0,4)!==model.range.end.slice(0,4))}</text>`).join('')}
       ${model.daily.map((d,i)=>d.known?`<circle cx="${x(i)}" cy="${y(d.working)}" r="3.4" class="analytics-work-dot" data-analytics-point="${i}" tabindex="${i===firstKnown?0:-1}" role="button" aria-label="${esc(d.date)}: ${d.working} working, ${d.vacation} Annual, ${d.sick} Sick, ${d.empty} unassigned" aria-describedby="analytics-point-tooltip"/><circle cx="${x(i)}" cy="${y(d.vacation+d.sick)}" r="2.6" class="analytics-leave-dot"/>`:'').join('')}
       <line id="analytics-probe-line" class="analytics-probe-line" x1="${left}" x2="${left}" y1="${top}" y2="${h-bottom}" hidden/>
       <circle id="analytics-active-point" r="6" class="analytics-active-point" hidden/>
@@ -55,18 +55,19 @@ function staffing(model) {
 
 function mix(model) {
   const total=model.totals.working,r=73,c=2*Math.PI*r;
-  const max=Math.max(1,...shiftSeries.map(s=>model.totals[s.id]));
+  const series=model.shiftMix.other?[...shiftMixSeries,{id:'other',label:'Other work',color:'#a3a2ad'}]:shiftMixSeries;
+  const max=Math.max(1,...series.map(s=>model.shiftMix[s.id]));
   let offset=0;
-  const arcs=shiftSeries.map(s=>{const fraction=total?model.totals[s.id]/total:0;
-    const strength=flareStrength(model.totals[s.id]/max);
+  const arcs=series.map(s=>{const fraction=total?model.shiftMix[s.id]/total:0;
+    const strength=flareStrength(model.shiftMix[s.id]/max);
     const flareLength=Math.min(fraction*c, 7+9*strength);
     const flareOffset=-(offset+fraction/2)*(2*Math.PI*(r+8))+flareLength/2;
     const geometry=`cx="100" cy="100" r="${r}" fill="none" stroke-dasharray="${fraction*c} ${c}" stroke-dashoffset="${-offset*c}" transform="rotate(-90 100 100)"`;
     const node=fraction?`<circle ${geometry} stroke="url(#analytics-mix-${s.id})" stroke-width="22" class="analytics-mix-segment"/>
       ${strength ? `<circle cx="100" cy="100" r="${r+8}" fill="none" stroke-dasharray="${flareLength} ${2*Math.PI*(r+8)}" stroke-dashoffset="${flareOffset}" transform="rotate(-90 100 100)" stroke="${s.color}" stroke-width="8" opacity="${(.65*strength).toFixed(3)}" filter="url(#analytics-mix-halo)" data-mix-glow="${s.id}"/>` : ''}`:'';offset+=fraction;return node;}).join('');
-  return `<section class="analytics-panel analytics-mix">${head('Shift mix','Working person-days · Lead counted once')}
-    <div class="analytics-mix-content"><div class="analytics-donut"><svg viewBox="0 0 200 200" role="img" aria-label="Shift distribution; exact counts and percentages beside the chart"><defs><filter id="analytics-mix-halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4"/></filter>${shiftSeries.map(s=>`<linearGradient id="analytics-mix-${s.id}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${s.color}"/><stop offset=".45" stop-color="${s.color}"/><stop offset="1" stop-color="${s.color}" stop-opacity=".55"/></linearGradient>`).join('')}</defs><circle cx="100" cy="100" r="73" class="analytics-ring" fill="none" stroke-width="22"/>${arcs}</svg><div><strong>${num(total)}</strong><span>work days</span></div></div>
-    <ul class="analytics-legend">${shiftSeries.map(s=>`<li style="--series:${s.color};--glow:${flareAlpha(model.totals[s.id]/max)}"><span><i class="analytics-dot"></i>${s.label}</span><strong>${num(model.totals[s.id])}</strong><small>${total?Math.round(model.totals[s.id]/total*100):0}%</small><div class="analytics-mix-track"><i style="width:${total?model.totals[s.id]/total*100:0}%"></i></div></li>`).join('')}</ul></div>
+  return `<section class="analytics-panel analytics-mix">${head('Shift mix','Working person-days by scheduled shift')}
+    <div class="analytics-mix-content"><div class="analytics-donut"><svg viewBox="0 0 200 200" role="img" aria-label="Shift distribution; exact counts and percentages beside the chart"><defs><filter id="analytics-mix-halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4"/></filter>${series.map(s=>`<linearGradient id="analytics-mix-${s.id}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${s.color}"/><stop offset=".45" stop-color="${s.color}"/><stop offset="1" stop-color="${s.color}" stop-opacity=".55"/></linearGradient>`).join('')}</defs><circle cx="100" cy="100" r="73" class="analytics-ring" fill="none" stroke-width="22"/>${arcs}</svg><div><strong>${num(total)}</strong><span>work days</span></div></div>
+    <ul class="analytics-legend">${series.map(s=>`<li style="--series:${s.color};--glow:${flareAlpha(model.shiftMix[s.id]/max)}"><span><i class="analytics-dot"></i>${s.label}</span><strong>${num(model.shiftMix[s.id])}</strong><small>${total?Math.round(model.shiftMix[s.id]/total*100):0}%</small><div class="analytics-mix-track"><i style="width:${total?model.shiftMix[s.id]/total*100:0}%"></i></div></li>`).join('')}</ul></div>
     ${!total?'<p class="analytics-footnote">No working shifts saved in this period.</p>':''}</section>`;
 }
 
@@ -79,35 +80,53 @@ function weekdays(model) {
 
 function monthly(model) {
   const max=Math.max(1,...model.months.map(m=>m.vacation+m.sick));
-  return `<section class="analytics-panel analytics-monthly">${head(`Leave by month · ${model.range.year}`,'Full calendar year · dated Annual and Sick person-days',`<div class="analytics-inline-legend"><span><i class="analytics-dot leave"></i>Annual</span><span><i class="analytics-dot sick"></i>Sick</span></div>`)}
-    <div class="analytics-month-bars">${model.months.map(m=>`<button type="button" data-analytics-month="${m.month}" class="analytics-month ${m.month>=model.range.start.slice(0,7)&&m.month<=model.range.end.slice(0,7)?'selected':''}" aria-label="${m.label} ${model.range.year}: ${m.known?`${m.vacation} Annual, ${m.sick} Sick days`:'no saved schedule'}. Show month."><span class="analytics-month-value">${m.known?m.vacation+m.sick:'—'}</span><span class="analytics-month-column"><i class="sick" style="height:${m.sick/max*100}%;--glow:${flareAlpha(m.sick/max)}"></i><i class="leave" style="height:${m.vacation/max*100}%;--glow:${flareAlpha(m.vacation/max)}"></i></span><span>${m.label}</span></button>`).join('')}</div>
+  const crossYear=model.range.start.slice(0,4)!==model.range.end.slice(0,4);
+  return `<section class="analytics-panel analytics-monthly">${head(model.custom?'Leave by month':`Leave by month · ${model.range.year}`,`${model.custom?'Selected dates':'Full calendar year'} · Annual and Sick person-days`,`<div class="analytics-inline-legend"><span><i class="analytics-dot leave"></i>Annual</span><span><i class="analytics-dot sick"></i>Sick</span></div>`)}
+    <div class="analytics-month-bars${model.custom?' custom':''}" style="--month-count:${model.months.length}">${model.months.map(m=>`<button type="button" data-analytics-month="${m.month}" class="analytics-month ${m.month>=model.range.start.slice(0,7)&&m.month<=model.range.end.slice(0,7)?'selected':''}" aria-label="${m.label} ${m.month.slice(0,4)}: ${m.known?`${m.vacation} Annual, ${m.sick} Sick days`:'no saved schedule'}. Show full month."><span class="analytics-month-value">${m.known?m.vacation+m.sick:'—'}</span><span class="analytics-month-column"><i class="sick" style="height:${m.sick/max*100}%;--glow:${flareAlpha(m.sick/max)}"></i><i class="leave" style="height:${m.vacation/max*100}%;--glow:${flareAlpha(m.vacation/max)}"></i></span><span>${m.label}${crossYear?` ’${m.month.slice(2,4)}`:''}</span></button>`).join('')}</div>
     <output id="analytics-month-output" class="analytics-month-output"></output>
     <p class="analytics-footnote">Select a month to inspect it. Manual Annual balance deductions have no dates and are excluded.</p></section>`;
 }
 
-function people(model,sort) {
-  const columns=[['name','Person'],['working','Work'],...shiftSeries.map(s=>[s.id,s.label]),['vacation','Annual'],['sick','Sick'],['empty','Unknown']];
-  const rows=[...model.people].sort((a,b)=>{const n=sort.key==='name'?a.name.localeCompare(b.name):a[sort.key]-b[sort.key];return (sort.direction==='asc'?n:-n)||a.name.localeCompare(b.name)||a.id.localeCompare(b.id);});
-  return `<section class="analytics-panel analytics-people">${head('People breakdown','Person-days in the selected period',`<span class="analytics-count">${model.people.length} people</span>`)}
-    <div class="analytics-table-scroll"><table><caption class="sr-only">Scheduled shifts by person. Sort using column headers.</caption><thead><tr>${columns.map(([key,label])=>`<th scope="col" aria-sort="${sort.key===key?(sort.direction==='asc'?'ascending':'descending'):'none'}"><button type="button" data-analytics-sort="${key}">${label}${sort.key===key?sort.direction==='asc'?' ↑':' ↓':''}</button></th>`).join('')}</tr></thead><tbody>
-    ${rows.map(p=>`<tr><th scope="row"><strong>${esc(p.name)}</strong><small>${esc(p.departmentIds.map(id=>model.departments.find(d=>d.id===id)?.name).filter(Boolean).join(' · ')||'Unassigned')}</small></th>${columns.slice(1).map(([key])=>`<td>${p[key]||'–'}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="10">No people in this scope.</td></tr>'}</tbody></table></div></section>`;
+function people(model,{sort,hierarchy,levels}) {
+  const metrics=[['working','Work'],...shiftSeries.map(s=>[s.id,s.label]),['vacation','Annual'],['sick','Sick'],['empty','Unknown']];
+  const columns=[['name','Person'],['seniorityLevel','Position'],...metrics];
+  const rows=analyticsPeople(model.people,hierarchy,sort,levels);
+  const positions=new Map(levels);
+  const extrema=new Map(metrics.map(([key])=>{
+    const counts=rows.map(person=>person[key]).filter(count=>count>0);
+    return [key,{low:Math.min(...counts),high:Math.max(...counts)}];
+  }));
+  const valueCell=(key,value)=>{
+    const {low,high}=extrema.get(key);
+    const extreme=low<high&&(value===high?'highest':value===low?'lowest':'');
+    return extreme
+      ? `<td><span class="analytics-extreme ${extreme}" title="${extreme==='highest'?'Highest':'Lowest'} count in this column">${num(value)}<span class="sr-only"> (${extreme})</span></span></td>`
+      : `<td>${value?num(value):'–'}</td>`;
+  };
+  const controls=`<div class="analytics-people-controls"><label>Hierarchy<select id="analytics-hierarchy">
+    <option value="all">All positions</option>${levels.map(([id,label])=>`<option value="${id}" ${hierarchy===id?'selected':''}>${label}</option>`).join('')}
+    </select></label><span class="analytics-count" role="status">${rows.length} ${rows.length===1?'person':'people'}</span></div>`;
+  return `<section class="analytics-panel analytics-people">${head('People breakdown','Click a column header to sort.',controls)}
+    <div class="analytics-table-scroll"><table><caption class="sr-only">Person-days in the selected period by person and position.</caption><thead><tr>${columns.map(([key,label])=>`<th scope="col" aria-sort="${sort.key===key?(sort.direction==='asc'?'ascending':'descending'):'none'}"><button type="button" data-analytics-sort="${key}">${label}${sort.key===key?sort.direction==='asc'?' ↑':' ↓':''}</button></th>`).join('')}</tr></thead><tbody>
+    ${rows.map(p=>`<tr><th scope="row"><strong>${esc(p.name)}</strong><small>${esc(p.departmentIds.map(id=>model.departments.find(d=>d.id===id)?.name).filter(Boolean).join(' · ')||'Unassigned')}</small></th>
+      <td class="analytics-person-position">${positions.get(p.seniorityLevel)}</td>${metrics.map(([key])=>valueCell(key,p[key])).join('')}</tr>`).join('')||`<tr><td class="analytics-people-empty" colspan="${columns.length}">No people match this scope and hierarchy filter.</td></tr>`}</tbody></table></div>
+    <p class="analytics-footnote analytics-extreme-legend"><span class="analytics-extreme highest">Highest</span><span class="analytics-extreme lowest">Lowest</span> nonzero counts in each column</p></section>`;
 }
 
-export function renderAnalyticsDashboard(model,sort,entering=false) {
+export function renderAnalyticsDashboard(model,{entering=false,...peopleOptions}) {
   const kpis=[['Scheduled work',num(model.totals.working),'person-days · includes Lead and On Ground'],['Average staffing',num(model.average),`people / day · ${model.knownDays} known dates`],['Annual + Sick',num(model.totals.vacation+model.totals.sick),`${model.totals.vacation} Annual · ${model.totals.sick} Sick person-days`],['Pending requests',num(model.pending),'requests overlapping this period']];
   const intensity=[model.known?model.totals.working/model.known:0,model.people.length?(model.average||0)/model.people.length:0,model.known?(model.totals.vacation+model.totals.sick)/model.known:0,model.people.length?Math.min(1,model.pending/model.people.length):0];
   return `<div class="analytics-dashboard${entering?' is-arriving':''}"><section class="analytics-kpis" aria-label="Period overview">${kpis.map(([label,value,detail],i)=>`<article class="analytics-kpi" style="--metric-glow:${flareAlpha(intensity[i], .16)}"><span>${label}</span><strong>${value}</strong><small>${detail}</small><div class="analytics-kpi-mark" aria-hidden="true">${['↗','◷','◈','◇'][i]}</div></article>`).join('')}</section>
-    <div class="analytics-grid">${staffing(model)}${mix(model)}${weekdays(model)}${monthly(model)}${people(model,sort)}
-    <section class="analytics-panel analytics-quality">${head('Schedule completeness','What these numbers cover')}
-      <div class="analytics-completeness"><strong>${model.coverage}%</strong><span>of person-days have saved shifts</span></div><div class="analytics-track" style="--glow:${flareAlpha(model.coverage/100)}"><span style="width:${model.coverage}%"></span></div>
-      <dl><div><dt>Known person-days</dt><dd>${num(model.known)}</dd></div><div><dt>Unassigned person-days</dt><dd>${num(model.totals.empty)}</dd></div><div><dt>People with working shifts</dt><dd>${model.workingPeople} / ${model.people.length}</dd></div></dl>
-      <p class="analytics-footnote">Planned shifts, not attendance or hours. People shared by teams count once. Scope uses current department membership.</p>
-      <p class="analytics-footnote">Annual and Sick count dated saved leave. Pending requests do not reduce staffing until approved.</p></section></div></div>`;
+    <div class="analytics-grid">${staffing(model)}${mix(model)}${weekdays(model)}${monthly(model)}${people(model,peopleOptions)}
+    <section class="analytics-panel analytics-quality">${head('Recorded schedule','How much of the selected period has a saved status')}
+      <div class="analytics-completeness"><strong>${model.slots?`${model.coverage}%`:'—'}</strong><span>${model.slots?`${num(model.known)} of ${num(model.slots)} person-days recorded`:'No people in this scope'}</span></div><div class="analytics-track" style="--glow:${flareAlpha(model.coverage/100)}"><span style="width:${model.coverage}%"></span></div>
+      <dl><div><dt>Person-days missing a status</dt><dd>${num(model.totals.empty)}</dd></div><div><dt>People with work scheduled</dt><dd>${model.workingPeople} / ${model.people.length}</dd></div></dl>
+      <p class="analytics-footnote">One person-day is one person on one date. Scheduled work, days off, and leave all count toward this percentage.</p></section></div></div>`;
 }
 
 export function bindAnalyticsProbe(model) {
   const monthOutput=document.querySelector('#analytics-month-output');
-  const showMonth=month=>{if(monthOutput)monthOutput.textContent=`${month.label} ${model.range.year} · ${month.known?`${month.vacation} Annual · ${month.sick} Sick person-days`:'No saved schedule'}`;};
+  const showMonth=month=>{if(monthOutput)monthOutput.textContent=`${month.label} ${month.month.slice(0,4)} · ${month.known?`${month.vacation} Annual · ${month.sick} Sick person-days`:'No saved schedule'}`;};
   document.querySelectorAll('[data-analytics-month]').forEach(button=>{
     const update=()=>showMonth(model.months.find(m=>m.month===button.dataset.analyticsMonth));
     button.addEventListener('pointerenter',update);button.addEventListener('focus',update);

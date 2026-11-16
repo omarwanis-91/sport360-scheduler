@@ -7,7 +7,12 @@ const fixture=()=>{
     {id:'sick',profileId:'emp-001',date:'2026-11-12',statusId:'sick'},
     {id:'ground',profileId:'emp-002',date:'2026-11-05',statusId:'ground'}];
   s.departmentLeads=[];s.departmentLeadRotations=[{id:'lead',departmentId:'ops',effectiveStart:'2026-11-01',pattern:['emp-002','emp-002','emp-002','emp-002','emp-002','','']}];
-  s.vacationRequests=[{id:'pending',profileId:'emp-003',startDate:'2026-11-16',endDate:'2026-11-18',status:'pending',reason:'Test'}];
+  s.vacationRequests=[
+    {id:'pending',profileId:'emp-003',startDate:'2026-11-16',endDate:'2026-11-18',status:'pending',reason:'Test'},
+    {id:'year-end',profileId:'emp-003',startDate:'2026-12-31',endDate:'2027-01-02',status:'pending',reason:'Test'}
+  ];
+  s.profiles[0].seniorityLevel='manager';
+  s.profiles[1].seniorityLevel='lead';
   return s;
 };
 test.beforeEach(async({page})=>{
@@ -24,7 +29,9 @@ test('Admin sees accurate saved counts, unknown data, interactive charts, sortab
   await expect(page.locator('.analytics-kpi').nth(2)).toContainText('1 Annual · 1 Sick');
   await expect(page.locator('.analytics-kpi').nth(3)).toContainText('1');
   await expect(page.locator('.analytics-quality')).toContainText('80%');
-  await expect(page.locator('.analytics-legend')).toContainText('Lead');
+  const shiftMix=page.locator('.analytics-legend');
+  await expect(shiftMix).not.toContainText('Lead');
+  expect(await shiftMix.locator('strong').allTextContents().then(counts=>counts.reduce((total,count)=>total+Number(count),0))).toBe(82);
   await expect(page.getByRole('slider',{name:'Inspect date'})).toHaveCount(0);
   const point=page.locator('[data-analytics-point="1"]');await point.hover();
   const popup=page.getByRole('tooltip');await expect(popup).toBeVisible();await expect(popup).toContainText('2 Nov 2026');
@@ -48,6 +55,52 @@ test('team, month, quarter and year controls recalculate; monthly chart navigate
   await page.locator('#analytics-month').selectOption('01');await page.locator('#analytics-year').selectOption('2027');
   await expect(page.locator('.analytics-dashboard')).toBeVisible();await expect(page.locator('.analytics-monthly h2')).toContainText('2027');
 });
+test('hierarchy filters and sorts the people table and limits the CSV rows',async({page})=>{
+  await open(page);
+  const people=page.locator('.analytics-people');
+  const rows=people.locator('tbody tr');
+  await expect(people.locator('tbody .analytics-extreme.highest').first()).toBeVisible();
+  await expect(people.locator('tbody .analytics-extreme.lowest').first()).toBeVisible();
+  const position=people.locator('[data-analytics-sort="seniorityLevel"]');
+  await position.click();
+  await expect(rows.first()).toContainText('Manager');
+  await position.click();
+  await expect(rows.last()).toContainText('Manager');
+  await page.getByLabel('Hierarchy').selectOption('lead');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Mona Saleh');
+  await expect(people.locator('tbody .analytics-extreme')).toHaveCount(0);
+  const pending=page.waitForEvent('download');
+  await page.getByRole('button',{name:'CSV',exact:true}).click();
+  const downloaded=await pending;
+  const stream=await downloaded.createReadStream();
+  const chunks=[];
+  for await(const chunk of stream)chunks.push(chunk);
+  const csv=Buffer.concat(chunks).toString('utf8');
+  expect(csv).toContain('Mona Saleh');
+  expect(csv).not.toContain('Omar Wanis');
+});
+test('Custom dates span calendar years, constrain start and end, and survive Refresh',async({page})=>{
+  await page.setViewportSize({width:375,height:980});
+  await open(page);
+  await page.getByRole('combobox',{name:'Period',exact:true}).selectOption('custom');
+  const from=page.getByLabel('From',{exact:true}),through=page.getByLabel('Through',{exact:true});
+  await from.fill('2026-12-31');
+  await expect(through).toHaveValue('2026-12-31');
+  await expect(through).toHaveAttribute('min','2026-12-31');
+  await through.fill('2027-01-03');
+  await page.getByRole('button',{name:'Apply range'}).click();
+  await expect(page.locator('.analytics-data tbody tr')).toHaveCount(4);
+  await expect(page.locator('.analytics-quality')).toContainText('16 of 20 person-days recorded');
+  await expect(page.locator('.analytics-kpi').nth(3).locator('strong')).toHaveText('1');
+  await expect(page.locator('[data-analytics-month]')).toHaveCount(2);
+  await expect(page.locator('[data-analytics-month="2027-01"]')).toContainText('Jan ’27');
+  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await expect(page.locator('.analytics-data tbody tr')).toHaveCount(4);
+  await expect(from).toHaveValue('2026-12-31');
+  await expect(through).toHaveValue('2027-01-03');
+});
 test('readable reports use full-width people totals, dropdown dates and tight peak highlights',async({page})=>{
   await page.setViewportSize({width:1920,height:1080});await open(page);
   await expect(page.getByRole('combobox',{name:'Month',exact:true})).toHaveValue('11');
@@ -55,7 +108,7 @@ test('readable reports use full-width people totals, dropdown dates and tight pe
   await expect(page.locator('input[type="month"]')).toHaveCount(0);
   const values=await page.evaluate(()=>{
     const grid=document.querySelector('.analytics-grid'),people=document.querySelector('.analytics-people');
-    return {body:Number.parseFloat(getComputedStyle(people.querySelector('tbody td')).fontSize),heading:Number.parseFloat(getComputedStyle(people.querySelector('h2')).fontSize),width:people.getBoundingClientRect().width/grid.getBoundingClientRect().width,
+    return {body:Number.parseFloat(getComputedStyle(people.querySelector('tbody td:nth-child(3)')).fontSize),heading:Number.parseFloat(getComputedStyle(people.querySelector('h2')).fontSize),width:people.getBoundingClientRect().width/grid.getBoundingClientRect().width,
       workGlow:Number(document.querySelector('[data-mix-glow="morning"]').getAttribute('opacity')),groundGlow:document.querySelector('[data-mix-glow="ground"]'),
       flares:[...document.querySelectorAll('.analytics-work-halo circle')].map(p=>Number(p.getAttribute('r'))),
       dailyPoints:document.querySelectorAll('.analytics-work-dot').length};
@@ -172,6 +225,7 @@ for(const width of [375,768,1024,1280,1920])test(`Analytics viewport ${width}: n
   // Measure the laid-out text size, excluding the brief entrance animation's scale.
   const axisSize=await page.locator('.analytics-line').evaluate(svg=>parseFloat(getComputedStyle(svg.querySelector('text')).fontSize)*svg.clientWidth/svg.viewBox.baseVal.width);
   expect(axisSize).toBeGreaterThanOrEqual(12.5);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({path:`test-results/analytics-${width}.png`,fullPage:true,animations:'disabled'});
 });

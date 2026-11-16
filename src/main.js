@@ -3,7 +3,7 @@ import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
 import { annualYear, annualBalanceImpact, deductDemoAnnual } from "./annualBalances.mjs";
 import { assignableDepartments, derivedProfileTitle, isDepartmentContainer, profileTeamIds } from "./profileStructure.mjs";
-import { analyticsRange, resolveAnalyticsDays, aggregateAnalytics, analyticsCsv } from "./analyticsLogic.mjs";
+import { analyticsRange, resolveAnalyticsDays, aggregateAnalytics, analyticsCsv, analyticsPeople } from "./analyticsLogic.mjs";
 import { availableReplacementDates, bookDemoLowDay, cairoDate, canConfirmWorkedDay, clearDemoWorkedDay, confirmDemoLowDay, holidayAllocation, lowDayStatus, saveDemoHoliday, saveDemoHolidaySelection, workedDayCredit } from "./lowDays.mjs";
 import { renderAnalyticsDashboard, bindAnalyticsProbe } from "./analyticsView.mjs";
 import {
@@ -138,7 +138,8 @@ const ui = {
   notice: "",
   noticeKind: "info",
   rolePreview: null,
-  analytics: { month:todayIso.slice(0,7), period:"month", departmentId:"all", key:"", status:"idle", snapshot:null, days:null, model:null, error:"", token:0, sort:{key:"name",direction:"asc"} },
+  analytics: { month:todayIso.slice(0,7), period:"month", customDates:null, departmentId:"all", hierarchy:"all",
+    key:"", status:"idle", snapshot:null, days:null, model:null, error:"", token:0, sort:{key:"name",direction:"asc"} },
   rolePreviewDraftRole: "lead",
   rolePreviewDraftDepartmentId: "",
   settingsTab: "schedule",
@@ -1402,39 +1403,67 @@ function analyticsContext() {
   if(a.departmentId!=="all"&&!departments.some(d=>d.id===a.departmentId))a.departmentId="all";
   const preview=isRolePreviewActive();
   const departmentId=preview?ui.rolePreview.departmentId:a.departmentId==="all"?null:a.departmentId;
-  const year=analyticsRange(a.month,a.period).year;
-  const params={year,departmentId,directOnly:preview};
-  const key=JSON.stringify([state.currentUserId,effectiveRole(),preview?ui.rolePreview:null,params]);
-  return {params,key,departments};
+  const range=analyticsRange(a.month,a.period,a.customDates);
+  const lastYear=Number(range.end.slice(0,4));
+  const years=Array.from({length:lastYear-range.year+1},(_,index)=>range.year+index);
+  const params={departmentId,directOnly:preview};
+  const key=JSON.stringify([state.currentUserId,effectiveRole(),preview?ui.rolePreview:null,params,years]);
+  return {params,years,range,key,departments};
 }
 
-function loadAnalytics(context) {
+async function loadAnalytics(context) {
   const a=ui.analytics,token=++a.token;
   a.key=context.key;a.status="loading";a.snapshot=null;a.days=null;a.model=null;a.error="";
-  Promise.resolve().then(()=>dataStore.getAnalytics(context.params)).then(snapshot=>{
-    if(a.token!==token||!canViewAnalytics()||analyticsContext().key!==context.key)return;
-    a.snapshot=snapshot;a.days=resolveAnalyticsDays(snapshot);a.status="ready";a.justLoaded=true;
+  const isCurrent=()=>a.token===token&&canViewAnalytics()&&analyticsContext().key===context.key;
+  try {
+    const snapshots=[];
+    for(let index=0;index<context.years.length;index+=6) {
+      const chunk=await Promise.all(context.years.slice(index,index+6)
+        .map(year=>dataStore.getAnalytics({...context.params,year})));
+      if(!isCurrent())return;
+      snapshots.push(...chunk);
+    }
+    const uniqueRows=(key)=>[...new Map(snapshots.flatMap(snapshot=>snapshot[key].map(row=>[row.id,row]))).values()];
+    a.snapshot={profiles:uniqueRows("profiles"),departments:uniqueRows("departments"),vacationRequests:uniqueRows("vacationRequests")};
+    a.days=snapshots.flatMap(resolveAnalyticsDays);a.status="ready";a.justLoaded=true;
     if(ui.activeView==="analytics")render();
-  }).catch(error=>{
-    if(a.token!==token||!canViewAnalytics()||analyticsContext().key!==context.key)return;
+  } catch(error) {
+    if(!isCurrent())return;
     a.status="error";a.error=error.message||"Analytics could not load.";
     if(ui.activeView==="analytics")render();
-  });
+  }
 }
 
 function renderAnalytics() {
   if(!canViewAnalytics()){invalidateAnalytics();return `${renderTopbar("Analytics","Admin and Lead access only.","")}<section class="empty-state">You do not have access to Analytics.</section>`;}
   const a=ui.analytics,context=analyticsContext();
-  if(a.key!==context.key)loadAnalytics(context);
-  const range=analyticsRange(a.month,a.period);
-  a.model=a.status==="ready"?aggregateAnalytics(a.snapshot,a.days,a.month,a.period):null;
+  if(a.key!==context.key)void loadAnalytics(context);
+  const {range}=context;
+  a.model=a.status==="ready"?aggregateAnalytics(a.snapshot,a.days,a.month,a.period,a.customDates):null;
+  if(a.model) {
+    const levels=new Map(state.profiles.map(profile=>[profile.id,profile.seniorityLevel]));
+    for(const person of a.model.people) person.seniorityLevel=normalizeHierarchyLevel(levels.get(person.id));
+  }
   const entering=a.justLoaded;a.justLoaded=false;
   const months=Array.from({length:12},(_,index)=>{const id=String(index+1).padStart(2,"0");return `<option value="${id}" ${a.month.slice(5)===id?"selected":""}>${new Date(2026,index,1).toLocaleDateString("en-GB",{month:"long"})}</option>`;}).join("");
   const years=Array.from({length:101},(_,index)=>2000+index).map(year=>`<option value="${year}" ${range.year===year?"selected":""}>${year}</option>`).join("");
-  const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label><label>Month<select id="analytics-month">${months}</select></label><label>Year<select id="analytics-year">${years}</select></label><label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label><button class="ghost" id="analytics-refresh" aria-label="Refresh analytics">${icons.rotations}</button><button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button></div>`;
+  const custom=a.period==="custom";
+  const dateControls=custom?`<form id="analytics-custom-range" class="analytics-custom-range">
+    <label>From<input type="date" name="startDate" min="2000-01-01" max="2100-12-31" value="${range.start}" required></label>
+    <label>Through<input type="date" name="endDate" min="${range.start}" max="2100-12-31" value="${range.end}" required></label>
+    <button class="ghost" type="submit">Apply range</button>
+  </form>`:"";
+  const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label>
+    ${custom?"":`<label>Month<select id="analytics-month">${months}</select></label><label>Year<select id="analytics-year">${years}</select></label>`}
+    <label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"],["custom","Custom"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label>
+    ${dateControls}
+    <div class="analytics-utility">
+      <button class="ghost" id="analytics-refresh" title="Reload saved Analytics data">${icons.rotations} Refresh</button>
+      <button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button>
+    </div></div>`;
   const scope=context.params.departmentId?context.departments.find(d=>d.id===context.params.departmentId)?.name:"All teams";
   return `${renderTopbar("Analytics",`${escapeHtml(scope)} · ${range.label} · Planned from saved schedules`,controls)}
-    ${a.status==="error"?`<section class="empty-state analytics-error" role="alert"><strong>Analytics could not load</strong><span>${escapeHtml(a.error)}</span><span>For a new deployment, apply migration 034 and audit 022 first.</span><button class="primary" id="analytics-retry">Retry</button></section>`:a.model?renderAnalyticsDashboard(a.model,a.sort,entering):'<section class="analytics-loading" role="status" aria-live="polite"><span>Loading schedule analytics…</span><div></div><div></div><div></div></section>'}`;
+    ${a.status==="error"?`<section class="empty-state analytics-error" role="alert"><strong>Analytics could not load</strong><span>${escapeHtml(a.error)}</span><span>For a new deployment, apply migration 034 and audit 022 first.</span><button class="primary" id="analytics-retry">Retry</button></section>`:a.model?renderAnalyticsDashboard(a.model,{sort:a.sort,hierarchy:a.hierarchy,levels:seniorityLevels,entering}):'<section class="analytics-loading" role="status" aria-live="polite"><span>Loading schedule analytics…</span><div></div><div></div><div></div></section>'}`;
 }
 
 function bindAnalyticsEvents() {
@@ -1444,12 +1473,29 @@ function bindAnalyticsEvents() {
   for(const [selector,field] of [["#analytics-month","monthPart"],["#analytics-year","year"],["#analytics-period","period"],["#analytics-department","departmentId"]]) {
     document.querySelector(selector)?.addEventListener("change",event=>{
       if(!event.target.value||!event.target.checkValidity())return;
+      if(field==="period"&&event.target.value==="custom"&&!a.customDates) {
+        const {start,end}=analyticsRange(a.month,a.period);
+        a.customDates={start,end};
+      }
       if(field==="monthPart") a.month=`${a.month.slice(0,4)}-${event.target.value}`;
       else if(field==="year") a.month=`${event.target.value}-${a.month.slice(5)}`;
       else a[field]=event.target.value;
       updateAndFocus(selector);
     });
   }
+  const rangeForm=document.querySelector("#analytics-custom-range");
+  bindDateRange(rangeForm,"startDate","endDate");
+  rangeForm?.addEventListener("submit",(event)=>{
+    event.preventDefault();
+    if(!event.currentTarget.reportValidity())return;
+    const {startDate,endDate}=event.currentTarget.elements;
+    a.customDates={start:startDate.value,end:endDate.value};
+    updateAndFocus("#analytics-custom-range button");
+  });
+  document.querySelector("#analytics-hierarchy")?.addEventListener("change",(event)=>{
+    a.hierarchy=event.target.value;
+    updateAndFocus("#analytics-hierarchy");
+  });
   for(const id of ["#analytics-retry","#analytics-refresh"])document.querySelector(id)?.addEventListener("click",()=>{invalidateAnalytics();render();});
   document.querySelectorAll("[data-analytics-month]").forEach(button=>button.addEventListener("click",()=>{a.month=button.dataset.analyticsMonth;a.period="month";updateAndFocus(`[data-analytics-month="${a.month}"]`);}));
   document.querySelectorAll("[data-analytics-sort]").forEach(button=>button.addEventListener("click",()=>{
@@ -1458,7 +1504,8 @@ function bindAnalyticsEvents() {
   }));
   document.querySelector("#analytics-export")?.addEventListener("click",()=>{
     if(!canViewAnalytics()||a.status!=="ready"||a.key!==analyticsContext().key||!a.model)return;
-    const url=URL.createObjectURL(new Blob([analyticsCsv(a.model)],{type:"text/csv;charset=utf-8"}));
+    const people=analyticsPeople(a.model.people,a.hierarchy,a.sort,seniorityLevels);
+    const url=URL.createObjectURL(new Blob([analyticsCsv({...a.model,people})],{type:"text/csv;charset=utf-8"}));
     const link=document.createElement("a");link.href=url;link.download=`sport360-analytics-${a.model.range.start}-${a.model.range.end}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   if(a.model)bindAnalyticsProbe(a.model);
