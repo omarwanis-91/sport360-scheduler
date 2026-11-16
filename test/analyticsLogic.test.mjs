@@ -34,6 +34,7 @@ test('Lead replaces underlying work once; daily leave and Ground win, no automat
   assert.equal(m.people.length,1);assert.equal(m.totals.lead,18);assert.equal(m.totals.ground,1);
   assert.equal(m.totals.working,19);assert.equal(m.totals.vacation,1);assert.equal(m.totals.sick,1);
   assert.equal(m.totals.morning+m.totals.midday+m.totals.night,0);
+  assert.deepEqual(m.shiftMix,{morning:12,midday:3,night:3,ground:1,other:0});
   s.departmentLeadRotations=[];assert.equal(model(s).totals.lead,0);
 });
 test('effective versions repeat beyond first week and specific overrides take precedence',()=>{
@@ -64,6 +65,28 @@ test('month, quarter and year ranges include leap days and reject invalid input'
   assert.deepEqual(analyticsRange('2026-11','quarter'),{year:2026,start:'2026-10-01',end:'2026-12-31',label:'Q4 · 2026'});
   assert.equal(analyticsRange('2026-11','year').start,'2026-01-01');
   assert.throws(()=>analyticsRange('2026-13'));assert.throws(()=>analyticsRange('1800-01'));
+  const dateRange={start:'2026-12-31',end:'2027-01-02'};
+  assert.equal(analyticsRange('2026-11','custom',dateRange).end,'2027-01-02');
+  assert.equal(analyticsRange('2026-11','custom',{...dateRange,end:dateRange.start}).start,dateRange.start);
+  assert.throws(()=>analyticsRange('2026-11','custom',{...dateRange,end:'2026-12-30'}));
+  assert.throws(()=>analyticsRange('2026-11','custom',{start:'2027-02-29',end:'2027-03-01'}));
+});
+test('custom ranges include both endpoints and aggregate only selected dates across years',()=>{
+  const s=fixture();
+  s.scheduleOverrides=[
+    {profileId:'emp-002',date:'2026-12-30',statusId:'vacation'},
+    {profileId:'emp-002',date:'2026-12-31',statusId:'vacation'},
+    {profileId:'emp-002',date:'2027-01-01',statusId:'sick'}
+  ];
+  const december=scope(s,{departmentId:'ops'});
+  const january=scope(s,{departmentId:'ops',year:2027});
+  const days=[...resolveAnalyticsDays(december),...resolveAnalyticsDays(january)];
+  const result=aggregateAnalytics(december,days,'2026-11','custom',{start:'2026-12-31',end:'2027-01-02'});
+  assert.equal(result.known,3);
+  assert.equal(result.totals.working,0);
+  assert.deepEqual(result.months.map(({month,vacation,sick})=>[month,vacation,sick]),[
+    ['2026-12',1,0],['2027-01',0,1]
+  ]);
 });
 test('CSV includes exact filtered totals and neutralizes spreadsheet formulas in names',()=>{
   const s=fixture();s.profiles[1].name='=HYPERLINK("x")';

@@ -1,4 +1,4 @@
-import { datesBetween, scheduleFor, departmentLeadForDate, holidayAppliesToProfile, weekdayIndex, toIso } from './scheduleLogic.mjs';
+import { datesBetween, parseDate, scheduleFor, departmentLeadForDate, holidayAppliesToProfile, weekdayIndex, toIso } from './scheduleLogic.mjs';
 
 export const shiftSeries = [
   { id:'morning', label:'Morning', color:'#d9b95f' },
@@ -8,6 +8,7 @@ export const shiftSeries = [
   { id:'ground', label:'On Ground', color:'#6abbb0' }
 ];
 const workIds = new Set(shiftSeries.map(s=>s.id));
+export const shiftMixSeries = shiftSeries.filter(({ id }) => id !== 'lead');
 const membership = p => [...new Set([p.departmentId,...(p.departmentIds||[])].filter(Boolean))];
 
 // Demo mirrors the server boundary. Production obtains this snapshot through the protected RPC.
@@ -46,7 +47,16 @@ export function scopedAnalyticsState(state, { year, departmentId=null, directOnl
       .map(({id,profileId,startDate,endDate,status})=>({id,profileId,startDate,endDate,status})) };
 }
 
-export function analyticsRange(month, period='month') {
+export function analyticsRange(month, period='month', customDates) {
+  if (period === 'custom') {
+    const { start, end } = customDates || {};
+    const valid = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date)
+      && date >= '2000-01-01' && date <= '2100-12-31' && toIso(parseDate(date)) === date;
+    if (!valid(start) || !valid(end) || end < start) throw new Error('Choose a valid start and end date.');
+    const formatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const label = formatter.formatRange(parseDate(start), parseDate(end));
+    return { year: Number(start.slice(0, 4)), start, end, label };
+  }
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Choose a valid month.');
   const [year,m]=month.split('-').map(Number);
   if(year<2000||year>2100) throw new Error('Choose a year between 2000 and 2100.');
@@ -65,31 +75,48 @@ export function resolveAnalyticsDays(snapshot) {
     for(const p of snapshot.profiles) {
       const status=scheduleFor(snapshot,p.id,date);
       const id=status.kind==='working'&&status.id!=='ground'&&leads.has(p.id)?'lead':status.id||'empty';
-      result.push({date,profileId:p.id,statusId:id});
+      result.push({date,profileId:p.id,statusId:id,shiftId:status.id || 'empty'});
     }
   }
   return result;
 }
 
-export function aggregateAnalytics(snapshot, days, month, period='month') {
-  const range=analyticsRange(month,period);
+export function aggregateAnalytics(snapshot, days, month, period='month', customDates) {
+  const range=analyticsRange(month,period,customDates);
+  const custom=period==='custom';
   const blank=()=>Object.fromEntries([...shiftSeries.map(s=>s.id),'vacation','sick','weekend','public_holiday','low_day','empty','working'].map(id=>[id,0]));
   const validIds=new Set(Object.keys(blank()));
   const people=snapshot.profiles.map(p=>({...p,...blank()}));
   const byPerson=new Map(people.map(p=>[p.id,p]));
-  const daily=datesBetween(range.start,range.end).map(date=>({date,...blank(),known:0}));
+  const daily=datesBetween(range.start,range.end).map(date=>({date,...blank(),empty:people.length,known:0}));
+  people.forEach(person=>{person.empty=daily.length;});
   const byDate=new Map(daily.map(d=>[d.date,d]));
-  const months=Array.from({length:12},(_,m)=>({month:`${range.year}-${String(m+1).padStart(2,'0')}`,label:new Date(range.year,m,1).toLocaleDateString('en',{month:'short'}),vacation:0,sick:0,known:0}));
+  const months=[];
+  const monthStart=custom?range.start.slice(0,7):`${range.year}-01`;
+  const monthEnd=custom?range.end.slice(0,7):`${range.year}-12`;
+  const monthLabel=new Intl.DateTimeFormat('en',{month:'short'});
+  for(const date=parseDate(`${monthStart}-01`);toIso(date).slice(0,7)<=monthEnd;date.setMonth(date.getMonth()+1)) {
+    months.push({month:toIso(date).slice(0,7),label:monthLabel.format(date),vacation:0,sick:0,known:0});
+  }
+  const byMonth=new Map(months.map(bucket=>[bucket.month,bucket]));
+  const shiftMix=Object.fromEntries([...shiftMixSeries.map(s=>s.id),'other'].map(id=>[id,0]));
   for(const d of days) {
     const id=validIds.has(d.statusId)?d.statusId:'empty';
-    const monthly=months[Number(d.date.slice(5,7))-1];
-    if(id!=='empty')monthly.known++;
-    if(id==='vacation'||id==='sick')monthly[id]++;
+    if(id==='empty')continue;
     const day=byDate.get(d.date),person=byPerson.get(d.profileId);
+    const monthly=(!custom||day)&&byMonth.get(d.date.slice(0,7));
+    if(monthly) {
+      monthly.known++;
+      if(id==='vacation'||id==='sick')monthly[id]++;
+    }
     if(!day||!person)continue;
     day[id]++;person[id]++;
-    if(id!=='empty')day.known++;
-    if(workIds.has(id)){day.working++;person.working++;}
+    day.empty--;person.empty--;day.known++;
+    if(workIds.has(id)){
+      day.working++;person.working++;
+      const shiftId=d.shiftId||id;
+      shiftMix[Object.hasOwn(shiftMix,shiftId)?shiftId:'other']++;
+    }
   }
   const totals=blank();people.forEach(p=>Object.keys(totals).forEach(id=>totals[id]+=p[id]));
   const knownDays=daily.filter(d=>d.known>0);
@@ -100,11 +127,21 @@ export function aggregateAnalytics(snapshot, days, month, period='month') {
       min:sample.length?Math.min(...sample):null,max:sample.length?Math.max(...sample):null};
   });
   const slots=people.length*daily.length,known=slots-totals.empty;
-  return {range,daily,months,weekdays,people,totals,slots,known,departments:snapshot.departments,knownDays:knownDays.length,
+  return {range,custom,daily,months,weekdays,people,totals,shiftMix,slots,known,departments:snapshot.departments,knownDays:knownDays.length,
     coverage:slots?Math.round(known/slots*100):0,
     average:knownDays.length?totals.working/knownDays.length:null,
     pending:snapshot.vacationRequests.filter(r=>r.status==='pending'&&r.startDate<=range.end&&r.endDate>=range.start).length,
     workingPeople:people.filter(p=>p.working>0).length};
+}
+
+export function analyticsPeople(people, hierarchy, sort, levels) {
+  const rank = new Map(levels.map(([id], index) => [id, index]));
+  return people.filter(person => hierarchy === 'all' || person.seniorityLevel === hierarchy).sort((a, b) => {
+    const order = sort.key === 'name' ? a.name.localeCompare(b.name)
+      : sort.key === 'seniorityLevel' ? rank.get(a.seniorityLevel) - rank.get(b.seniorityLevel)
+      : a[sort.key] - b[sort.key];
+    return (sort.direction === 'asc' ? order : -order) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  });
 }
 
 export function analyticsCsv(model) {
