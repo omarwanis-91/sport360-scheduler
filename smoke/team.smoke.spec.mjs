@@ -182,6 +182,7 @@ test('remote hierarchy saves use the guarded RPC and rejected saves keep the ori
   const writes = [];
   await page.route(`${url}/rest/v1/**`, async route => {
     const name = new URL(route.request().url()).pathname.split('/').at(-1);
+    if (name === 'get_profile_schedule_placements') return route.fulfill({ json: { enabled: true, placements: [] } });
     if (route.request().method() !== 'GET') writes.push(name);
     if (name === 'update_profile_hierarchy') {
       payload = route.request().postDataJSON();

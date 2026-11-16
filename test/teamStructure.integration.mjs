@@ -382,5 +382,60 @@ await deny(() => clearWorked(pe, latestWork), /Cancel the booked replacement/);
 await book(newCredit.id, null);
 equal((await clearWorked(pe, latestWork)).override.status_id, 'vacation');
 equal((await calendar()).credits.some((credit) => credit.id === newCredit.id), false);
-await db.close();
 console.log(`${checks - beforeEntitlements} Holiday entitlement and Low Days PostgreSQL checks passed.`);
+
+const beforePlacement = checks;
+await db.exec('reset role');
+await db.exec(file('../supabase/migrations/042_profile_schedule_placement.sql'));
+equal((await rows(file('../supabase/audit/031_profile_schedule_placement_audit.sql'))).map(({ passed }) => passed),
+  [true, true, true, true, true]);
+const placements = async () => (await rows('select public.get_profile_schedule_placements() as result'))[0].result.placements;
+const savePlacement = (profileId, position, teams, placement) =>
+  rows('select public.save_managed_profile_with_schedule_placement($1,$2,$3::uuid[],null,null,$4)',
+    [profileId, position, teams, placement]);
+const saveAdminPlacement = async (id, placement, teams=[edit,motion], name) => {
+  const p = await profile(id);
+  return rows('select public.save_admin_profile_with_schedule_placement($1,$2,$3,$4,$5,$6,$7::uuid[],$8,$9,$10,$11,$12,$13,$14,$15)',
+    [id,p.employee_code,p.email,name||p.full_name,p.title,p.seniority_level,teams,p.photo_url,
+      p.yearly_vacation_days,p.remaining_vacation_days,p.user_id,p.annual_balance_year,p.yearly_vacation_days,p.remaining_vacation_days,placement]);
+};
+await login(admin);
+equal(await placements(), []);
+const scheduleBefore = await original();
+const testLeadDate = await at(38);
+await rows('insert into public.department_daily_leads(department_id,lead_profile_id,lead_date) values($1,$3,$4),($2,$3,$4)',
+  [edit,motion,hybrid,testLeadDate]);
+const dailyAssignments = () => rows('select id,department_id,lead_profile_id from public.department_daily_leads where lead_date=$1 order by department_id',
+  [testLeadDate]);
+const leadsBefore = await dailyAssignments();
+await deny(() => saveAdminPlacement(hybrid, outside, [edit,motion], 'Must roll back'), /assigned teams/);
+equal((await profile(hybrid)).full_name, 'Hybrid');
+await deny(() => saveAdminPlacement(pe, edit, [edit]), /assigned teams/);
+await saveAdminPlacement(hybrid, motion);
+equal(await placements(), [{ profileId: hybrid, departmentId: motion }]);
+equal((await profile(hybrid)).title, 'Head of Video Unit');
+equal(await original(), scheduleBefore);
+equal(await dailyAssignments(), leadsBefore);
+await login(lead);
+equal(await placements(), []);
+await deny(() => savePlacement(hybrid, 'artist', [edit], edit), /management of all/);
+await deny(() => rows('select * from public.profile_schedule_placements'), /permission denied/);
+await login(manager);
+await deny(() => savePlacement(hybrid, 'artist', [edit], null), /management of all/);
+await login(hybridManager);
+await savePlacement(hybrid, 'artist', [edit,motion], edit);
+equal(await placements(), [{ profileId: hybrid, departmentId: edit }]);
+await structure(hybrid,'artist',[edit,motion]);
+equal(await placements(), [{ profileId: hybrid, departmentId: edit }]);
+await structure(hybrid,'artist',[motion]);
+await structure(hybrid,'artist',[edit,motion]);
+equal(await placements(), []);
+await login(admin);
+const newHybrid=id(199);
+await rows("select public.create_admin_team_profile_with_schedule_placement($1,'new-placement@test','New Hybrid','artist',$2::uuid[],null,21,21,$3)",
+  [newHybrid,[edit,motion],motion]);
+equal(await placements(), [{ profileId: newHybrid, departmentId: motion }]);
+await saveAdminPlacement(newHybrid, null);
+equal(await placements(), []);
+console.log(`${checks - beforePlacement} Profile schedule placement PostgreSQL checks passed.`);
+await db.close();

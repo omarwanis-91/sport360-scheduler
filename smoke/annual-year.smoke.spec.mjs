@@ -75,6 +75,7 @@ test('remote profile saves send the original balance, preserve stored values on 
   await page.evaluate(()=>localStorage.setItem('sport360-supabase-session',JSON.stringify({access_token:'test-access',refresh_token:'test-refresh',expires_at:Date.now()+3600000,user:{id:'admin-user',email:'admin@test'}})));
   await page.route(`${url}/rest/v1/**`,async r=>{
     const name=new URL(r.request().url()).pathname.split('/').at(-1);
+    if(name==='get_profile_schedule_placements')return r.fulfill({json:{enabled:true,placements:[]}});
     if (r.request().method()!=='GET') writes.push(name);
     if (name==='save_admin_profile_annual') {
       payload=r.request().postDataJSON();
