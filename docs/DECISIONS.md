@@ -573,3 +573,10 @@ A daily shift edit can explicitly replace the selected holiday for that person a
 Admin sets the number of holiday days per person in Review Holiday. Compare it with the dates allocated to each person in the reviewed teams. Issue one Low Days credit per unallocated day with a deadline measured from the last selected holiday date. The expiry period defaults to 30 calendar days and Admin can change it for new holiday batches and worked credits.
 
 Clear Override can reverse a worked shift and its unused credit together. Restore any previous shift and Annual deduction in the same transaction. Cancel an upcoming replacement booking before clearing the worked shift. Keep taken replacements in history.
+
+## D-074 - Hybrid Profile Schedule Placement
+
+**Date:** 2026-11-16
+**Status:** Accepted
+
+Use Hybrid as the default group for people shared by multiple teams in a combined schedule. Allow an authorized profile editor to put their row in one assigned team’s group for capacity planning. Actual memberships continue to drive individual team access, lead coverage, and schedule calculations.

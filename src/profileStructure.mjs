@@ -12,6 +12,12 @@ export function profileTeamIds(state, profile) {
     .filter(id=>!isDepartmentContainer(state,id));
 }
 
+export function profileSchedulePlacement(state, profile) {
+  const teams = profileTeamIds(state, profile);
+  return teams.length > 1 && teams.includes(profile?.scheduleGroupDepartmentId)
+    ? profile.scheduleGroupDepartmentId : null;
+}
+
 export function derivedProfileTitle(state, profile) {
   const ids=new Set(profileTeamIds(state,profile));
   const names=state.departments.filter(d=>ids.has(d.id)).map(d=>d.name.toLowerCase().replace(/[^a-z]/g,''));
@@ -27,6 +33,7 @@ export function normalizeDemoProfileStructure(state) {
   for(const profile of state.profiles) {
     const teams=profileTeamIds(state,profile);
     profile.departmentIds=teams;profile.departmentId=teams[0]||null;
+    profile.scheduleGroupDepartmentId=profileSchedulePlacement(state,profile);
     profile.title=derivedProfileTitle(state,profile);
   }
   return state;

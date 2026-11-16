@@ -38,6 +38,7 @@ function createLocalStore() {
       state.holidaySelectionEnabled = true;
       state.holidayShiftOverridesEnabled = true;
       state.holidayEntitlementsEnabled = true;
+      state.schedulePlacementEnabled = true;
       state.lowDayExpiryDays ||= 30;
       state.holidayEntitlements ||= [];
       state.scheduleEvents ||= [];
@@ -221,14 +222,17 @@ function createRemoteStore(client) {
       this.onboardingSubmission = null;
       this.prelaunchRestricted = false;
     },
-    async createProfile(profile) {
-      const row=await client.rpc("create_admin_team_profile",{p_profile_id:profile.id,p_email:profile.email,p_full_name:profile.name,
+    async createProfile(profile, schedulePlacement) {
+      const rpc=schedulePlacement===undefined?"create_admin_team_profile":"create_admin_team_profile_with_schedule_placement";
+      const row=await client.rpc(rpc,{p_profile_id:profile.id,p_email:profile.email,p_full_name:profile.name,
         p_seniority_level:profile.seniorityLevel,p_department_ids:profile.departmentIds||[],p_photo_url:profile.photoRef||profile.photo||null,
-        p_yearly_vacation_days:profile.yearlyVacationDays,p_remaining_vacation_days:profile.remainingVacationDays});
+        p_yearly_vacation_days:profile.yearlyVacationDays,p_remaining_vacation_days:profile.remainingVacationDays,
+        ...(schedulePlacement===undefined?{}:{p_schedule_department_id:schedulePlacement})});
       return row?{...fromDbProfile(row),departmentIds:profile.departmentIds||[]}:null;
     },
-    async updateProfile(profile) {
-      const row = await client.rpc("save_admin_profile_annual", {
+    async updateProfile(profile, schedulePlacement) {
+      const rpc=schedulePlacement===undefined?"save_admin_profile_annual":"save_admin_profile_with_schedule_placement";
+      const row = await client.rpc(rpc, {
         p_profile_id: profile.id,
         p_employee_code: profile.employeeId,
         p_email: profile.email,
@@ -242,7 +246,8 @@ function createRemoteStore(client) {
         p_user_id: profile.userId || null,
         p_expected_balance_year: profile.expectedAnnualYear ?? profile.annualBalanceYear,
         p_expected_allowance: profile.expectedAnnualAllowance ?? profile.yearlyVacationDays,
-        p_expected_remaining: profile.expectedAnnualRemaining ?? profile.remainingVacationDays
+        p_expected_remaining: profile.expectedAnnualRemaining ?? profile.remainingVacationDays,
+        ...(schedulePlacement===undefined?{}:{p_schedule_department_id:schedulePlacement})
       });
       return row ? fromDbProfile(row) : null;
     },
@@ -260,9 +265,11 @@ function createRemoteStore(client) {
       });
       return row?fromDbProfile(row):null;
     },
-    async updateProfileStructure(profile,editOwnIdentity=false) {
-      const result=await client.rpc("save_managed_profile_structure",{p_profile_id:profile.id,p_seniority_level:profile.seniorityLevel,
-        p_department_ids:profile.departmentIds||[],p_full_name:editOwnIdentity?profile.name:null,p_photo_url:editOwnIdentity?profile.photoRef||profile.photo||null:null});
+    async updateProfileStructure(profile,editOwnIdentity=false,schedulePlacement) {
+      const rpc=schedulePlacement===undefined?"save_managed_profile_structure":"save_managed_profile_with_schedule_placement";
+      const result=await client.rpc(rpc,{p_profile_id:profile.id,p_seniority_level:profile.seniorityLevel,
+        p_department_ids:profile.departmentIds||[],p_full_name:editOwnIdentity?profile.name:null,p_photo_url:editOwnIdentity?profile.photoRef||profile.photo||null:null,
+        ...(schedulePlacement===undefined?{}:{p_schedule_department_id:schedulePlacement})});
       const mapped=fromDbProfile(result.profile);
       mapped.departmentIds=result.department_ids||[];
       mapped.structurePermissions={teams:result.can_edit_teams,position:result.can_edit_position};
@@ -821,7 +828,7 @@ function emptyState() {
 
 async function loadRemoteState(client, session) {
   await client.rpc("refresh_annual_balances");
-  const [departments, profiles, profileDepartments, statuses, rotations, overrides, leads, leadRotations, requests, roles, annualBalances] = await Promise.all([
+  const [departments, profiles, profileDepartments, statuses, rotations, overrides, leads, leadRotations, requests, roles, annualBalances, schedulePlacements] = await Promise.all([
     client.select("departments", "created_at"),
     client.select("employee_profiles", "full_name"),
     safeSelect(client, "employee_profile_departments", "profile_id"),
@@ -832,11 +839,14 @@ async function loadRemoteState(client, session) {
     safeSelect(client, "department_lead_rotation_versions", "effective_start"),
     client.select("vacation_requests", "requested_at", false),
     client.select("user_roles", "created_at"),
-    client.select("annual_balance_years", "balance_year")
+    client.select("annual_balance_years", "balance_year"),
+    readSchedulePlacements(client)
   ]);
 
+  const placements = new Map((schedulePlacements?.placements || []).map(({ profileId, departmentId }) => [profileId, departmentId]));
   const mappedProfiles = await Promise.all(profiles.map(async (row) => {
     const profile = fromDbProfile(row);
+    profile.scheduleGroupDepartmentId = placements.get(profile.id) || null;
     profile.departmentIds = [
       profile.departmentId,
       ...profileDepartments.filter((membership) => membership.profile_id === profile.id).map((membership) => membership.department_id)
@@ -874,6 +884,7 @@ async function loadRemoteState(client, session) {
     userRoles: roles.map(fromDbUserRole),
     onboardingSubmissions,
     profiles: mappedProfiles,
+    schedulePlacementEnabled: schedulePlacements?.enabled === true,
     lowDaysEnabled,
     ...calendar,
     ...schedulerTools,
@@ -1056,6 +1067,15 @@ async function readSchedulerTools(client) {
     return fromDbSchedulerTools(await client.rpc("get_scheduler_tools"));
   } catch (error) {
     if (/schema cache|could not find the function/i.test(error.message)) return {};
+    throw error;
+  }
+}
+
+async function readSchedulePlacements(client) {
+  try {
+    return await client.rpc("get_profile_schedule_placements");
+  } catch (error) {
+    if (/schema cache|could not find the function/i.test(error.message)) return null;
     throw error;
   }
 }

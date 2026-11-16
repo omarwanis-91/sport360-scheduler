@@ -7987,6 +7987,9 @@ body:has(.profile-editor-modal) { overflow:hidden; }
 .profile-team-choices input { width:16px; height:16px; accent-color:var(--red); }
 .profile-team-choices label:has(:checked) { border-color:#d6537555; background:#ac304c14; }
 .profile-position-row { display:grid; grid-template-columns:minmax(160px,.6fr) minmax(0,1.4fr); gap:18px; align-items:end; }
+.profile-schedule-placement { margin-top:16px; }
+.profile-schedule-placement label { max-width:320px; }
+.profile-schedule-placement .hint { margin:6px 0 0; }
 .profile-derived-title { min-height:68px; display:grid; align-content:center; gap:8px; padding:12px 15px; border-radius:10px; background:#ffffff03; }
 .profile-derived-title > span { display:flex; align-items:center; gap:10px; color:#aaa3b1; font-size:13px; }.profile-derived-title small { font-size:11px; color:#c59daa; }
 .profile-derived-title output { font-size:16px; font-weight:600; color:#ece6ee; }

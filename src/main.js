@@ -2,7 +2,7 @@ import { seedState } from "./data.js";
 import { appConfig } from "./config.js";
 import { createSupabaseStore } from "./supabaseStore.js";
 import { annualYear, annualBalanceImpact, deductDemoAnnual } from "./annualBalances.mjs";
-import { assignableDepartments, derivedProfileTitle, isDepartmentContainer, profileTeamIds } from "./profileStructure.mjs";
+import { assignableDepartments, derivedProfileTitle, isDepartmentContainer, profileSchedulePlacement, profileTeamIds } from "./profileStructure.mjs";
 import { analyticsRange, resolveAnalyticsDays, aggregateAnalytics, analyticsCsv, analyticsPeople } from "./analyticsLogic.mjs";
 import { availableReplacementDates, bookDemoLowDay, cairoDate, canConfirmWorkedDay, clearDemoWorkedDay, confirmDemoLowDay, holidayAllocation, lowDayStatus, saveDemoHoliday, saveDemoHolidaySelection, workedDayCredit } from "./lowDays.mjs";
 import { renderAnalyticsDashboard, bindAnalyticsProbe } from "./analyticsView.mjs";
@@ -1782,33 +1782,29 @@ function renderTopbar(title, subtitle, action = "") {
 }
 
 function renderDepartmentScheduleRows(department, profiles, renderRow) {
-  if (department?.name.trim().toLowerCase() !== "video unit") {
-    return profiles.map(renderRow).join("");
-  }
+  if (!department) return profiles.map(renderRow).join("");
+  const descendants = new Set(descendantDepartmentIds(department.id));
+  const teams = assignableDepartments(state).filter(team => descendants.has(team.id));
+  if (!teams.length) return profiles.map(renderRow).join("");
 
-  const scope = new Set(departmentScopeIds(department.id));
-  const videoEdit = new Set();
-  const motionGraphics = new Set();
-  for (const team of assignableDepartments(state)) {
-    if (!scope.has(team.id)) continue;
-    const name = team.name.trim().toLowerCase();
-    if (name === "video edit") videoEdit.add(team.id);
-    if (name === "motion graphics" || name === "motion") motionGraphics.add(team.id);
-  }
-
-  const groups = { "Video Edit": [], Hybrid: [], "Other teams": [], "Motion Graphics": [] };
+  const hybrid = { id: null, name: "Hybrid" };
+  const isVideoUnit = department.name.trim().toLowerCase() === "video unit";
+  const video = teams.filter(team => team.name.trim().toLowerCase() === "video edit");
+  const motion = teams.filter(team => ["motion", "motion graphics"].includes(team.name.trim().toLowerCase()));
+  const others = teams.filter(team => !video.includes(team) && !motion.includes(team));
+  const sections = isVideoUnit ? [...video, hybrid, ...others, ...motion] : [...teams, hybrid];
+  const groups = new Map(sections.map(team => [team.id, { name: team.name, members: [] }]));
+  groups.set(undefined, { name: "Other teams", members: [] });
+  const teamIds = new Set(teams.map(team => team.id));
   for (const profile of profiles) {
-    const teams = profileDepartmentIds(profile);
-    const edits = teams.some((id) => videoEdit.has(id));
-    const animates = teams.some((id) => motionGraphics.has(id));
-    if (edits && animates) groups.Hybrid.push(profile);
-    else if (edits) groups["Video Edit"].push(profile);
-    else if (animates) groups["Motion Graphics"].push(profile);
-    else groups["Other teams"].push(profile);
+    const assigned = profileTeamIds(state, profile).filter(id => teamIds.has(id));
+    const placement = assigned.includes(profile.scheduleGroupDepartmentId)
+      ? profile.scheduleGroupDepartmentId : assigned.length > 1 ? null : assigned[0];
+    groups.get(placement).members.push(profile);
   }
 
-  return Object.entries(groups).filter(([, members]) => members.length).map(([label, members]) => `
-    <div class="schedule-team-divider"><h2>${label}</h2></div>
+  return [...groups.values()].filter(({ members }) => members.length).map(({ name, members }) => `
+    <div class="schedule-team-divider"><h2>${escapeHtml(name)}</h2></div>
     ${members.map(renderRow).join("")}
   `).join("");
 }
@@ -4102,6 +4098,7 @@ function profileDrawer() {
   const editPosition = profile ? canEditHierarchy(profile) : admin;
   const teams = assignableDepartments(state).filter(d=>admin || visibleDepartments().some(visible=>visible.id===d.id));
   const initialTeams = profile ? profileTeamIds(state,profile) : [ui.drawer.departmentId || ui.selectedDepartmentId].filter(id=>teams.some(d=>d.id===id));
+  const placement = profileSchedulePlacement(state,profile);
   const role = profile?.userId ? roleForProfile(profile) : "unclaimed";
   const year = profile?.annualBalanceYear || annualYear();
   const title = admin ? derivedProfileTitle(state,{...profile,departmentId:null,departmentIds:initialTeams}) : profile?.title || derivedProfileTitle(state,profile);
@@ -4133,6 +4130,13 @@ function profileDrawer() {
             <label>Position<select name="seniorityLevel" ${editPosition ? "" : "disabled"}>${seniorityLevels.map(([id,label])=>`<option value="${id}" ${normalizeHierarchyLevel(profile?.seniorityLevel) === id ? "selected" : ""}>${label}</option>`).join("")}</select></label>
             <div class="profile-derived-title"><span>Title <small>Automatic</small></span><output id="profile-title-preview">${escapeHtml(title)}</output></div>
           </div>
+          ${state.schedulePlacementEnabled && editPosition ? `<div class="profile-schedule-placement" hidden>
+            <label>Schedule placement<select name="scheduleGroupDepartmentId" aria-describedby="profile-placement-hint" disabled>
+              <option value="">Hybrid</option>
+              ${teams.map(team=>`<option value="${team.id}" ${team.id===placement?"selected":""}>${escapeHtml(team.name)}</option>`).join("")}
+            </select></label>
+            <p class="hint" id="profile-placement-hint">Chooses this person's group in combined schedules and rotations. Team memberships and lead coverage stay active.</p>
+          </div>` : ""}
           ${!editPosition && editTeams ? `<p class="hint">Position changes require management of all of this person’s teams.</p>` : ""}
         </section>
         <section class="profile-editor-section" aria-labelledby="profile-access-title">
@@ -4911,6 +4915,19 @@ function bindProfileModal() {
   const modal=document.querySelector(".profile-editor-modal");
   if(!modal)return;
   const form=modal.querySelector("#profile-form");
+  const placement=form.elements.scheduleGroupDepartmentId;
+  const teamInputs=[...form.querySelectorAll('[name="departmentMembership"]')];
+  if(placement) {
+    const syncPlacement=()=>{
+      const chosen=new Set(teamInputs.filter(input=>input.checked).map(input=>input.value));
+      if(!chosen.has(placement.value)) placement.value="";
+      for(const option of placement.options) option.disabled=option.hidden=Boolean(option.value&&!chosen.has(option.value));
+      placement.disabled=chosen.size<2;
+      placement.closest(".profile-schedule-placement").hidden=placement.disabled;
+    };
+    teamInputs.forEach(input=>input.addEventListener("change",syncPlacement));
+    syncPlacement();
+  }
   const updateTitle=()=>{
     if(!isAdmin() && dataStore.mode!=="demo")return;
     const data=new FormData(form);
@@ -6134,6 +6151,10 @@ async function saveProfile(event) {
     ? form.getAll("departmentMembership").filter((departmentId, index, values) => departmentId && values.indexOf(departmentId) === index)
     : profileDepartmentIds(existing);
   const departmentId = hadProfileAdmin || canEditTeams ? (departmentIds[0] || null) : existing.departmentId;
+  const chosenPlacement = form.get("scheduleGroupDepartmentId");
+  const schedulePlacement = state.schedulePlacementEnabled && (hadProfileAdmin || canEditProfileHierarchy)
+    && chosenPlacement !== null && (chosenPlacement || null) !== (existing?.scheduleGroupDepartmentId || null)
+    ? chosenPlacement || null : undefined;
   const profile = {
     id: existing?.id || makeId("emp"),
     employeeId: existing?.employeeId || `SCH-${crypto.randomUUID().slice(0,8).toUpperCase()}`,
@@ -6144,6 +6165,7 @@ async function saveProfile(event) {
     leadEligible: existing?.leadEligible ?? true,
     departmentId,
     departmentIds,
+    scheduleGroupDepartmentId: schedulePlacement===undefined ? existing?.scheduleGroupDepartmentId || null : schedulePlacement,
     photo: existing?.photo || "",
     photoRef: existing?.photoRef || form.get("photoRef") || "",
     yearlyVacationDays: hadProfileAdmin ? Number(form.get("yearlyVacationDays")) : existing.yearlyVacationDays,
@@ -6176,15 +6198,15 @@ async function saveProfile(event) {
       }
       if (existing && !hadProfileAdmin) {
         if (canEditTeams) {
-          const saved=await dataStore.updateProfileStructure(profile,canEditOwnIdentity);
+          const saved=await dataStore.updateProfileStructure(profile,canEditOwnIdentity,schedulePlacement);
           if(saved) Object.assign(profile,{title:saved.title,departmentId:saved.departmentId,departmentIds:saved.departmentIds,seniorityLevel:saved.seniorityLevel,structurePermissions:saved.structurePermissions});
         } else if (canEditOwnIdentity) await dataStore.updateOwnProfile(profile);
       } else if (existing) {
-        const saved=await dataStore.updateProfile({ ...profile, ...annualExpectation });
+        const saved=await dataStore.updateProfile({ ...profile, ...annualExpectation },schedulePlacement);
         if(saved)Object.assign(profile,{title:saved.title,employeeId:saved.employeeId});
       }
       else {
-        const saved=await dataStore.createProfile(profile);
+        const saved=await dataStore.createProfile(profile,schedulePlacement);
         if(saved)Object.assign(profile,saved);
       }
 
@@ -6205,6 +6227,7 @@ async function saveProfile(event) {
       throw error;
     }
 
+    if (hadProfileAdmin || canEditProfileHierarchy) profile.scheduleGroupDepartmentId=profileSchedulePlacement(state,profile);
     if (existing) Object.assign(existing, profile);
     else state.profiles.push(profile);
     if (uploadedPhoto && previousPhotoRef && previousPhotoRef !== uploadedPhoto.reference) {
@@ -6346,6 +6369,8 @@ async function removeProfileDepartment() {
     render();
     const saved=await dataStore.removeProfileFromDepartment(profile.id, managedDepartmentId);
     profile.title=saved?.title || derivedProfileTitle(state,profile);
+    if (isAdmin()) profile.scheduleGroupDepartmentId=profileSchedulePlacement(state,profile);
+    else if (profile.scheduleGroupDepartmentId === managedDepartmentId) profile.scheduleGroupDepartmentId=null;
     if (dataStore?.mode !== "supabase") {
       audit("profile.department_removed", "profile", profile.id, `${profile.name} removed from ${previousDepartment?.name || "department"}`);
     }
@@ -6415,6 +6440,7 @@ async function deleteDepartment() {
       profile.departmentIds = profileDepartmentIds(profile).filter((departmentId) => departmentId !== department.id);
       if (profile.departmentId === department.id) profile.departmentId = profile.departmentIds[0] || null;
       await dataStore.updateProfile(profile);
+      profile.scheduleGroupDepartmentId=profileSchedulePlacement(state,profile);
     }
     state.departmentLeads = state.departmentLeads.filter((lead) => lead.departmentId !== department.id);
     state.departments = state.departments.filter((item) => item.id !== department.id);

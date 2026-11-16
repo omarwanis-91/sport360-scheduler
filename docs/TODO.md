@@ -10,6 +10,7 @@ This file tracks current priorities. Reorder and update it as work progresses. C
 - [ ] Verify Scheduler holiday ranges, per-team alerts, and worked leave credits in production. Migration 038 and audit 027 passed before PR #43 merged.
 - [ ] Verify Scheduler holiday edits, removal, and daily lead replacement in production. Migration 039 and audit 028 passed before PR #44 merged.
 - [ ] Apply `040_holiday_entitlement_and_low_day_expiry.sql`, run audit 029, and verify that holiday shortfalls create credits and clearing a worked override restores the previous shift.
+- [ ] Apply `042_profile_schedule_placement.sql`, run audit 031, and verify grouping and dual-team lead coverage in Scheduler and Rotations.
 - [ ] Review the three confirmed pending onboarding submissions in Admin Team → Pending profiles and link each to the correct existing operational profile. Diagnosis is complete; avoid duplicate profiles and preserve their schedules/balances.
 
 - [ ] Verify production Analytics after PR #37 deployment: inspect Admin all-team/department views and Lead-only scope. Employees must have no Analytics access. Migration 034 and all five audit 022 rows are confirmed applied. See `docs/ANALYTICS.md`.
