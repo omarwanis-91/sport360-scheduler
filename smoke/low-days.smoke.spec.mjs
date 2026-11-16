@@ -184,6 +184,61 @@ test("a saved holiday can be overridden for one shift and removed directly from 
   await expect(holidayShift).toHaveClass(/night/);
 });
 
+test("the Scheduler can hide and restore day-off details while cells stay actionable", async ({ page }) => {
+  await page.evaluate(() => {
+    const key = "sport360-scheduler-state";
+    const state = JSON.parse(localStorage.getItem(key));
+    state.rotationVersions = state.rotationVersions.filter(({ profileId }) => profileId !== "emp-002");
+    state.scheduleOverrides.push(
+      { id: "annual", profileId: "emp-001", date: "2026-11-12", statusId: "vacation" },
+      { id: "sick", profileId: "emp-001", date: "2026-11-13", statusId: "sick" },
+      { id: "replacement", profileId: "emp-001", date: "2026-11-16", statusId: "low_day" }
+    );
+    state.publicHolidays = [
+      { id: "holiday", name: "Observed Holiday", date: "2026-11-17", dayOff: true,
+        organizationWide: true, departmentIds: [] }
+    ];
+    localStorage.setItem(key, JSON.stringify(state));
+  });
+  await page.reload();
+  const toggle = page.getByRole("button", { name: "Toggle Day Off Type" });
+  const annual = shift(page, "2026-11-12");
+  const offDays = [
+    annual, shift(page, "2026-11-13"), shift(page, "2026-11-14"),
+    shift(page, "2026-11-16"), shift(page, "2026-11-17")
+  ];
+  const annualDecoration = () => annual.evaluate((cell) => ({
+    hatch: getComputedStyle(cell).backgroundImage,
+    rail: getComputedStyle(cell, "::before").backgroundColor
+  }));
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle.locator("svg")).toBeVisible();
+  await expect(annual.locator(".shift-label")).toBeVisible();
+  const decoration = await annualDecoration();
+  expect(decoration.hatch).toContain("repeating-linear-gradient");
+  await toggle.press("Space");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toBeFocused();
+  for (const cell of offDays) {
+    await expect(cell.locator(".shift-icon")).toBeHidden();
+    await expect(cell.locator(".shift-label")).toBeHidden();
+    await expect(cell.locator("small")).toBeHidden();
+  }
+  expect(await annualDecoration()).toEqual(decoration);
+  await expect(shift(page, "2026-11-12", "emp-003").locator(".shift-label")).toBeVisible();
+  const unassigned = shift(page, "2026-11-12", "emp-002").locator(".shift-label");
+  await expect(unassigned).toHaveText("Unassigned");
+  await expect(unassigned).toBeVisible();
+  await expect(annual).toHaveAccessibleName(/Omar Wanis.*Annual/);
+  await annual.click();
+  await expect(page.getByRole("dialog")).toContainText("Annual");
+  await page.locator("#close-drawer").click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  for (const cell of offDays) await expect(cell.locator(".shift-label")).toBeVisible();
+});
+
 test("employees see their own Low Days and cannot manage holiday selections", async ({ page }) => {
   await page.evaluate(() => {
     const key = "sport360-scheduler-state";
