@@ -689,9 +689,7 @@ function departmentLeadForDate(departmentId, dateIso) {
     ? schedulerLeadDraftForDate(departmentId, dateIso)
     : null;
   if (staged) {
-    if (!staged.profileId) return departmentLeadForDateLogic({
-      ...state, departmentLeads: state.departmentLeads.filter((row) => row.departmentId !== departmentId || row.date !== dateIso)
-    }, departmentId, dateIso);
+    if (!staged.profileId) return departmentLeadForDateLogic(state, departmentId, dateIso, { useDailyOverride: false });
     const profile = byId(state.profiles, staged.profileId);
     return {
       profile,
@@ -4433,7 +4431,7 @@ function renderVacationImpactRow(row, requestStatus, profileId) {
 function leadDrawer() {
   const departmentId = activeDrawerDepartmentId();
   const lead = dailyLeadOverrideForDate(departmentId, ui.drawer.date);
-  const resolvedLead = departmentLeadForDate(departmentId, ui.drawer.date);
+  const weeklyLead = departmentLeadForDateLogic(state, departmentId, ui.drawer.date, { useDailyOverride: false }).profile;
   const candidates = availableLeadCandidates(departmentId, ui.drawer.date);
   const replacement = ui.drawer.replacement;
   const staged = schedulerLeadDraftForDate(departmentId, ui.drawer.date);
@@ -4455,11 +4453,12 @@ function leadDrawer() {
         </div>
         <span class="lead-state">${leadHealth.missing ? "Needs lead" : "Covered"}</span>
       </div>
-      <p class="lead-only-copy">${activeLeadText}</p>
+      <p class="lead-only-copy">${escapeHtml(activeLeadText)}</p>
+      ${lead ? `<p class="hint">Saved daily override · ${escapeHtml(byId(state.profiles, lead.profileId)?.name || "Unavailable")}</p>` : ""}
 
       <form id="lead-form" class="day-lead-form">
         <label>${replacement ? "Replacement lead" : "Daily lead override"}<select name="profileId" ${canEdit ? "" : "disabled"} ${replacement ? "required" : ""}>
-          <option value="">${replacement ? "Choose a replacement lead" : `Use weekly rotation${resolvedLead.rotation && resolvedLead.profile ? ` (${escapeHtml(resolvedLead.profile.name)})` : ""}`}</option>
+          <option value="">${replacement ? "Choose a replacement lead" : `Use weekly rotation (${escapeHtml(weeklyLead?.name || "Unassigned")})`}</option>
           ${candidates.map((profile) => `<option value="${profile.id}" ${selectedId === profile.id ? "selected" : ""}>${escapeHtml(profile.name)}</option>`).join("")}
         </select></label>
         <p class="hint">${candidates.length ? "Only people available on this day are listed." : "No available replacement leaders for this department on this day."}</p>
