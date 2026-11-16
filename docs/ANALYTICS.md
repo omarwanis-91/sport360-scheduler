@@ -19,7 +19,7 @@ This migration adds one read-only function. It does not rewrite rotations, reque
 | Average staffing | Working person-days divided by dates with at least one known saved shift. Fully unknown dates are excluded; known Weekend dates count as zero work. |
 | Daily staffing | Saved work and Annual/Sick per date. Partial dates show known shifts and the count of unassigned people. Fully unknown dates are gaps. |
 | Weekday rhythm | Mean/min/max working people on each weekday across known dates in the selected period, with sample counts. |
-| Leave by month | Annual and Sick person-days for the selected calendar year, or across the exact dates when using Custom. A dash marks a month without saved schedule data. |
+| Leave by month | Annual and Sick person-days for the selected calendar year, or for the selected months when using Custom. A dash marks a month without saved schedule data. |
 | Pending requests | Distinct pending Annual requests whose date ranges overlap the selected period. These do not reduce working counts until approval writes leave. |
 | Recorded schedule | Person-days with a saved status divided by all people × dates in the selected period. Scheduled work, days off, and leave all count. |
 | CSV | Exact counts for the people shown in the breakdown, in its current order. Spreadsheet formulas in names are neutralized. |
@@ -28,7 +28,7 @@ The dashboard is planned scheduling analysis, not attendance, hours, payroll, or
 
 ## Controls and validation
 
-Choose Team and a Month, Quarter, Year, or Custom period. For Custom, set both inclusive dates and select Apply range. The range can cross calendar years. Hover or focus a month for exact Annual/Sick values. Selecting it opens the full month. Hover or tap a daily chart point for its nearby values popup. Keyboard users can focus a point, use arrows/Home/End between dates, and press Escape to dismiss. The daily table remains an accessible alternative.
+Choose Team and a Month, Quarter, Year, or Custom period. For Custom, choose a month and year for both From and Through, then select Apply range. Both months are included in full, and the range can cross calendar years. Hover or focus a month for exact Annual/Sick values. Selecting it opens the full month. Hover or tap a daily chart point for its nearby values popup. Keyboard users can focus a point, use arrows/Home/End between dates, and press Escape to dismiss. The daily table remains an accessible alternative.
 
 The dashboard uses larger reporting text, a full-width people table, and a gradient donut with aligned counts and small comparison tracks. Small highlights fade toward lower values and disappear below the upper half of the chart’s value range. On bars they concentrate at the tip, and on lines they sit at the plotted peak values. Reduced motion is supported.
 

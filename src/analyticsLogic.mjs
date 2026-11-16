@@ -47,24 +47,24 @@ export function scopedAnalyticsState(state, { year, departmentId=null, directOnl
       .map(({id,profileId,startDate,endDate,status})=>({id,profileId,startDate,endDate,status})) };
 }
 
-export function analyticsRange(month, period='month', customDates) {
+const isAnalyticsMonth=month=>/^\d{4}-(0[1-9]|1[0-2])$/.test(month)&&month>='2000-01'&&month<='2100-12';
+const analyticsMonthLabel=new Intl.DateTimeFormat('en-GB',{month:'long',year:'numeric'});
+
+export function analyticsRange(month, period='month', customMonths) {
   if (period === 'custom') {
-    const { start, end } = customDates || {};
-    const valid = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date)
-      && date >= '2000-01-01' && date <= '2100-12-31' && toIso(parseDate(date)) === date;
-    if (!valid(start) || !valid(end) || end < start) throw new Error('Choose a valid start and end date.');
-    const formatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const label = formatter.formatRange(parseDate(start), parseDate(end));
-    return { year: Number(start.slice(0, 4)), start, end, label };
+    const { start, end } = customMonths || {};
+    if (!isAnalyticsMonth(start) || !isAnalyticsMonth(end) || end < start) throw new Error('Choose a valid start and end month.');
+    const first=analyticsRange(start);
+    const last=analyticsRange(end);
+    return {year:first.year,start:first.start,end:last.end,label:start===end?first.label:`${first.label} to ${last.label}`};
   }
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Choose a valid month.');
+  if (!isAnalyticsMonth(month)) throw new Error('Choose a month between 2000 and 2100.');
   const [year,m]=month.split('-').map(Number);
-  if(year<2000||year>2100) throw new Error('Choose a year between 2000 and 2100.');
   const first=period==='year'?1:period==='quarter'?Math.floor((m-1)/3)*3+1:m;
   const last=period==='year'?12:period==='quarter'?first+2:m;
   const start=`${year}-${String(first).padStart(2,'0')}-01`,end=toIso(new Date(year,last,0));
   const label=period==='year'?`${year}`:period==='quarter'?`Q${Math.floor((m-1)/3)+1} · ${year}`:
-    new Date(year,m-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    analyticsMonthLabel.format(new Date(year,m-1,1));
   return {year,start,end,label};
 }
 
@@ -81,8 +81,8 @@ export function resolveAnalyticsDays(snapshot) {
   return result;
 }
 
-export function aggregateAnalytics(snapshot, days, month, period='month', customDates) {
-  const range=analyticsRange(month,period,customDates);
+export function aggregateAnalytics(snapshot, days, month, period='month', customMonths) {
+  const range=analyticsRange(month,period,customMonths);
   const custom=period==='custom';
   const blank=()=>Object.fromEntries([...shiftSeries.map(s=>s.id),'vacation','sick','weekend','public_holiday','low_day','empty','working'].map(id=>[id,0]));
   const validIds=new Set(Object.keys(blank()));

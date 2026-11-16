@@ -43,10 +43,20 @@
 /* Analytics: readable reporting typography and data-weighted, diffuse chart glows. */
 .analytics-controls { display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
 .analytics-controls label { display:grid; gap:6px; color:#bcb4c1; font-size:13px; font-weight:500; }
-.analytics-controls :is(select,input) { height:40px; min-width:100px; font:inherit; font-size:14px; color:var(--text); }
+.analytics-controls select { height:40px; min-width:100px; font:inherit; font-size:14px; color:var(--text); }
 .analytics-controls > label:first-child { min-width:160px; }
 .analytics-custom-range { display:flex; flex-wrap:wrap; align-items:end; gap:8px; min-width:0; }
-.analytics-custom-range input { width:136px; }
+.analytics-range-endpoint {
+  display:grid;
+  grid-template-columns:minmax(112px,auto) minmax(76px,auto);
+  gap:6px;
+  min-width:0;
+  margin:0;
+  padding:0;
+  border:0;
+}
+.analytics-range-endpoint legend { padding:0; margin-bottom:6px; color:#bcb4c1; font-size:13px; font-weight:500; }
+.analytics-controls .analytics-range-endpoint select { min-width:0; }
 .analytics-utility { display:flex; align-items:center; gap:8px; }
 .analytics-controls button { height:40px; display:inline-flex; align-items:center; justify-content:center; gap:7px; font-size:14px; }
 .analytics-controls button svg { width:17px; height:17px; }
@@ -154,9 +164,18 @@
 .analytics-people-controls .analytics-count { margin-block:4px; }
 .analytics-people tbody .analytics-person-position { color:#c0b3c8; font-size:14px; font-weight:500; }
 .analytics-people tbody .analytics-people-empty { text-align:left; font-size:14px; font-weight:500; white-space:normal; }
-.analytics-extreme { position:relative; display:inline-block; padding:2px 7px; border-radius:5px; }
-.analytics-extreme.highest { color:#aed0b7; background:#63896b26; }
-.analytics-extreme.lowest { color:#dcb0b5; background:#99606b26; }
+.analytics-extreme { position:relative; display:inline-block; padding:2px 7px; border-radius:5px; background:var(--analytics-extreme-bg); }
+.analytics-extreme.highest { color:#aed0b7; --analytics-extreme-bg:#63896b26; }
+.analytics-extreme.lowest { color:#dcb0b5; --analytics-extreme-bg:#99606b26; }
+.analytics-people tbody .analytics-extreme { isolation:isolate; padding:0; background:none; }
+.analytics-people tbody .analytics-extreme::before {
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:-2px -7px;
+  border-radius:5px;
+  background:var(--analytics-extreme-bg);
+}
 .analytics-extreme-legend { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .analytics-quality { display:grid; grid-template-columns:minmax(170px,1fr) minmax(220px,1fr) minmax(300px,2fr); gap:6px 32px; align-items:center; }
 .analytics-quality .analytics-panel-head { grid-column:1/-1; margin-bottom:8px; }
