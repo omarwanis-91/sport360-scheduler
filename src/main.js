@@ -138,7 +138,7 @@ const ui = {
   notice: "",
   noticeKind: "info",
   rolePreview: null,
-  analytics: { month:todayIso.slice(0,7), period:"month", customDates:null, departmentId:"all", hierarchy:"all",
+  analytics: { month:todayIso.slice(0,7), period:"month", customMonths:null, departmentId:"all", hierarchy:"all",
     key:"", status:"idle", snapshot:null, days:null, model:null, error:"", token:0, sort:{key:"name",direction:"asc"} },
   rolePreviewDraftRole: "lead",
   rolePreviewDraftDepartmentId: "",
@@ -1403,7 +1403,7 @@ function analyticsContext() {
   if(a.departmentId!=="all"&&!departments.some(d=>d.id===a.departmentId))a.departmentId="all";
   const preview=isRolePreviewActive();
   const departmentId=preview?ui.rolePreview.departmentId:a.departmentId==="all"?null:a.departmentId;
-  const range=analyticsRange(a.month,a.period,a.customDates);
+  const range=analyticsRange(a.month,a.period,a.customMonths);
   const lastYear=Number(range.end.slice(0,4));
   const years=Array.from({length:lastYear-range.year+1},(_,index)=>range.year+index);
   const params={departmentId,directOnly:preview};
@@ -1439,24 +1439,28 @@ function renderAnalytics() {
   const a=ui.analytics,context=analyticsContext();
   if(a.key!==context.key)void loadAnalytics(context);
   const {range}=context;
-  a.model=a.status==="ready"?aggregateAnalytics(a.snapshot,a.days,a.month,a.period,a.customDates):null;
+  a.model=a.status==="ready"?aggregateAnalytics(a.snapshot,a.days,a.month,a.period,a.customMonths):null;
   if(a.model) {
     const levels=new Map(state.profiles.map(profile=>[profile.id,profile.seniorityLevel]));
     for(const person of a.model.people) person.seniorityLevel=normalizeHierarchyLevel(levels.get(person.id));
   }
   const entering=a.justLoaded;a.justLoaded=false;
-  const months=Array.from({length:12},(_,index)=>{const id=String(index+1).padStart(2,"0");return `<option value="${id}" ${a.month.slice(5)===id?"selected":""}>${new Date(2026,index,1).toLocaleDateString("en-GB",{month:"long"})}</option>`;}).join("");
-  const years=Array.from({length:101},(_,index)=>2000+index).map(year=>`<option value="${year}" ${range.year===year?"selected":""}>${year}</option>`).join("");
+  const months=(selected)=>Array.from({length:12},(_,index)=>{const id=String(index+1).padStart(2,"0");return `<option value="${id}" ${selected===id?"selected":""}>${new Date(2026,index,1).toLocaleDateString("en-GB",{month:"long"})}</option>`;}).join("");
+  const years=(selected)=>Array.from({length:101},(_,index)=>2000+index).map(year=>`<option value="${year}" ${selected===String(year)?"selected":""}>${year}</option>`).join("");
+  const monthFields=(label,name,month)=>`<fieldset class="analytics-range-endpoint"><legend>${label}</legend>
+    <select name="${name}Month" aria-label="${label} month">${months(month.slice(5))}</select>
+    <select name="${name}Year" aria-label="${label} year">${years(month.slice(0,4))}</select>
+  </fieldset>`;
   const custom=a.period==="custom";
-  const dateControls=custom?`<form id="analytics-custom-range" class="analytics-custom-range">
-    <label>From<input type="date" name="startDate" min="2000-01-01" max="2100-12-31" value="${range.start}" required></label>
-    <label>Through<input type="date" name="endDate" min="${range.start}" max="2100-12-31" value="${range.end}" required></label>
+  const rangeControls=custom?`<form id="analytics-custom-range" class="analytics-custom-range">
+    ${monthFields("From","start",a.customMonths.start)}
+    ${monthFields("Through","end",a.customMonths.end)}
     <button class="ghost" type="submit">Apply range</button>
   </form>`:"";
   const controls=`<div class="analytics-controls"><label>Team<select id="analytics-department">${isRolePreviewActive()?"":'<option value="all">All teams</option>'}${context.departments.map(d=>`<option value="${d.id}" ${a.departmentId===d.id||isRolePreviewActive()?"selected":""}>${escapeHtml(d.name)}</option>`).join("")}</select></label>
-    ${custom?"":`<label>Month<select id="analytics-month">${months}</select></label><label>Year<select id="analytics-year">${years}</select></label>`}
+    ${custom?"":`<label>Month<select id="analytics-month">${months(a.month.slice(5))}</select></label><label>Year<select id="analytics-year">${years(a.month.slice(0,4))}</select></label>`}
     <label>Period<select id="analytics-period">${[["month","Month"],["quarter","Quarter"],["year","Year"],["custom","Custom"]].map(([id,label])=>`<option value="${id}" ${a.period===id?"selected":""}>${label}</option>`).join("")}</select></label>
-    ${dateControls}
+    ${rangeControls}
     <div class="analytics-utility">
       <button class="ghost" id="analytics-refresh" title="Reload saved Analytics data">${icons.rotations} Refresh</button>
       <button class="ghost" id="analytics-export" ${a.model?"":"disabled"}>${icons.upload} CSV</button>
@@ -1473,9 +1477,9 @@ function bindAnalyticsEvents() {
   for(const [selector,field] of [["#analytics-month","monthPart"],["#analytics-year","year"],["#analytics-period","period"],["#analytics-department","departmentId"]]) {
     document.querySelector(selector)?.addEventListener("change",event=>{
       if(!event.target.value||!event.target.checkValidity())return;
-      if(field==="period"&&event.target.value==="custom"&&!a.customDates) {
+      if(field==="period"&&event.target.value==="custom"&&!a.customMonths) {
         const {start,end}=analyticsRange(a.month,a.period);
-        a.customDates={start,end};
+        a.customMonths={start:start.slice(0,7),end:end.slice(0,7)};
       }
       if(field==="monthPart") a.month=`${a.month.slice(0,4)}-${event.target.value}`;
       else if(field==="year") a.month=`${event.target.value}-${a.month.slice(5)}`;
@@ -1484,14 +1488,23 @@ function bindAnalyticsEvents() {
     });
   }
   const rangeForm=document.querySelector("#analytics-custom-range");
-  bindDateRange(rangeForm,"startDate","endDate");
-  rangeForm?.addEventListener("submit",(event)=>{
-    event.preventDefault();
-    if(!event.currentTarget.reportValidity())return;
-    const {startDate,endDate}=event.currentTarget.elements;
-    a.customDates={start:startDate.value,end:endDate.value};
-    updateAndFocus("#analytics-custom-range button");
-  });
+  if(rangeForm) {
+    const {startMonth,startYear,endMonth,endYear}=rangeForm.elements;
+    const updateRangeLimits=()=>{
+      for(const option of endYear.options) option.disabled=option.value<startYear.value;
+      if(endYear.value<startYear.value) endYear.value=startYear.value;
+      const earliestMonth=endYear.value===startYear.value?startMonth.value:"01";
+      for(const option of endMonth.options) option.disabled=option.value<earliestMonth;
+      if(endMonth.value<earliestMonth) endMonth.value=earliestMonth;
+    };
+    updateRangeLimits();
+    rangeForm.addEventListener("change",updateRangeLimits);
+    rangeForm.addEventListener("submit",(event)=>{
+      event.preventDefault();
+      a.customMonths={start:`${startYear.value}-${startMonth.value}`,end:`${endYear.value}-${endMonth.value}`};
+      updateAndFocus("#analytics-custom-range button");
+    });
+  }
   document.querySelector("#analytics-hierarchy")?.addEventListener("change",(event)=>{
     a.hierarchy=event.target.value;
     updateAndFocus("#analytics-hierarchy");

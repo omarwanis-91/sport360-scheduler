@@ -61,6 +61,11 @@ test('hierarchy filters and sorts the people table and limits the CSV rows',asyn
   const rows=people.locator('tbody tr');
   await expect(people.locator('tbody .analytics-extreme.highest').first()).toBeVisible();
   await expect(people.locator('tbody .analytics-extreme.lowest').first()).toBeVisible();
+  const alignment=await people.locator('tbody .analytics-extreme').evaluateAll(highlights=>highlights.map(highlight=>{
+    const cell=highlight.closest('td');
+    return cell.getBoundingClientRect().right-highlight.getBoundingClientRect().right-parseFloat(getComputedStyle(cell).paddingRight);
+  }));
+  expect(alignment.every(offset=>Math.abs(offset)<1)).toBe(true);
   const position=people.locator('[data-analytics-sort="seniorityLevel"]');
   await position.click();
   await expect(rows.first()).toContainText('Manager');
@@ -80,26 +85,34 @@ test('hierarchy filters and sorts the people table and limits the CSV rows',asyn
   expect(csv).toContain('Mona Saleh');
   expect(csv).not.toContain('Omar Wanis');
 });
-test('Custom dates span calendar years, constrain start and end, and survive Refresh',async({page})=>{
+test('Custom month ranges span calendar years, constrain the end month, and survive Refresh',async({page})=>{
   await page.setViewportSize({width:375,height:980});
   await open(page);
   await page.getByRole('combobox',{name:'Period',exact:true}).selectOption('custom');
-  const from=page.getByLabel('From',{exact:true}),through=page.getByLabel('Through',{exact:true});
-  await from.fill('2026-12-31');
-  await expect(through).toHaveValue('2026-12-31');
-  await expect(through).toHaveAttribute('min','2026-12-31');
-  await through.fill('2027-01-03');
+  await expect(page.locator('#analytics-custom-range input')).toHaveCount(0);
+  const from=page.getByRole('combobox',{name:'From month'}),through=page.getByRole('combobox',{name:'Through month'});
+  const endYear=page.getByRole('combobox',{name:'Through year'});
+  await from.selectOption('12');
+  await expect(through).toHaveValue('12');
+  await expect(through.locator('option[value="11"]')).toBeDisabled();
+  await expect(endYear.locator('option[value="2025"]')).toBeDisabled();
+  await endYear.selectOption('2027');
+  await through.selectOption('01');
   await page.getByRole('button',{name:'Apply range'}).click();
-  await expect(page.locator('.analytics-data tbody tr')).toHaveCount(4);
-  await expect(page.locator('.analytics-quality')).toContainText('16 of 20 person-days recorded');
+  const days=page.locator('.analytics-data tbody tr');
+  await expect(days).toHaveCount(62);
+  await expect(days.first()).toContainText('2026-12-01');
+  await expect(days.last()).toContainText('2027-01-31');
+  await expect(page.locator('.analytics-quality')).toContainText('248 of 310 person-days recorded');
   await expect(page.locator('.analytics-kpi').nth(3).locator('strong')).toHaveText('1');
   await expect(page.locator('[data-analytics-month]')).toHaveCount(2);
   await expect(page.locator('[data-analytics-month="2027-01"]')).toContainText('Jan ’27');
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
-  await expect(page.locator('.analytics-data tbody tr')).toHaveCount(4);
-  await expect(from).toHaveValue('2026-12-31');
-  await expect(through).toHaveValue('2027-01-03');
+  await expect(days).toHaveCount(62);
+  await expect(from).toHaveValue('12');
+  await expect(through).toHaveValue('01');
+  await expect(endYear).toHaveValue('2027');
 });
 test('readable reports use full-width people totals, dropdown dates and tight peak highlights',async({page})=>{
   await page.setViewportSize({width:1920,height:1080});await open(page);

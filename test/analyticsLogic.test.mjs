@@ -65,13 +65,14 @@ test('month, quarter and year ranges include leap days and reject invalid input'
   assert.deepEqual(analyticsRange('2026-11','quarter'),{year:2026,start:'2026-10-01',end:'2026-12-31',label:'Q4 · 2026'});
   assert.equal(analyticsRange('2026-11','year').start,'2026-01-01');
   assert.throws(()=>analyticsRange('2026-13'));assert.throws(()=>analyticsRange('1800-01'));
-  const dateRange={start:'2026-12-31',end:'2027-01-02'};
-  assert.equal(analyticsRange('2026-11','custom',dateRange).end,'2027-01-02');
-  assert.equal(analyticsRange('2026-11','custom',{...dateRange,end:dateRange.start}).start,dateRange.start);
-  assert.throws(()=>analyticsRange('2026-11','custom',{...dateRange,end:'2026-12-30'}));
-  assert.throws(()=>analyticsRange('2026-11','custom',{start:'2027-02-29',end:'2027-03-01'}));
+  assert.deepEqual(analyticsRange('2026-11','custom',{start:'2026-12',end:'2027-01'}),{
+    year:2026,start:'2026-12-01',end:'2027-01-31',label:'December 2026 to January 2027'
+  });
+  assert.equal(analyticsRange('2026-11','custom',{start:'2024-02',end:'2024-02'}).end,'2024-02-29');
+  assert.throws(()=>analyticsRange('2026-11','custom',{start:'2026-12',end:'2026-11'}));
+  assert.throws(()=>analyticsRange('2026-11','custom',{start:'2027-02-01',end:'2027-03'}));
 });
-test('custom ranges include both endpoints and aggregate only selected dates across years',()=>{
+test('custom ranges include the full start and end months across years',()=>{
   const s=fixture();
   s.scheduleOverrides=[
     {profileId:'emp-002',date:'2026-12-30',statusId:'vacation'},
@@ -81,11 +82,10 @@ test('custom ranges include both endpoints and aggregate only selected dates acr
   const december=scope(s,{departmentId:'ops'});
   const january=scope(s,{departmentId:'ops',year:2027});
   const days=[...resolveAnalyticsDays(december),...resolveAnalyticsDays(january)];
-  const result=aggregateAnalytics(december,days,'2026-11','custom',{start:'2026-12-31',end:'2027-01-02'});
-  assert.equal(result.known,3);
-  assert.equal(result.totals.working,0);
+  const result=aggregateAnalytics(december,days,'2026-11','custom',{start:'2026-12',end:'2027-01'});
+  assert.equal(result.known,62);
   assert.deepEqual(result.months.map(({month,vacation,sick})=>[month,vacation,sick]),[
-    ['2026-12',1,0],['2027-01',0,1]
+    ['2026-12',2,0],['2027-01',0,1]
   ]);
 });
 test('CSV includes exact filtered totals and neutralizes spreadsheet formulas in names',()=>{
